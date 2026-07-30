@@ -1,0 +1,6 @@
+{
+  "name": "Rüzgar'ın Görev Treni",
+  "description": "5 yaşındaki Rüzgar için günlük rutin alışkanlık takibi, tren dünyası ve ebeveyn onaylı ödül sistemi oyunu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

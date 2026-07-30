@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Quicksand', sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  button:focus-visible {
+    outline: 3px solid #facc15;
+    outline-offset: 3px;
+  }
+}
+
+.font-game {
+  font-family: 'Fredoka', cursive;
+}
+
+.game-icon {
+  filter: drop-shadow(0 2px 2px rgba(15, 23, 42, 0.45));
+}
+
+@keyframes floatCloud {
+  0% { transform: translateX(-100px); }
+  100% { transform: translateX(calc(100vw + 100px)); }
+}
+
+.animate-cloud-slow {
+  animation: floatCloud 40s linear infinite;
+}
+
+.animate-cloud-fast {
+  animation: floatCloud 25s linear infinite;
+}
+
+@keyframes sunRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-sun-spin {
+  animation: sunRotate 20s linear infinite;
+}
+
+/* Custom scrollbar for game UI */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #3B82F6;
+  border-radius: 10px;
+}
