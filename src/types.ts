@@ -63,6 +63,8 @@ export interface UserProfile {
   soundEnabled: boolean;
   speechEnabled: boolean;
   activeTrainIcon: string;
+  /** Ortak aile verisinde başlangıç seviyesinin bir kez uygulanmasını sağlar. */
+  progressVersion?: string;
 }
 
 export interface ParentConfig {

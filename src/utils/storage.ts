@@ -19,16 +19,18 @@ const STORAGE_KEYS = {
 };
 
 const FIRST_DAY_RESET_VERSION = 'ruzgar_first_day_reset_v1';
+export const START_LEVEL_VERSION = 'start-with-6-coins-v1';
 
 export const INITIAL_USER: UserProfile = {
   name: 'Rüzgar',
   title: 'Makinist Başı 🚂',
-  coins: 0,
+  coins: 6,
   totalCompletedTasks: 0,
   currentStreak: 0,
   soundEnabled: true,
   speechEnabled: true,
   activeTrainIcon: '🚂',
+  progressVersion: START_LEVEL_VERSION,
 };
 
 export const INITIAL_PARENT: ParentConfig = {
@@ -291,6 +293,21 @@ export const getStoredUser = (): UserProfile => {
     saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));
     window.localStorage.setItem(FIRST_DAY_RESET_VERSION, 'done');
     return firstDayUser;
+  }
+
+  // Yeni ortak başlangıç seviyesi: görevler açılır, 6 Tren Parası verilir.
+  // Bu işaret profilin içinde taşındığı için ailede sadece bir kez uygulanır.
+  if (stored.progressVersion !== START_LEVEL_VERSION) {
+    const startLevelUser = {
+      ...stored,
+      coins: 6,
+      totalCompletedTasks: 0,
+      currentStreak: 0,
+      progressVersion: START_LEVEL_VERSION,
+    };
+    saveToStorage(STORAGE_KEYS.USER, startLevelUser);
+    saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));
+    return startLevelUser;
   }
 
   return stored;

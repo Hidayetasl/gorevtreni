@@ -30,6 +30,7 @@ import {
   INITIAL_BONUSES,
   INITIAL_VOICE_MESSAGES,
   INITIAL_VIDEOS,
+  START_LEVEL_VERSION,
 } from './utils/storage';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -89,12 +90,31 @@ export default function App() {
         if (cancelled) return;
         unsubscribe = await subscribeToFamily(familyCode, (remote) => {
           remoteUpdateRef.current = true;
-          setUser(remote.user); setParentConfig(remote.parentConfig); setTasks(remote.tasks);
+          const needsStartLevel = remote.user.progressVersion !== START_LEVEL_VERSION;
+          const startLevelUser: UserProfile = needsStartLevel
+            ? {
+                ...remote.user,
+                coins: 6,
+                totalCompletedTasks: 0,
+                currentStreak: 0,
+                progressVersion: START_LEVEL_VERSION,
+              }
+            : remote.user;
+
+          setUser(startLevelUser); setParentConfig(remote.parentConfig);
+          setTasks(needsStartLevel ? INITIAL_TASKS.map((task) => ({ ...task })) : remote.tasks);
           setShop(remote.shop); setWorld(remote.world); setBonuses(remote.bonuses);
           setVoiceMessages(remote.voiceMessages || []); setVideos(remote.videos || []);
           setCloudStatus('Eşitlendi ✓');
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
           syncReadyRef.current = true;
+          if (needsStartLevel) {
+            uploadFamilyData(familyCode, {
+              ...remote,
+              user: startLevelUser,
+              tasks: INITIAL_TASKS.map((task) => ({ ...task })),
+            }).catch(() => setCloudStatus('Çevrimdışı: başlangıç seviyesi bu cihazda bekliyor'));
+          }
         }, (message) => setCloudStatus(`Eşitleme hatası: ${message}`));
       } catch (error) {
         setCloudStatus(error instanceof Error ? `Eşitleme hatası: ${error.message}` : 'Eşitleme hatası oluştu.');
@@ -240,9 +260,10 @@ export default function App() {
   const handleResetData = () => {
     setUser((current) => ({
       ...current,
-      coins: 0,
+      coins: 6,
       totalCompletedTasks: 0,
       currentStreak: 0,
+      progressVersion: START_LEVEL_VERSION,
     }));
     setTasks(INITIAL_TASKS.map((task) => ({ ...task })));
     setIsParentModalOpen(false);

@@ -50,6 +50,13 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const isStationUnlocked = inventory.some((i) => i.id === 'track-station' && i.unlocked);
   const isFerrisUnlocked = inventory.some((i) => i.id === 'scenery-ferris' && i.unlocked);
   const isCowUnlocked = inventory.some((i) => i.id === 'scenery-cow' && i.unlocked);
+  const hasPlacedStation = worldItems.some((item) => item.itemId === 'track-station');
+
+  // Mağazadan "Dünyana Ekle" ile bırakılan her dekor ana manzarada da görünür.
+  // Ray yapıları kendi, raya hizalı katmanlarında çizilir.
+  const placedSceneItems = worldItems.filter((item) => ![
+    'track-straight', 'track-curve', 'track-bridge', 'track-tunnel', 'track-station',
+  ].includes(item.itemId));
 
   // Interactive village elements states
   const [cowMooing, setCowMooing] = useState(false);
@@ -427,6 +434,27 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             ))}
 
+            {/* Mağazadan yerleştirilen dekorlar: sadece harita çiziminde değil, ana dünyada da kalıcı görünür. */}
+            {placedSceneItems.map((item, index) => {
+              const left = 9 + ((item.x * 11.5 + index * 2.5) % 76);
+              const top = 25 + ((item.y * 7 + index * 3) % 34);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleTileClick(item.x, item.y)}
+                  className="absolute z-25 flex flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  style={{ left: `${left}%`, top: `${top}%` }}
+                  title={`${item.name} — dokun ve keşfet`}
+                >
+                  <span className="text-3xl sm:text-5xl leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]">{item.icon}</span>
+                  <span className="max-w-20 truncate rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[8px] font-black text-white shadow-sm sm:text-[10px]">
+                    {item.name}
+                  </span>
+                </button>
+              );
+            })}
+
             {/* 4. STRAIGHT HORIZONTAL RAILWAY TRACK OVERLAY */}
             <div className="absolute bottom-[13%] left-0 w-full h-10 sm:h-14 z-10 pointer-events-none">
               <svg className="w-full h-full" viewBox="0 0 1000 40" preserveAspectRatio="none">
@@ -579,23 +607,23 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             </div>
 
-            {/* Railway Station Building Along the Straight Track Line */}
-            <div
+            {/* Merkezî Tren Garı — mağazadan alındığında ana ray hattında görünür. */}
+            {(isStationUnlocked || hasPlacedStation) && <div
               onClick={() => {
                 playPopSound(soundEnabled);
-                setInteractiveMessage('Sincap Köy Durağı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
+                setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
                 speakText('Tren istasyonundaki yolcular el sallıyor!', speechEnabled);
               }}
               className="absolute bottom-[18.5%] left-[42%] z-20 cursor-pointer hover:scale-105 transition-transform"
-              title="Sincap Köy Durağına tıkla!"
+              title="Sincap Köy Garına tıkla!"
             >
               <div className="flex items-center gap-1.5 bg-amber-950/90 border-2 border-amber-500/80 px-2.5 py-1 rounded-xl shadow-xl">
                 <span className="text-xl sm:text-3xl">🚉</span>
                 <span className="font-game text-[10px] sm:text-xs text-amber-300 font-bold whitespace-nowrap">
-                  Sincap Köy Durağı
+                  Sincap Köy Garı
                 </span>
               </div>
-            </div>
+            </div>}
 
             {/* Floating Smoke Puff Bubbles generated from whistle */}
             {smokePuffs.map((puff) => (
