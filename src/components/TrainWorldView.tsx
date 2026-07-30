@@ -614,11 +614,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
                 speakText('Tren istasyonundaki yolcular el sallıyor!', speechEnabled);
               }}
-              className="absolute bottom-[18.5%] left-[42%] z-20 cursor-pointer hover:scale-105 transition-transform"
+              className="absolute bottom-[24%] left-[6%] z-20 cursor-pointer hover:scale-105 transition-transform"
               title="Sincap Köy Garına tıkla!"
             >
               <div className="flex items-center gap-1.5 bg-amber-950/90 border-2 border-amber-500/80 px-2.5 py-1 rounded-xl shadow-xl">
-                <span className="text-xl sm:text-3xl">🚉</span>
+                <span className="text-2xl sm:text-4xl">🚉</span>
                 <span className="font-game text-[10px] sm:text-xs text-amber-300 font-bold whitespace-nowrap">
                   Sincap Köy Garı
                 </span>
