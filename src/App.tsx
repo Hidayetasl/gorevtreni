@@ -432,6 +432,7 @@ export default function App() {
           messages={voiceMessages}
           onSendMessage={handleSendVoiceMessage}
           onMarkRead={handleMarkReadVoiceMessage}
+          onDeleteMessage={handleDeleteVoiceMessage}
           soundEnabled={user.soundEnabled}
           speechEnabled={user.speechEnabled}
           initialTab={voiceModalInitialTab}

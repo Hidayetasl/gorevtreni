@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { VoiceMessage } from '../types';
 import { playPopSound, playCoinSound, speakText } from '../utils/audio';
-import { X, Mic, Square, Play, Send, Volume2, MessageCircle } from 'lucide-react';
+import { X, Mic, Square, Play, Send, Volume2, MessageCircle, Trash2 } from 'lucide-react';
 
 interface VoiceMessagesModalProps {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface VoiceMessagesModalProps {
   messages: VoiceMessage[];
   onSendMessage: (msg: Omit<VoiceMessage, 'id' | 'createdAt' | 'isNew'>) => void;
   onMarkRead: (id: string) => void;
+  onDeleteMessage: (id: string) => void;
   soundEnabled: boolean;
   speechEnabled: boolean;
   senderRole?: 'child' | 'parent';
@@ -33,6 +34,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   messages,
   onSendMessage,
   onMarkRead,
+  onDeleteMessage,
   soundEnabled,
   speechEnabled,
   senderRole = 'child',
@@ -178,6 +180,12 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     setPlayingId(null);
   };
 
+  const handleDeleteMessage = (id: string) => {
+    if (!window.confirm('Bu sesli mesaj silinsin mi?')) return;
+    if (playingId === id) handleStopMessage();
+    onDeleteMessage(id);
+  };
+
   const newMessagesCount = messages.filter((m) => m.isNew).length;
 
   return (
@@ -294,7 +302,18 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                             </span>
                           </div>
                         </div>
-
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteMessage(msg.id);
+                          }}
+                          className="min-w-11 min-h-11 rounded-xl border border-rose-500/60 bg-rose-950/50 text-rose-200 hover:bg-rose-700 hover:text-white flex items-center justify-center transition-colors"
+                          aria-label={`${msg.senderName} mesajını sil`}
+                          title="Mesajı sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
 
                       {/* Message Content & Waveform */}

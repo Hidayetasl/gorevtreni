@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserProfile, TabType } from '../types';
 import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play } from 'lucide-react';
 import familyPhoto from '../assets/images/rb-family.jpg';
@@ -32,6 +32,20 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenVoiceModal,
   unreadVoiceCount = 0,
 }) => {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const dateLabel = now.toLocaleDateString('tr-TR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeLabel = now.toLocaleTimeString('tr-TR', {
+    hour: '2-digit', minute: '2-digit',
+  });
+
   const tabs = [
     { id: 'tasks' as TabType, label: 'Görev', icon: '⭐', LucideIcon: Star },
     { id: 'world' as TabType, label: 'Dünya', icon: '🚂', LucideIcon: Train },
@@ -62,6 +76,9 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="font-game text-xl sm:text-3xl font-black text-white tracking-tight leading-none drop-shadow-sm">
                 Görev Treni
               </h1>
+              <p className="mt-1 text-[10px] sm:text-xs font-bold text-sky-200 capitalize">
+                📅 {dateLabel} · 🕒 {timeLabel}
+              </p>
             </div>
           </div>
 
