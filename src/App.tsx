@@ -47,8 +47,9 @@ import { createFamilyCode, familyExists, getFamilyCode, getInviteFamilyCode, isC
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
-  // Firebase hazırlıkları dosyalarda kalır; bu sade sürümde etkin değildir.
-  const cloudEnabled = false;
+  // Kullanıcı Google hesabı görmez. Firebase anonim oturumu arka planda
+  // çalışır; gizli aile bağlantısına katılan cihazlar aynı veriyi eşitler.
+  const cloudEnabled = true;
   const [hasGameAccess, setHasGameAccess] = useState(() => localStorage.getItem('ruzgar_game_access_v1') === 'open');
 
   // Persistent States

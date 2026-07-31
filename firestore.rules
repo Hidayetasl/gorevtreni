@@ -1,10 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Firebase hazırlığı etkin değildir; yalnızca doğrulanmış ebeveyn hesabı
-    // ileride ayrı olarak açıldığında erişebilir.
+    // Her cihaz arka planda anonim Firebase oturumu açar. Aile belgesi adı
+    // rastgele davet kodudur; kod bilinmeden veriye erişilemez.
     match /families/{familyCode} {
-      allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
+      allow read, write: if request.auth != null;
     }
   }
 }

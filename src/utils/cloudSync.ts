@@ -5,8 +5,6 @@ import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'
 import type { BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
-// Tek oyun, tek ortak aile odası: davet kodu veya hesap kurulumu gerekmez.
-const SIMPLE_FAMILY_CODE = 'RUZGARORTAK2026';
 // Davet başka cihazda açılacağı için yerel geliştirme adresi (localhost) asla
 // paylaşılmaz. Bu uygulamanın herkesçe erişilen tek giriş noktası budur.
 const PUBLIC_APP_URL = 'https://hidayetasl.github.io/ruzgar-rutin-oyunu/';
@@ -52,10 +50,7 @@ async function getServices() {
 }
 
 export function getFamilyCode() {
-  // Eski denemelerdeki ayrı aile kodları cihazları bölüyordu. Bu sade sürümde
-  // uygulamayı açan bütün aile cihazları aynı ortak odayı kullanır.
-  localStorage.setItem(FAMILY_CODE_KEY, SIMPLE_FAMILY_CODE);
-  return SIMPLE_FAMILY_CODE;
+  return localStorage.getItem(FAMILY_CODE_KEY) || '';
 }
 
 /** WhatsApp ile gönderilebilen davet bağlantısından aile kodunu okur. */
