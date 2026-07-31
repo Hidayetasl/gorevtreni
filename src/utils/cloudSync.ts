@@ -73,16 +73,51 @@ async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
   const { storage } = await getServices();
   return Promise.all(messages.map(async (message) => {
     if (!message.audioUrl?.startsWith('data:audio/')) return message;
-    const storageRef = ref(storage, `families/${code}/voice/${message.id}.webm`);
-    await uploadString(storageRef, message.audioUrl, 'data_url');
-    return { ...message, audioUrl: await getDownloadURL(storageRef) };
+    try {
+      const storageRef = ref(storage, `families/${code}/voice/${message.id}.webm`);
+      await uploadString(storageRef, message.audioUrl, 'data_url');
+      return { ...message, audioUrl: await getDownloadURL(storageRef) };
+    } catch (error) {
+      // A ses dosyası yüklenemese bile metaverisini Firestore'a göndermek çok
+      // önemli: aksi durumda tek bir kayıt tüm aile eşitlemesini durduruyordu.
+      // data: URL'i Firestore belgesine yazılamaz (belge boyutu sınırını aşar).
+      console.warn('Ses dosyası yüklenemedi; sesli not metaverisi eşitleniyor.', error);
+      return { ...message, audioUrl: undefined };
+    }
   }));
+}
+
+/**
+ * Uygulamanın diğer verileri tek aile belgesinde duruyor. İki telefon aynı
+ * anda eşitlerken eski bir kopyanın yeni sesli notları silmesini önlemek için
+ * sesli not listesini kimliğine göre birleştiriyoruz.
+ */
+function mergeVoiceMessages(remote: VoiceMessage[], local: VoiceMessage[]) {
+  const messages = new Map<string, VoiceMessage>();
+  for (const message of remote) messages.set(message.id, message);
+  for (const message of local) {
+    const existing = messages.get(message.id);
+    // Storage'a daha önce çıkmış indirme adresini, yerel data: URL ile geri
+    // ezme. Böylece diğer telefonlar gerçek ses dosyasını dinleyebilir.
+    const remoteAudio = existing?.audioUrl?.startsWith('http') ? existing.audioUrl : undefined;
+    messages.set(message.id, { ...existing, ...message, audioUrl: remoteAudio ?? message.audioUrl ?? existing?.audioUrl });
+  }
+  return [...messages.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function uploadFamilyData(code: string, data: FamilyData) {
   const normalized = saveFamilyCode(code);
   await getServices();
-  const voiceMessages = await moveAudioToStorage(normalized, data.voiceMessages);
+  // Önce buluttaki sesli notları alıp yeni yerel notlarla birleştiriyoruz.
+  // Bu, anne ve babanın aynı anda yolladığı notların kaybolmasını engeller.
+  const existing = await getDoc(familyRef(normalized));
+  const remoteMessages = existing.exists()
+    ? ((existing.data().voiceMessages || []) as VoiceMessage[])
+    : [];
+  const voiceMessages = await moveAudioToStorage(
+    normalized,
+    mergeVoiceMessages(remoteMessages, data.voiceMessages),
+  );
   await setDoc(familyRef(normalized), { ...data, voiceMessages, updatedAt: Date.now(), schemaVersion: 1 }, { merge: false });
 }
 
