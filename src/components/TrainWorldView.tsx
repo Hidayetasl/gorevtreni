@@ -21,6 +21,32 @@ interface TrainWorldViewProps {
 type ViewMode = 'ride' | 'builder';
 type EnvironmentTheme = 'farm' | 'mountains' | 'sunset' | 'night';
 
+type SceneAnchor = { left: string; top: string; size: string };
+
+// Ana dünya bir oyun sahnesi; kareli "Harita Çizimi" görünümü ise ayrı bir
+// düzenleme ekranı. Her eşyanın sahnede doğal ve sabit bir yeri vardır.
+// Aynı türden birden çok eşya alındığında sıradaki alternatif nokta kullanılır.
+const SCENE_ANCHORS: Record<string, SceneAnchor[]> = {
+  'scenery-tree': [
+    { left: '13%', top: '30%', size: 'text-4xl sm:text-6xl' },
+    { left: '70%', top: '29%', size: 'text-4xl sm:text-6xl' },
+    { left: '84%', top: '43%', size: 'text-3xl sm:text-5xl' },
+  ],
+  'scenery-flower': [
+    { left: '76%', top: '62%', size: 'text-3xl sm:text-5xl' },
+    { left: '46%', top: '63%', size: 'text-2xl sm:text-4xl' },
+  ],
+  'scenery-cow': [
+    { left: '67%', top: '48%', size: 'text-4xl sm:text-6xl' },
+  ],
+  'scenery-house': [
+    { left: '34%', top: '42%', size: 'text-4xl sm:text-6xl' },
+  ],
+  'scenery-ferris': [
+    { left: '79%', top: '24%', size: 'text-5xl sm:text-7xl' },
+  ],
+};
+
 export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   worldItems,
   inventory,
@@ -45,18 +71,25 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [interactiveMessage, setInteractiveMessage] = useState<string>('Panda Kaptan Rayların Üzerinde Düz Hatta İlerliyor! 🚂💨');
 
   // Check unlocked structures from inventory
-  const isBridgeUnlocked = inventory.some((i) => i.id === 'track-bridge' && i.unlocked);
-  const isTunnelUnlocked = inventory.some((i) => i.id === 'track-tunnel' && i.unlocked);
-  const isStationUnlocked = inventory.some((i) => i.id === 'track-station' && i.unlocked);
-  const isFerrisUnlocked = inventory.some((i) => i.id === 'scenery-ferris' && i.unlocked);
-  const isCowUnlocked = inventory.some((i) => i.id === 'scenery-cow' && i.unlocked);
+  const hasPlacedBridge = worldItems.some((item) => item.itemId === 'track-bridge');
+  const hasPlacedTunnel = worldItems.some((item) => item.itemId === 'track-tunnel');
   const hasPlacedStation = worldItems.some((item) => item.itemId === 'track-station');
 
   // Mağazadan "Dünyana Ekle" ile bırakılan her dekor ana manzarada da görünür.
   // Ray yapıları kendi, raya hizalı katmanlarında çizilir.
   const placedSceneItems = worldItems.filter((item) => ![
     'track-straight', 'track-curve', 'track-bridge', 'track-tunnel', 'track-station',
-  ].includes(item.itemId));
+  ].includes(item.itemId) && SCENE_ANCHORS[item.itemId]);
+
+  const sceneItems = (() => {
+    const usedAnchors = new Map<string, number>();
+    return placedSceneItems.map((item) => {
+      const anchors = SCENE_ANCHORS[item.itemId];
+      const used = usedAnchors.get(item.itemId) || 0;
+      usedAnchors.set(item.itemId, used + 1);
+      return { item, anchor: anchors[used % anchors.length] };
+    });
+  })();
 
   // Interactive village elements states
   const [cowMooing, setCowMooing] = useState(false);
@@ -435,19 +468,17 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             ))}
 
             {/* Mağazadan yerleştirilen dekorlar: sadece harita çiziminde değil, ana dünyada da kalıcı görünür. */}
-            {placedSceneItems.map((item, index) => {
-              const left = 9 + ((item.x * 11.5 + index * 2.5) % 76);
-              const top = 25 + ((item.y * 7 + index * 3) % 34);
+            {sceneItems.map(({ item, anchor }) => {
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => handleTileClick(item.x, item.y)}
                   className="absolute z-25 flex flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-300"
-                  style={{ left: `${left}%`, top: `${top}%` }}
+                  style={{ left: anchor.left, top: anchor.top }}
                   title={`${item.name} — dokun ve keşfet`}
                 >
-                  <span className="text-3xl sm:text-5xl leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]">{item.icon}</span>
+                  <span className={`${anchor.size} leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]`}>{item.icon}</span>
                   <span className="max-w-20 truncate rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[8px] font-black text-white shadow-sm sm:text-[10px]">
                     {item.name}
                   </span>
@@ -485,7 +516,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </div>
 
             {/* Red Steel Bridge Overlay when unlocked or placed */}
-            {(isBridgeUnlocked || worldItems.some((i) => i.icon.includes('🌉'))) && (
+            {hasPlacedBridge && (
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
@@ -511,7 +542,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             )}
 
             {/* Mountain Tunnel Overlay when unlocked or placed */}
-            {(isTunnelUnlocked || worldItems.some((i) => i.icon.includes('🕳️'))) && (
+            {hasPlacedTunnel && (
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
@@ -608,7 +639,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </div>
 
             {/* Merkezî Tren Garı — mağazadan alındığında ana ray hattında görünür. */}
-            {(isStationUnlocked || hasPlacedStation) && <div
+            {hasPlacedStation && <div
               onClick={() => {
                 playPopSound(soundEnabled);
                 setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
