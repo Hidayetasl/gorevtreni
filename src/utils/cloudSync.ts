@@ -93,7 +93,18 @@ async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
   return Promise.all(messages.map(async (message) => {
     if (!message.audioUrl?.startsWith('data:audio/')) return message;
     try {
-      const storageRef = ref(storage, `families/${code}/voice/${message.id}.webm`);
+      // Keep the recording's original format. Safari normally creates MP4/AAC,
+      // while Chrome/Android normally creates WebM/Opus. Giving an iPhone MP4
+      // bytes a .webm name/content type is a common reason for silent playback.
+      const mimeType = message.audioUrl.match(/^data:(audio\/[^;,]+)/i)?.[1]?.toLowerCase() || 'audio/webm';
+      const extension = mimeType.includes('mp4') || mimeType.includes('aac')
+        ? 'm4a'
+        : mimeType.includes('ogg')
+          ? 'ogg'
+          : mimeType.includes('mpeg')
+            ? 'mp3'
+            : 'webm';
+      const storageRef = ref(storage, `families/${code}/voice/${message.id}.${extension}`);
       await uploadString(storageRef, message.audioUrl, 'data_url');
       return { ...message, audioUrl: await getDownloadURL(storageRef) };
     } catch (error) {

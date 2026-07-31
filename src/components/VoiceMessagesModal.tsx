@@ -46,6 +46,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'record'>('inbox');
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState('');
 
   // Voice Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -75,7 +76,22 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     playPopSound(soundEnabled);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      // Safari, Chrome and Android do not all record the same audio format.  Use
+      // the best format the current phone supports and keep that format all the
+      // way to Firebase; forcing every recording to `audio/webm` made some
+      // iPhone recordings impossible to play back.
+      const preferredTypes = [
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+      ];
+      const supportedType = typeof MediaRecorder.isTypeSupported === 'function'
+        ? preferredTypes.find((type) => MediaRecorder.isTypeSupported(type))
+        : undefined;
+      const mediaRecorder = supportedType
+        ? new MediaRecorder(stream, { mimeType: supportedType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -86,7 +102,9 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const chunkType = audioChunksRef.current.find((chunk) => chunk.type)?.type;
+        const mimeType = chunkType || mediaRecorder.mimeType || supportedType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(audioBlob);
         setAudioBlob(audioBlob);
         setAudioUrl(url);
@@ -163,19 +181,36 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     if (playingId === msg.id) return;
     audioPlayerRef.current?.pause();
     playPopSound(soundEnabled);
+    setPlaybackError('');
     setPlayingId(msg.id);
-    onMarkRead(msg.id);
 
     if (msg.audioUrl) {
-      const audio = new Audio(msg.audioUrl);
+      const audio = new Audio();
+      // iPhone Safari needs a real media element initiated directly from the
+      // button click. `playsInline` also keeps playback within Safari.
+      audio.preload = 'auto';
+      audio.setAttribute('playsinline', '');
+      audio.src = msg.audioUrl;
       audioPlayerRef.current = audio;
-      audio.play();
       audio.onended = () => {
         audioPlayerRef.current = null;
         setPlayingId(null);
       };
+      audio.onerror = () => {
+        audioPlayerRef.current = null;
+        setPlayingId(null);
+        setPlaybackError('Ses açılamadı. Telefonun sesini açıp Oynat’a yeniden dokun.');
+      };
+      void audio.play().then(() => {
+        onMarkRead(msg.id);
+      }).catch(() => {
+        audioPlayerRef.current = null;
+        setPlayingId(null);
+        setPlaybackError('Ses başlayamadı. Telefonun sesini açıp Oynat’a yeniden dokun.');
+      });
     } else {
       // Speak transcript using SpeechSynthesis
+      onMarkRead(msg.id);
       speakText(msg.transcript, speechEnabled);
       setTimeout(() => setPlayingId(null), (msg.durationSeconds || 4) * 1000);
     }
@@ -262,6 +297,11 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
         <div className="p-4 overflow-y-auto space-y-4 flex-1">
           {activeTab === 'inbox' ? (
             <div className="space-y-3">
+              {playbackError && (
+                <div role="alert" className="rounded-xl border border-amber-300 bg-amber-950/60 px-3 py-2 text-center text-xs font-bold text-amber-100">
+                  {playbackError}
+                </div>
+              )}
               {visibleMessages.length === 0 ? (
                 <div className="bg-[#091720] border border-slate-800 rounded-2xl p-6 text-center text-slate-400 space-y-2">
                   <div className="text-4xl">📭</div>
