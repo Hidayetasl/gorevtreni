@@ -166,6 +166,23 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {onManualSync && cloudStatus && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`mb-2 flex items-center gap-1.5 text-[10px] sm:text-xs font-bold rounded-lg px-2.5 py-1.5 w-fit border ${
+              cloudStatus.startsWith('Eşitleme hatası')
+                ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                : cloudStatus.startsWith('Çevrimdışı')
+                  ? 'bg-amber-950/50 border-amber-500/60 text-amber-100'
+                  : 'bg-sky-950/60 border-sky-600/60 text-sky-200'
+            }`}
+          >
+            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>Bulut: {cloudStatus}</span>
+          </div>
+        )}
+
         {/* Top Horizontal Pill Navigation Bar */}
         <nav className="grid grid-cols-4 gap-1.5 sm:gap-3 pt-1">
           {tabs.map((tab) => {
