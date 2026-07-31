@@ -50,10 +50,12 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<number | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      audioPlayerRef.current?.pause();
     };
   }, []);
 
@@ -149,19 +151,31 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   };
 
   const handlePlayMessage = (msg: VoiceMessage) => {
+    if (playingId === msg.id) return;
+    audioPlayerRef.current?.pause();
     playPopSound(soundEnabled);
     setPlayingId(msg.id);
     onMarkRead(msg.id);
 
     if (msg.audioUrl) {
       const audio = new Audio(msg.audioUrl);
+      audioPlayerRef.current = audio;
       audio.play();
-      audio.onended = () => setPlayingId(null);
+      audio.onended = () => {
+        audioPlayerRef.current = null;
+        setPlayingId(null);
+      };
     } else {
       // Speak transcript using SpeechSynthesis
       speakText(msg.transcript, speechEnabled);
       setTimeout(() => setPlayingId(null), (msg.durationSeconds || 4) * 1000);
     }
+  };
+
+  const handleStopMessage = () => {
+    audioPlayerRef.current?.pause();
+    audioPlayerRef.current = null;
+    setPlayingId(null);
   };
 
   const newMessagesCount = messages.filter((m) => m.isNew).length;
@@ -254,7 +268,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                           ? 'border-amber-300 ring-2 ring-amber-400/60 bg-[#193646] animate-pulse'
                           : 'border-slate-700/70'
                       }`}
-                      onClick={() => handlePlayMessage(msg)}
+                      onClick={() => !isPlaying && handlePlayMessage(msg)}
                     >
                       {/* Sender Row */}
                       <div className="flex items-center justify-between gap-2 mb-2">
@@ -284,29 +298,28 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                       </div>
 
                       {/* Message Content & Waveform */}
-                      <div className="bg-[#0a1820] border border-slate-800 rounded-xl p-2">
+                      <div className="bg-[#0a1820] border border-slate-800 rounded-xl p-2 grid grid-cols-2 gap-2">
                         <button
                           onClick={(event) => {
                             event.stopPropagation();
                             handlePlayMessage(msg);
                           }}
-                          className={`w-full min-h-14 flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl font-game text-base font-bold transition-all shadow-sm ${
-                            isPlaying
-                              ? 'bg-amber-500 text-amber-950 border border-amber-300 animate-pulse'
-                              : 'bg-[#2263df] hover:bg-[#1c55c5] text-white border border-blue-400'
-                          }`}
+                          disabled={isPlaying}
+                          className="min-h-14 flex items-center justify-center gap-2 py-2 px-2 rounded-xl font-game text-sm sm:text-base font-bold transition-all shadow-sm bg-[#2263df] hover:bg-[#1c55c5] text-white border border-blue-400 disabled:cursor-default disabled:bg-slate-600 disabled:opacity-70"
                         >
-                          {isPlaying ? (
-                            <>
-                              <Volume2 className="w-4 h-4 animate-bounce" />
-                              <span>Dinleniyor... 🔊</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4 fill-current" />
-                              <span>Mesajı Dinle ▶</span>
-                            </>
-                          )}
+                          <Play className="w-4 h-4 fill-current" />
+                          <span>{isPlaying ? 'Dinleniyor…' : 'Oynat'}</span>
+                        </button>
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleStopMessage();
+                          }}
+                          disabled={!isPlaying}
+                          className="min-h-14 flex items-center justify-center gap-2 py-2 px-2 rounded-xl font-game text-sm sm:text-base font-bold transition-all shadow-sm bg-rose-600 hover:bg-rose-500 text-white border border-rose-300 disabled:cursor-default disabled:bg-slate-700 disabled:text-slate-500 disabled:border-slate-600"
+                        >
+                          <Square className="w-4 h-4 fill-current" />
+                          <span>Durdur</span>
                         </button>
                       </div>
 
