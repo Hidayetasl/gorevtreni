@@ -60,6 +60,7 @@ export default function App() {
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
   const remoteUpdateRef = useRef(false);
   const syncReadyRef = useRef(false);
+  const videosRef = useRef(videos);
 
   // Modal States
   const [isParentModalOpen, setIsParentModalOpen] = useState(false);
@@ -77,6 +78,7 @@ export default function App() {
   useEffect(() => saveStoredBonuses(bonuses), [bonuses]);
   useEffect(() => saveStoredVoiceMessages(voiceMessages), [voiceMessages]);
   useEffect(() => saveStoredVideos(videos), [videos]);
+  useEffect(() => { videosRef.current = videos; }, [videos]);
 
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
 
@@ -105,7 +107,14 @@ export default function App() {
           setUser(startLevelUser); setParentConfig(remote.parentConfig);
           setTasks(needsStartLevel ? INITIAL_TASKS.map((task) => ({ ...task })) : remote.tasks);
           setShop(remote.shop); setWorld(remote.world); setBonuses(remote.bonuses);
-          setVoiceMessages(remote.voiceMessages || []); setVideos(remote.videos || []);
+          setVoiceMessages(remote.voiceMessages || []);
+          const remoteVideos = remote.videos || [];
+          const localVideos = videosRef.current;
+          const combinedVideos = [...remoteVideos];
+          for (const video of localVideos) {
+            if (!combinedVideos.some((remoteVideo) => remoteVideo.id === video.id)) combinedVideos.push(video);
+          }
+          setVideos(combinedVideos);
           setCloudStatus('Eşitlendi ✓');
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
           syncReadyRef.current = true;
@@ -115,6 +124,12 @@ export default function App() {
               user: startLevelUser,
               tasks: INITIAL_TASKS.map((task) => ({ ...task })),
             }).catch(() => setCloudStatus('Çevrimdışı: başlangıç seviyesi bu cihazda bekliyor'));
+          }
+          if (combinedVideos.length > remoteVideos.length) {
+            // Bu cihazda olup henüz buluta gitmemiş videoyu koru. Sadece video
+            // listesi eklenir; buluttan gelen diğer güncel veriler aynen kalır.
+            uploadFamilyData(familyCode, { ...remote, videos: combinedVideos })
+              .catch(() => setCloudStatus('Çevrimdışı: video bu cihazda güvenle bekliyor'));
           }
         }, (message) => setCloudStatus(`Eşitleme hatası: ${message}`));
       } catch (error) {
