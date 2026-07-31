@@ -52,6 +52,7 @@ export interface VoiceMessage {
   durationSeconds: number;
   createdAt: string;
   isNew: boolean;
+  kind?: 'message' | 'journal';
 }
 
 export interface UserProfile {

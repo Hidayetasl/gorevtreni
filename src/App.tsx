@@ -65,6 +65,7 @@ export default function App() {
   const [isParentModalOpen, setIsParentModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [voiceModalInitialTab, setVoiceModalInitialTab] = useState<'inbox' | 'record'>('inbox');
+  const [isJournalMode, setIsJournalMode] = useState(false);
   const [purchasedItemModal, setPurchasedItemModal] = useState<ShopItem | null>(null);
 
   // Sync to LocalStorage
@@ -301,7 +302,19 @@ export default function App() {
 
   const openVoiceModal = (initialTab: 'inbox' | 'record' = 'inbox') => {
     setVoiceModalInitialTab(initialTab);
+    setIsJournalMode(false);
     setIsVoiceModalOpen(true);
+  };
+
+  const openJournal = (initialTab: 'inbox' | 'record' = 'inbox') => {
+    setVoiceModalInitialTab(initialTab);
+    setIsJournalMode(true);
+    setIsVoiceModalOpen(true);
+  };
+
+  const handleJournalSaved = () => {
+    const journalTask = tasks.find((task) => task.id === 'task-8');
+    if (journalTask?.status === 'todo') handleMarkTaskDone('task-8');
   };
 
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
@@ -351,6 +364,7 @@ export default function App() {
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
               onOpenVoiceModal={openVoiceModal}
+              onOpenJournal={openJournal}
               unreadVoiceCount={unreadVoiceCount}
             />
           )}
@@ -436,6 +450,8 @@ export default function App() {
           soundEnabled={user.soundEnabled}
           speechEnabled={user.speechEnabled}
           initialTab={voiceModalInitialTab}
+          journalMode={isJournalMode}
+          onJournalSaved={handleJournalSaved}
         />
 
         {/* Unclaimed Bonus Card Modal */}

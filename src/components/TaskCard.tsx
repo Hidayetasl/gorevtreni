@@ -9,6 +9,7 @@ interface TaskCardProps {
   onMarkDone: (taskId: string) => void;
   soundEnabled: boolean;
   speechEnabled: boolean;
+  onStartJournal?: () => void;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -16,8 +17,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onMarkDone,
   soundEnabled,
   speechEnabled,
+  onStartJournal,
 }) => {
   const [isPressing, setIsPressing] = useState(false);
+  const isJournalTask = task.id === 'task-8';
 
   const handleClickDone = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -100,7 +103,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       <div className="mt-1.5 pt-1 border-t border-gray-100">
         {task.status === 'todo' && (
           <button
-            onClick={handleClickDone}
+            onClick={isJournalTask ? onStartJournal : handleClickDone}
             disabled={isPressing}
             className={`w-full py-1.5 px-3 rounded-xl font-game text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all duration-150 shadow border-b-3 active:translate-y-0.5 active:border-b-0 ${
               isPressing
@@ -108,7 +111,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 : 'bg-gradient-to-b from-emerald-500 to-green-600 border-green-800 hover:brightness-105'
             }`}
           >
-            {isPressing ? 'SÜPER! 🌟' : 'YAPTIM! 👍'}
+            {isJournalTask ? '🎙️ GÜNÜMÜ ANLAT' : isPressing ? 'SÜPER! 🌟' : 'YAPTIM! 👍'}
           </button>
         )}
 

@@ -9,6 +9,7 @@ interface TasksViewProps {
   soundEnabled: boolean;
   speechEnabled: boolean;
   onOpenVoiceModal?: (initialTab?: 'inbox' | 'record') => void;
+  onOpenJournal?: (initialTab?: 'inbox' | 'record') => void;
   unreadVoiceCount?: number;
 }
 
@@ -18,6 +19,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   soundEnabled,
   speechEnabled,
   onOpenVoiceModal,
+  onOpenJournal,
   unreadVoiceCount = 0,
 }) => {
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | 'all' | 'extra'>('all');
@@ -69,6 +71,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               >
                 <span>🎙️ Gönder</span>
               </button>
+              {onOpenJournal && <button onClick={() => onOpenJournal('inbox')} className="bg-gradient-to-r from-violet-600 to-purple-700 border-2 border-violet-300 text-white px-3 py-2 rounded-2xl shadow-lg text-xs font-bold font-game transition-all active:scale-95">📔 Günlüğüm</button>}
             </>
           )}
 
@@ -221,6 +224,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               onMarkDone={onMarkTaskDone}
               soundEnabled={soundEnabled}
               speechEnabled={speechEnabled}
+              onStartJournal={task.id === 'task-8' ? () => onOpenJournal?.('record') : undefined}
             />
           ))}
         </div>

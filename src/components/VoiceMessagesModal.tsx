@@ -14,6 +14,8 @@ interface VoiceMessagesModalProps {
   speechEnabled: boolean;
   senderRole?: 'child' | 'parent';
   initialTab?: 'inbox' | 'record';
+  journalMode?: boolean;
+  onJournalSaved?: () => void;
 }
 
 /**
@@ -39,6 +41,8 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   speechEnabled,
   senderRole = 'child',
   initialTab = 'inbox',
+  journalMode = false,
+  onJournalSaved,
 }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'record'>('inbox');
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -141,7 +145,10 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       transcript: finalTranscript,
       durationSeconds: recordingTime > 0 ? recordingTime : 5,
       audioUrl: persistentAudioUrl,
+      kind: journalMode ? 'journal' : 'message',
     });
+
+    if (journalMode) onJournalSaved?.();
 
     speakText(finalTranscript, speechEnabled);
 
@@ -186,7 +193,8 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     onDeleteMessage(id);
   };
 
-  const newMessagesCount = messages.filter((m) => m.isNew).length;
+  const visibleMessages = messages.filter((message) => journalMode ? message.kind === 'journal' : message.kind !== 'journal');
+  const newMessagesCount = visibleMessages.filter((m) => m.isNew).length;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
@@ -199,7 +207,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
             </div>
             <div>
               <h2 className="font-game text-lg sm:text-xl font-bold flex items-center gap-2 text-white">
-                Sesli Notlar
+                {journalMode ? 'Günlüğüm' : 'Sesli Notlar'}
                 {newMessagesCount > 0 && (
                   <span className="bg-rose-500 text-white text-xs font-black px-2 py-0.5 rounded-full animate-bounce">
                     {newMessagesCount} Yeni
@@ -207,7 +215,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                 )}
               </h2>
               <p className="text-xs text-sky-100 font-bold">
-                Babama ses bırak, gelen mesajı dinle.
+                {journalMode ? 'Bugününü anlat; günlüğün tarih ve saatle saklansın.' : 'Babama ses bırak, gelen mesajı dinle.'}
               </p>
             </div>
           </div>
@@ -231,7 +239,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
             }`}
           >
             <MessageCircle className="w-4 h-4" />
-            <span>📥 Gelenler ({messages.length})</span>
+            <span>{journalMode ? `📔 Günlükler (${visibleMessages.length})` : `📥 Gelenler (${visibleMessages.length})`}</span>
             {newMessagesCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
             )}
@@ -246,7 +254,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
             }`}
           >
             <Mic className="w-4 h-4" />
-            <span>🎙️ Babama Gönder</span>
+            <span>{journalMode ? '🎙️ Günlük Kaydı' : '🎙️ Babama Gönder'}</span>
           </button>
         </div>
 
@@ -254,18 +262,18 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
         <div className="p-4 overflow-y-auto space-y-4 flex-1">
           {activeTab === 'inbox' ? (
             <div className="space-y-3">
-              {messages.length === 0 ? (
+              {visibleMessages.length === 0 ? (
                 <div className="bg-[#091720] border border-slate-800 rounded-2xl p-6 text-center text-slate-400 space-y-2">
                   <div className="text-4xl">📭</div>
                   <p className="font-game text-sm font-bold text-slate-300">
-                    Henüz sesli mesajınız yok!
+                    {journalMode ? 'Henüz günlük kaydın yok!' : 'Henüz sesli mesajınız yok!'}
                   </p>
                   <p className="text-xs">
-                    “Babama Gönder” düğmesine dokunarak ilk sesli notunu bırakabilirsin.
+                    {journalMode ? '🎙️ Günlük Kaydı düğmesine dokunup bugününü anlatabilirsin.' : '“Babama Gönder” düğmesine dokunarak ilk sesli notunu bırakabilirsin.'}
                   </p>
                 </div>
               ) : (
-                messages.map((msg) => {
+                visibleMessages.map((msg) => {
                   const isPlaying = playingId === msg.id;
 
                   return (
@@ -298,7 +306,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                               )}
                             </div>
                             <span className="text-[10px] text-slate-400">
-                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(msg.createdAt).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         </div>
@@ -370,7 +378,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                 <div className="space-y-1">
                   <h3 className="font-game text-sm sm:text-base font-bold text-white flex items-center justify-center gap-2">
                     <Mic className="w-4 h-4 text-rose-400" />
-                    Babama Ses Bırak
+                    {journalMode ? 'Bugününü Anlat' : 'Babama Ses Bırak'}
                   </h3>
                   <p className="text-xs text-slate-400">
                     Önce konuş, sonra kaydı bitir ve gönder.
@@ -418,7 +426,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                     className="w-full min-h-12 px-4 rounded-xl font-game text-sm font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-2 border-emerald-300 hover:brightness-110 shadow-md flex items-center justify-center gap-2 active:scale-95"
                   >
                     <Send className="w-5 h-5" />
-                    <span>Babaya Gönder 🚀</span>
+                    <span>{journalMode ? 'Günlüğü Kaydet 📔' : 'Babaya Gönder 🚀'}</span>
                   </button>
                 )}
               </div>
