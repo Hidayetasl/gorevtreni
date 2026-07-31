@@ -5,6 +5,9 @@ import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'
 import type { BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
+// Davet başka cihazda açılacağı için yerel geliştirme adresi (localhost) asla
+// paylaşılmaz. Bu uygulamanın herkesçe erişilen tek giriş noktası budur.
+const PUBLIC_APP_URL = 'https://hidayetasl.github.io/ruzgar-rutin-oyunu/';
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'] as const;
 
 const firebaseConfig = {
@@ -61,9 +64,7 @@ export function getInviteFamilyCode() {
 export function getFamilyInviteLink(code: string) {
   const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!normalized) return '';
-  const url = new URL(window.location.href);
-  url.search = '';
-  url.hash = '';
+  const url = new URL(PUBLIC_APP_URL);
   url.searchParams.set('aile', normalized);
   return url.toString();
 }
