@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, type User } from 'firebase/auth';
 import { doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
@@ -45,8 +45,30 @@ function createServices() {
 async function getServices() {
   if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
   services ??= createServices();
-  if (!services.auth.currentUser) await signInAnonymously(services.auth);
+  if (!services.auth.currentUser || services.auth.currentUser.isAnonymous) {
+    throw new Error('Oyunu açmak için Google hesabıyla ebeveyn girişi gerekli.');
+  }
   return services;
+}
+
+/** Sadece Google ile oturum açmış ebeveynler oyunu kullanabilir. */
+export function observeGoogleParent(onUser: (user: User | null) => void) {
+  if (!isCloudConfigured) {
+    onUser(null);
+    return () => undefined;
+  }
+  services ??= createServices();
+  return onAuthStateChanged(services.auth, (user) => {
+    onUser(user && !user.isAnonymous && user.providerData.some((provider) => provider.providerId === 'google.com') ? user : null);
+  });
+}
+
+export async function signInParentWithGoogle() {
+  if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
+  services ??= createServices();
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  await signInWithPopup(services.auth, provider);
 }
 
 export function getFamilyCode() {

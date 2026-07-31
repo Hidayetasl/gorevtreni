@@ -1,10 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Aile kodu 12 rastgele karakterdir. Yalnızca oturum açmış uygulama istemcileri
-    // bu kodla erişebilir. Daha ileri erişim kontrolü için Firebase Auth hesabı eklenebilir.
+    // Oyun yalnızca doğrulanmış Google hesabıyla giriş yapan ebeveynlerce açılır.
     match /families/{familyCode} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
   }
 }
