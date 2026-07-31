@@ -105,6 +105,15 @@ function mergeVoiceMessages(remote: VoiceMessage[], local: VoiceMessage[]) {
   return [...messages.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+// Video ekleme işlemi de iki cihazdan gelebilir. Eski bir telefonun boş/önceki
+// listesi, Mac'te yeni eklenen videoyu artık silemez.
+function mergeVideos(remote: StoryVideo[], local: StoryVideo[]) {
+  const videos = new Map<string, StoryVideo>();
+  for (const video of remote) videos.set(video.id, video);
+  for (const video of local) videos.set(video.id, { ...videos.get(video.id), ...video });
+  return [...videos.values()];
+}
+
 export async function uploadFamilyData(code: string, data: FamilyData) {
   const normalized = saveFamilyCode(code);
   await getServices();
@@ -114,11 +123,15 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
   const remoteMessages = existing.exists()
     ? ((existing.data().voiceMessages || []) as VoiceMessage[])
     : [];
+  const remoteVideos = existing.exists()
+    ? ((existing.data().videos || []) as StoryVideo[])
+    : [];
   const voiceMessages = await moveAudioToStorage(
     normalized,
     mergeVoiceMessages(remoteMessages, data.voiceMessages),
   );
-  await setDoc(familyRef(normalized), { ...data, voiceMessages, updatedAt: Date.now(), schemaVersion: 1 }, { merge: false });
+  const videos = mergeVideos(remoteVideos, data.videos);
+  await setDoc(familyRef(normalized), { ...data, voiceMessages, videos, updatedAt: Date.now(), schemaVersion: 1 }, { merge: false });
 }
 
 export async function familyExists(code: string) {
