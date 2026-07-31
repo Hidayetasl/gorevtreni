@@ -259,6 +259,10 @@ export default function App() {
   const handleJoinFamily = async (code: string) => {
     const normalized = saveFamilyCode(code);
     if (!(await familyExists(normalized))) throw new Error('Bu aile koduyla kayıt bulunamadı.');
+    // Yeni aile verisi gelene kadar bu cihazdaki eski verinin yeni aileyi
+    // ezmesini engelle. Önce yalnızca buluttaki aile kaydı okunur.
+    syncReadyRef.current = false;
+    remoteUpdateRef.current = true;
     setFamilyCode(normalized);
     setCloudStatus('Aile verisi yükleniyor…');
   };

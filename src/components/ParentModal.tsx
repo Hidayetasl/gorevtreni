@@ -828,6 +828,15 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                       </button>
                       <p className="text-[11px] leading-relaxed text-sky-800">Bağlantıyı diğer telefonda açmak yeterlidir: görevler, puanlar, dünya, videolar ve sesli notlar otomatik ortak olur. PIN yalnızca ebeveyn ekranını açar.</p>
                       {inviteMessage && <p role="status" className="break-all text-[11px] font-bold text-sky-800">{inviteMessage}</p>}
+
+                      <div className="border-t border-sky-200 pt-3 space-y-2">
+                        <p className="text-xs font-bold text-sky-900">Bu Mac'i başka bir aileye bağla</p>
+                        <p className="text-[10px] leading-relaxed text-sky-800">Telefonunuzdaki aile kodunu yazın. Bu cihazdaki eski eşitleme kodu değişir; telefonun buluttaki kayıtları önce güvenle yüklenir.</p>
+                        <div className="flex gap-2">
+                          <input value={joiningCode} onChange={(e) => setJoiningCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="Telefonun aile kodu" className="min-w-0 flex-1 rounded-xl border border-sky-300 bg-white px-3 py-2 text-xs font-bold" />
+                          <button onClick={handleJoin} disabled={joiningCode.length < 8} className="min-h-11 rounded-xl bg-sky-700 px-3 text-xs font-game font-bold text-white disabled:opacity-50">Bağlan</button>
+                        </div>
+                      </div>
                     </>
                   ) : (
                     <button onClick={async () => setSyncMessage(`Aile kodu hazır: ${await onCreateFamily()}`)} className="w-full min-h-11 rounded-xl bg-sky-600 text-white font-game text-xs font-bold">Aileyi Bu Telefonla Başlat</button>
