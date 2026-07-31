@@ -1,18 +1,75 @@
-import React, { useState } from 'react';
-import { StoryVideo } from '../types';
-import { extractYoutubeId } from '../utils/storage';
-import { Tv, Play, X, Plus, Trash2, Youtube, Sparkles, Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ParentConfig, StoryVideo } from '../types';
+import { hashParentPin } from '../utils/storage';
+import { Tv, Play, X, Youtube, LockKeyhole, Timer } from 'lucide-react';
 
 interface VideosViewProps {
   videos: StoryVideo[];
-  onDeleteVideo?: (id: string) => void;
+  parentConfig: ParentConfig;
 }
 
 export const VideosView: React.FC<VideosViewProps> = ({
   videos,
-  onDeleteVideo,
+  parentConfig,
 }) => {
   const [activeVideo, setActiveVideo] = useState<StoryVideo | null>(null);
+  const [lockedVideo, setLockedVideo] = useState<StoryVideo | null>(null);
+  const [pin, setPin] = useState('');
+  const [minutes, setMinutes] = useState('10');
+  const [pinError, setPinError] = useState('');
+  const [playUntil, setPlayUntil] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    if (!activeVideo || !playUntil) return;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((playUntil - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left === 0) {
+        setActiveVideo(null);
+        setPlayUntil(null);
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeVideo, playUntil]);
+
+  const askToPlay = (video: StoryVideo) => {
+    setLockedVideo(video);
+    setPin('');
+    setPinError('');
+  };
+
+  const startTimedVideo = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!/^\d{4}$/.test(pin)) {
+      setPinError('PIN 4 rakam olmalı.');
+      return;
+    }
+    if (!parentConfig.pinHash || hashParentPin(pin) !== parentConfig.pinHash) {
+      setPinError('PIN yanlış.');
+      return;
+    }
+    const duration = Number(minutes);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 180) {
+      setPinError('Süre 1 ile 180 dakika arasında olmalı.');
+      return;
+    }
+    setActiveVideo(lockedVideo);
+    setPlayUntil(Date.now() + duration * 60_000);
+    setSecondsLeft(duration * 60);
+    setLockedVideo(null);
+    setPin('');
+  };
+
+  const stopAndLock = () => {
+    setActiveVideo(null);
+    setPlayUntil(null);
+    setSecondsLeft(0);
+  };
+
+  const timeLeftLabel = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
   return (
     <div className="space-y-4 pb-28">
@@ -53,7 +110,7 @@ export const VideosView: React.FC<VideosViewProps> = ({
             >
               <div>
                 <div
-                  onClick={() => setActiveVideo(video)}
+                  onClick={() => askToPlay(video)}
                   className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 mb-3 border border-slate-800 cursor-pointer"
                 >
                   <img
@@ -76,19 +133,12 @@ export const VideosView: React.FC<VideosViewProps> = ({
 
                 <div className="flex items-start justify-between gap-2">
                   <h3
-                    onClick={() => setActiveVideo(video)}
+                    onClick={() => askToPlay(video)}
                     className="font-game text-white text-sm sm:text-base font-bold group-hover:text-sky-300 transition-colors cursor-pointer"
                   >
                     {video.title}
                   </h3>
 
-                  <button
-                    onClick={() => onDeleteVideo(video.id)}
-                    className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors flex-shrink-0"
-                    title="Videoyu Sil"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
 
                 <p className="text-xs text-slate-100 font-medium mt-1 line-clamp-2">
@@ -97,18 +147,48 @@ export const VideosView: React.FC<VideosViewProps> = ({
               </div>
 
               <button
-                onClick={() => setActiveVideo(video)}
+                onClick={() => askToPlay(video)}
                 className="mt-3 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white font-game text-xs font-bold border border-rose-400 flex items-center justify-center gap-1.5 shadow-md"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Videoyu İzle</span>
+                <span>🔐 Ebeveynle İzle</span>
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Video Modal Player */}
+      {/* Ebeveyn PIN'i ve süre belirleme */}
+      {lockedVideo && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 animate-fadeIn">
+          <form onSubmit={startTimedVideo} className="bg-[#0f1d27] rounded-3xl max-w-sm w-full overflow-hidden border-2 border-amber-400/70 shadow-2xl text-white">
+            <div className="p-4 bg-gradient-to-r from-amber-500 to-orange-600 flex items-center gap-2">
+              <LockKeyhole className="w-5 h-5" />
+              <h3 className="font-game font-bold">Ebeveynle İzleme Zamanı</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm font-bold text-slate-100">{lockedVideo.title}</p>
+              <label className="block text-xs font-bold text-slate-300">Ebeveyn PIN’i
+                <input autoFocus inputMode="numeric" pattern="[0-9]*" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))} className="mt-1.5 w-full min-h-12 rounded-xl border border-slate-600 bg-slate-950 px-3 text-center text-xl tracking-[0.45em] font-black" placeholder="••••" />
+              </label>
+              <label className="block text-xs font-bold text-slate-300">Kaç dakika izlesin?
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Timer className="w-5 h-5 text-amber-300" />
+                  <input inputMode="numeric" value={minutes} onChange={(event) => setMinutes(event.target.value.replace(/\D/g, '').slice(0, 3))} className="min-h-12 flex-1 rounded-xl border border-slate-600 bg-slate-950 px-3 text-center text-lg font-black" />
+                  <span className="text-sm">dakika</span>
+                </div>
+              </label>
+              {pinError && <p role="alert" className="rounded-xl bg-rose-950/80 border border-rose-400 px-3 py-2 text-xs font-bold text-rose-200">{pinError}</p>}
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setLockedVideo(null)} className="min-h-12 rounded-xl border border-slate-600 font-game text-sm">Vazgeç</button>
+                <button type="submit" className="min-h-12 rounded-xl bg-emerald-600 border border-emerald-300 font-game text-sm font-bold">▶ Başlat</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Süreli Video Oynatıcı */}
       {activeVideo && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
           <div className="bg-[#0f1d27] rounded-3xl max-w-2xl w-full overflow-hidden border-2 border-sky-500/70 shadow-2xl text-white">
@@ -120,7 +200,7 @@ export const VideosView: React.FC<VideosViewProps> = ({
                 </h3>
               </div>
               <button
-                onClick={() => setActiveVideo(null)}
+                onClick={stopAndLock}
                 className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors flex-shrink-0"
               >
                 <X className="w-5 h-5 text-white" />
@@ -136,6 +216,10 @@ export const VideosView: React.FC<VideosViewProps> = ({
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
+              </div>
+              <div className="rounded-2xl border border-amber-400/70 bg-amber-950/50 px-3 py-2 flex items-center justify-between gap-2">
+                <span className="font-game text-xs text-amber-200">⏳ Kalan süre: {timeLeftLabel}</span>
+                <button onClick={stopAndLock} className="min-h-10 rounded-xl bg-rose-600 px-3 text-xs font-game font-bold">■ Durdur ve Kilitle</button>
               </div>
               <div className="bg-[#091720] p-3 rounded-2xl border border-slate-800 flex items-center justify-between gap-2">
                 <p className="text-xs text-slate-300 font-medium">

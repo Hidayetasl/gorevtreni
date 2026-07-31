@@ -383,7 +383,7 @@ export default function App() {
           {activeTab === 'videos' && (
             <VideosView
               videos={videos}
-              onDeleteVideo={handleDeleteVideo}
+              parentConfig={parentConfig}
             />
           )}
         </main>
