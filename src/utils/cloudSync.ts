@@ -50,6 +50,24 @@ export function getFamilyCode() {
   return localStorage.getItem(FAMILY_CODE_KEY) || '';
 }
 
+/** WhatsApp ile gönderilebilen davet bağlantısından aile kodunu okur. */
+export function getInviteFamilyCode() {
+  if (typeof window === 'undefined') return '';
+  const code = new URLSearchParams(window.location.search).get('aile') || '';
+  return code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** Aynı uygulama adresinde, aile kodunu otomatik taşıyan güvenli davet bağlantısı. */
+export function getFamilyInviteLink(code: string) {
+  const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!normalized) return '';
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('aile', normalized);
+  return url.toString();
+}
+
 export function createFamilyCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const bytes = crypto.getRandomValues(new Uint8Array(12));

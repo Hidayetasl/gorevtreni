@@ -201,26 +201,11 @@ export const INITIAL_WORLD: PlacedWorldItem[] = [
 
 export const INITIAL_BONUSES: BonusCard[] = [];
 
-export const INITIAL_VOICE_MESSAGES: VoiceMessage[] = [
-  {
-    id: 'vm-1',
-    sender: 'parent',
-    senderName: 'Anne & Baba ❤️',
-    transcript: 'Aferin oğlum Rüzgar! Rutin görevlerini harika bir şekilde tamamlıyorsun. Seni çok seviyoruz! 💖',
-    durationSeconds: 6,
-    createdAt: new Date().toISOString(),
-    isNew: true,
-  },
-  {
-    id: 'vm-2',
-    sender: 'panda',
-    senderName: 'Panda Kaptan 🐼',
-    transcript: 'Çuf çuf! Rüzgar Kaptan, tren dünyasında yeni vagona hazır mısın? Düdüğü çal ve raylarda ilerle! 🚂💨',
-    durationSeconds: 8,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    isNew: true,
-  },
-];
+// Önceki deneme sürümünde iki örnek mesaj gösteriliyordu. Bunlar gerçek aile
+// mesajı olmadığı için yeni cihazlarda görünmez; eski kayıtlardan da bir kez
+// ayıklanır. Gerçek ses kayıtlarının hiçbirine dokunulmaz.
+export const INITIAL_VOICE_MESSAGES: VoiceMessage[] = [];
+const DEMO_VOICE_MESSAGE_IDS = new Set(['vm-1', 'vm-2']);
 
 // Helper functions for LocalStorage
 export function loadFromStorage<T>(key: string, fallback: T): T {
@@ -383,7 +368,12 @@ export function extractYoutubeId(urlOrId: string): string {
   return trimmed;
 }
 
-export const getStoredVoiceMessages = () => loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_MESSAGES, INITIAL_VOICE_MESSAGES);
+export const getStoredVoiceMessages = () => {
+  const messages = loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_MESSAGES, INITIAL_VOICE_MESSAGES);
+  const cleaned = messages.filter((message) => !DEMO_VOICE_MESSAGE_IDS.has(message.id));
+  if (cleaned.length !== messages.length) saveToStorage(STORAGE_KEYS.VOICE_MESSAGES, cleaned);
+  return cleaned;
+};
 export const saveStoredVoiceMessages = (msgs: VoiceMessage[]) => saveToStorage(STORAGE_KEYS.VOICE_MESSAGES, msgs);
 
 export const getStoredVideos = () => loadFromStorage<StoryVideo[]>(STORAGE_KEYS.VIDEOS, INITIAL_VIDEOS);

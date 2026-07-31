@@ -42,7 +42,7 @@ import { ParentModal } from './components/ParentModal';
 import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
-import { createFamilyCode, familyExists, getFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { createFamilyCode, familyExists, getFamilyCode, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
@@ -62,6 +62,29 @@ export default function App() {
   const syncReadyRef = useRef(false);
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
+
+  // Davet bağlantısı (?aile=...) başka bir telefonda açıldığında aile kodu
+  // otomatik doğrulanır. PIN sadece ebeveyn kilididir; eşitleme anahtarı
+  // değildir. Böylece iki kavram karışmaz.
+  useEffect(() => {
+    const inviteCode = getInviteFamilyCode();
+    if (!isCloudConfigured || !inviteCode || inviteCode === familyCode) return;
+    let cancelled = false;
+    setCloudStatus('Davet bağlantısı doğrulanıyor…');
+    familyExists(inviteCode)
+      .then((exists) => {
+        if (cancelled) return;
+        if (!exists) {
+          setCloudStatus('Davet bağlantısı geçersiz. Ebeveynden yeni bağlantıyı isteyin.');
+          return;
+        }
+        saveFamilyCode(inviteCode);
+        setFamilyCode(inviteCode);
+        setCloudStatus('Aile verisi yükleniyor…');
+      })
+      .catch(() => !cancelled && setCloudStatus('Davet bağlantısı şu an doğrulanamadı. İnternet bağlantısını kontrol edin.'));
+    return () => { cancelled = true; };
+  }, [familyCode]);
 
   // Modal States
   const [isParentModalOpen, setIsParentModalOpen] = useState(false);

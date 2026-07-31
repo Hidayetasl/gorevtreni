@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo } from '../types';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
 import { extractYoutubeId, hashParentPin } from '../utils/storage';
+import { getFamilyInviteLink } from '../utils/cloudSync';
 import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube } from 'lucide-react';
 
 interface ParentModalProps {
@@ -63,6 +64,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
+  const [inviteMessage, setInviteMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'approvals' | 'add_task' | 'bonus' | 'videos' | 'stats' | 'settings'>('approvals');
 
   // Video Form State
@@ -794,9 +796,25 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                     <p className="text-xs font-semibold leading-relaxed text-sky-900">Firebase bağlantısı henüz eklenmedi. Bağlantı tamamlandığında burada aile kodu görünür.</p>
                   ) : familyCode ? (
                     <>
-                      <p className="text-xs font-semibold text-sky-900">Bu kodu diğer telefondaki ebeveyne verin:</p>
+                      <p className="text-xs font-semibold text-sky-900">Diğer telefon için aile kodu:</p>
                       <div className="rounded-xl bg-white border border-sky-300 px-3 py-2 text-center font-mono font-black tracking-[0.18em] text-sky-800">{familyCode}</div>
-                      <p className="text-[11px] leading-relaxed text-sky-800">Diğer telefonda Ebeveyn → Ayarlar’a girip aşağıdaki alana bu kodu yazar. Böylece görevler, puanlar, mağaza, dünya ve sesli notlar ortak olur.</p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const inviteLink = getFamilyInviteLink(familyCode);
+                          try {
+                            await navigator.clipboard.writeText(inviteLink);
+                            setInviteMessage('Davet bağlantısı kopyalandı. WhatsApp ile gönderin.');
+                          } catch {
+                            setInviteMessage(`Davet bağlantısı: ${inviteLink}`);
+                          }
+                        }}
+                        className="w-full min-h-11 rounded-xl bg-sky-700 text-white font-game text-xs font-bold"
+                      >
+                        🔗 Davet Bağlantısını Kopyala
+                      </button>
+                      <p className="text-[11px] leading-relaxed text-sky-800">Bağlantıyı diğer telefonda açmak yeterlidir: görevler, puanlar, dünya, videolar ve sesli notlar otomatik ortak olur. PIN yalnızca ebeveyn ekranını açar.</p>
+                      {inviteMessage && <p role="status" className="break-all text-[11px] font-bold text-sky-800">{inviteMessage}</p>}
                     </>
                   ) : (
                     <button onClick={async () => setSyncMessage(`Aile kodu hazır: ${await onCreateFamily()}`)} className="w-full min-h-11 rounded-xl bg-sky-600 text-white font-game text-xs font-bold">Aileyi Bu Telefonla Başlat</button>

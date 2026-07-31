@@ -5,6 +5,10 @@ import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, M
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/cartoon_train_background_1785400076710.jpg';
+
+// Safari eski bir uygulama kabuğunu kısa süre tutsa bile sabit yol üzerinden
+// yedek manzarayı yükleyebilir. `?v=3` eski görsel önbelleğini geçersiz kılar.
+const stableCartoonBackground = `${import.meta.env.BASE_URL}train-world.jpg?v=3`;
 import pandaLocomotive from '../assets/images/cartoon_panda_locomotive_1785400092467.jpg';
 
 interface TrainWorldViewProps {
@@ -371,6 +375,10 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             <img
               src={cartoonBg}
               alt="Cartoon Train Scene"
+              onError={(event) => {
+                const image = event.currentTarget;
+                if (image.src !== stableCartoonBackground) image.src = stableCartoonBackground;
+              }}
               className={`w-full h-full object-cover transition-all duration-700 ${
                 envTheme === 'sunset'
                   ? 'sepia hue-rotate-15 contrast-110'
