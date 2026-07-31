@@ -832,7 +832,10 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   ) : (
                     <button onClick={async () => setSyncMessage(`Aile kodu hazır: ${await onCreateFamily()}`)} className="w-full min-h-11 rounded-xl bg-sky-600 text-white font-game text-xs font-bold">Aileyi Bu Telefonla Başlat</button>
                   )}
-                  {cloudConfigured && (
+                  {/* Bu cihaz zaten aileye bağlıysa tekrar kod istemeyiz. Aksi
+                      halde davet bağlantısını koda dönüştürmeye çalışmak
+                      gereksiz "kayıt bulunamadı" uyarıları çıkarıyordu. */}
+                  {cloudConfigured && !familyCode && (
                     <div className="pt-1 flex gap-2">
                       <input value={joiningCode} onChange={(e) => setJoiningCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="Diğer telefonun aile kodu" className="min-w-0 flex-1 rounded-xl border border-sky-300 bg-white px-3 py-2 text-xs font-bold" />
                       <button onClick={handleJoin} disabled={joiningCode.length < 8} className="min-h-11 rounded-xl bg-sky-700 px-3 text-xs font-game font-bold text-white disabled:opacity-50">Bağlan</button>
