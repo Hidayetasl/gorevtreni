@@ -42,11 +42,14 @@ import { ParentModal } from './components/ParentModal';
 import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
-import { ParentLoginGate } from './components/ParentLoginGate';
-import { createFamilyCode, familyExists, getFamilyCode, getInviteFamilyCode, isCloudConfigured, observeGoogleParent, saveFamilyCode, signInParentWithGoogle, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { SimpleAccessGate } from './components/SimpleAccessGate';
+import { createFamilyCode, familyExists, getFamilyCode, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
+  // Firebase hazırlıkları dosyalarda kalır; bu sade sürümde etkin değildir.
+  const cloudEnabled = false;
+  const [hasGameAccess, setHasGameAccess] = useState(() => localStorage.getItem('ruzgar_game_access_v1') === 'open');
 
   // Persistent States
   const [user, setUser] = useState<UserProfile>(() => getStoredUser());
@@ -58,25 +61,18 @@ export default function App() {
   const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>(() => getStoredVoiceMessages());
   const [videos, setVideos] = useState<StoryVideo[]>(() => getStoredVideos());
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
-  const [parentSessionReady, setParentSessionReady] = useState(false);
-  const [isParentSignedIn, setIsParentSignedIn] = useState(false);
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
   const remoteUpdateRef = useRef(false);
   const syncReadyRef = useRef(false);
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
 
-  useEffect(() => observeGoogleParent((parent) => {
-    setIsParentSignedIn(Boolean(parent));
-    setParentSessionReady(true);
-  }), []);
-
   // Davet bağlantısı (?aile=...) başka bir telefonda açıldığında aile kodu
   // otomatik doğrulanır. PIN sadece ebeveyn kilididir; eşitleme anahtarı
   // değildir. Böylece iki kavram karışmaz.
   useEffect(() => {
     const inviteCode = getInviteFamilyCode();
-    if (!isCloudConfigured || !isParentSignedIn || !inviteCode || inviteCode === familyCode) return;
+    if (!cloudEnabled || !isCloudConfigured || !inviteCode || inviteCode === familyCode) return;
     let cancelled = false;
     setCloudStatus('Davet bağlantısı doğrulanıyor…');
     familyExists(inviteCode)
@@ -92,7 +88,7 @@ export default function App() {
       })
       .catch(() => !cancelled && setCloudStatus('Davet bağlantısı şu an doğrulanamadı. İnternet bağlantısını kontrol edin.'));
     return () => { cancelled = true; };
-  }, [familyCode, isParentSignedIn]);
+  }, [familyCode, cloudEnabled]);
 
   // Modal States
   const [isParentModalOpen, setIsParentModalOpen] = useState(false);
@@ -116,7 +112,7 @@ export default function App() {
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
 
   useEffect(() => {
-    if (!isCloudConfigured || !familyCode || !isParentSignedIn) return;
+    if (!cloudEnabled || !isCloudConfigured || !familyCode) return;
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
     setCloudStatus('Aile verisine bağlanıyor…');
@@ -179,17 +175,17 @@ export default function App() {
     return () => { cancelled = true; unsubscribe?.(); syncReadyRef.current = false; };
   // family code changes intentionally recreate the subscription.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [familyCode, isParentSignedIn]);
+  }, [familyCode, cloudEnabled]);
 
   useEffect(() => {
-    if (!isCloudConfigured || !familyCode || !isParentSignedIn || !syncReadyRef.current || remoteUpdateRef.current) return;
+    if (!cloudEnabled || !isCloudConfigured || !familyCode || !syncReadyRef.current || remoteUpdateRef.current) return;
     const timer = window.setTimeout(() => {
       uploadFamilyData(familyCode, currentFamilyData())
         .then(() => setCloudStatus('Eşitlendi ✓'))
         .catch(() => setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'));
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, familyCode, isParentSignedIn]);
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, familyCode, cloudEnabled]);
 
   const handleCreateFamily = async () => {
     const code = createFamilyCode();
@@ -377,13 +373,7 @@ export default function App() {
   const unreadVoiceCount = voiceMessages.filter((m) => m.isNew).length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
-  if (!parentSessionReady) {
-    return <main className="min-h-screen bg-[#0e2531] grid place-items-center text-white font-game">Giriş hazırlanıyor…</main>;
-  }
-
-  if (!isParentSignedIn) {
-    return <ParentLoginGate onSignIn={signInParentWithGoogle} />;
-  }
+  if (!hasGameAccess) return <SimpleAccessGate onUnlock={() => setHasGameAccess(true)} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0e2531] via-[#112f3e] to-[#2f7533] text-slate-100 relative selection:bg-sky-200">
@@ -495,7 +485,7 @@ export default function App() {
           videos={videos}
           onAddVideo={handleAddVideo}
           onDeleteVideo={handleDeleteVideo}
-          cloudConfigured={isCloudConfigured}
+          cloudConfigured={cloudEnabled && isCloudConfigured}
           cloudStatus={cloudStatus}
           familyCode={familyCode}
           onCreateFamily={handleCreateFamily}

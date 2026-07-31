@@ -35,7 +35,8 @@ export const INITIAL_USER: UserProfile = {
 
 export const INITIAL_PARENT: ParentConfig = {
   parentName: 'Baba / Anne',
-  pinHash: '',
+  // Her yeni cihazda da oyun giriş koduyla aynı ebeveyn PIN'i kullanılır.
+  pinHash: hashParentPin('1234'),
 };
 
 export const INITIAL_TASKS: RoutineTask[] = [

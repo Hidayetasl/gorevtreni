@@ -1,10 +1,12 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, type User } from 'firebase/auth';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import { doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
+// Tek oyun, tek ortak aile odası: davet kodu veya hesap kurulumu gerekmez.
+const SIMPLE_FAMILY_CODE = 'RUZGARORTAK2026';
 // Davet başka cihazda açılacağı için yerel geliştirme adresi (localhost) asla
 // paylaşılmaz. Bu uygulamanın herkesçe erişilen tek giriş noktası budur.
 const PUBLIC_APP_URL = 'https://hidayetasl.github.io/ruzgar-rutin-oyunu/';
@@ -45,34 +47,15 @@ function createServices() {
 async function getServices() {
   if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
   services ??= createServices();
-  if (!services.auth.currentUser || services.auth.currentUser.isAnonymous) {
-    throw new Error('Oyunu açmak için Google hesabıyla ebeveyn girişi gerekli.');
-  }
+  if (!services.auth.currentUser) await signInAnonymously(services.auth);
   return services;
 }
 
-/** Sadece Google ile oturum açmış ebeveynler oyunu kullanabilir. */
-export function observeGoogleParent(onUser: (user: User | null) => void) {
-  if (!isCloudConfigured) {
-    onUser(null);
-    return () => undefined;
-  }
-  services ??= createServices();
-  return onAuthStateChanged(services.auth, (user) => {
-    onUser(user && !user.isAnonymous && user.providerData.some((provider) => provider.providerId === 'google.com') ? user : null);
-  });
-}
-
-export async function signInParentWithGoogle() {
-  if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
-  services ??= createServices();
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  await signInWithPopup(services.auth, provider);
-}
-
 export function getFamilyCode() {
-  return localStorage.getItem(FAMILY_CODE_KEY) || '';
+  // Eski denemelerdeki ayrı aile kodları cihazları bölüyordu. Bu sade sürümde
+  // uygulamayı açan bütün aile cihazları aynı ortak odayı kullanır.
+  localStorage.setItem(FAMILY_CODE_KEY, SIMPLE_FAMILY_CODE);
+  return SIMPLE_FAMILY_CODE;
 }
 
 /** WhatsApp ile gönderilebilen davet bağlantısından aile kodunu okur. */

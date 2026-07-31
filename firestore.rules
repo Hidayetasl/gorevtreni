@@ -1,7 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Oyun yalnızca doğrulanmış Google hesabıyla giriş yapan ebeveynlerce açılır.
+    // Firebase hazırlığı etkin değildir; yalnızca doğrulanmış ebeveyn hesabı
+    // ileride ayrı olarak açıldığında erişebilir.
     match /families/{familyCode} {
       allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
