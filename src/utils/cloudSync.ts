@@ -99,6 +99,8 @@ async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
       const mimeType = message.audioUrl.match(/^data:(audio\/[^;,]+)/i)?.[1]?.toLowerCase() || 'audio/webm';
       const extension = mimeType.includes('mp4') || mimeType.includes('aac')
         ? 'm4a'
+        : mimeType.includes('wav')
+          ? 'wav'
         : mimeType.includes('ogg')
           ? 'ogg'
           : mimeType.includes('mpeg')

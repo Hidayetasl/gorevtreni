@@ -30,6 +30,43 @@ const audioBlobToDataUrl = (blob: Blob) =>
     reader.readAsDataURL(blob);
   });
 
+/**
+ * WAV is deliberately used for outgoing messages. Unlike WebM/Opus, it plays
+ * natively in both iPhone Safari and Chrome/Android, so a note sent from a
+ * computer cannot become silent on an iPhone.
+ */
+const encodeWav = (chunks: Float32Array[], sampleRate: number) => {
+  const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const buffer = new ArrayBuffer(44 + length * 2);
+  const view = new DataView(buffer);
+  const write = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index));
+  };
+  write(0, 'RIFF');
+  view.setUint32(4, 36 + length * 2, true);
+  write(8, 'WAVE');
+  write(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  write(36, 'data');
+  view.setUint32(40, length * 2, true);
+
+  let offset = 44;
+  for (const chunk of chunks) {
+    for (let index = 0; index < chunk.length; index += 1) {
+      const sample = Math.max(-1, Math.min(1, chunk[index]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+};
+
 export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   isOpen,
   onClose,
@@ -56,6 +93,12 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const silenceNodeRef = useRef<GainNode | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const pcmChunksRef = useRef<Float32Array[]>([]);
   const timerIntervalRef = useRef<number | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
@@ -63,6 +106,8 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       audioPlayerRef.current?.pause();
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      void audioContextRef.current?.close();
     };
   }, []);
 
@@ -76,6 +121,36 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     playPopSound(soundEnabled);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+
+      // Record standard PCM/WAV whenever Web Audio is available. This is the
+      // most reliable shared format for Safari, Chrome and Android.
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const context = new AudioContextClass();
+        await context.resume();
+        const source = context.createMediaStreamSource(stream);
+        const processor = context.createScriptProcessor(4096, 1, 1);
+        const silentGain = context.createGain();
+        silentGain.gain.value = 0;
+        pcmChunksRef.current = [];
+        processor.onaudioprocess = (event) => {
+          pcmChunksRef.current.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+        };
+        source.connect(processor);
+        processor.connect(silentGain);
+        silentGain.connect(context.destination);
+        audioContextRef.current = context;
+        sourceNodeRef.current = source;
+        processorNodeRef.current = processor;
+        silenceNodeRef.current = silentGain;
+        setIsRecording(true);
+        setRecordingTime(0);
+        timerIntervalRef.current = window.setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
+        return;
+      }
+
+      // Very old browsers without Web Audio retain the existing recorder path.
       // Safari, Chrome and Android do not all record the same audio format.  Use
       // the best format the current phone supports and keep that format all the
       // way to Firebase; forcing every recording to `audio/webm` made some
@@ -132,6 +207,24 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     playPopSound(soundEnabled);
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setIsRecording(false);
+
+    if (audioContextRef.current) {
+      sourceNodeRef.current?.disconnect();
+      processorNodeRef.current?.disconnect();
+      silenceNodeRef.current?.disconnect();
+      const recording = encodeWav(pcmChunksRef.current, audioContextRef.current.sampleRate);
+      const url = URL.createObjectURL(recording);
+      setAudioBlob(recording);
+      setAudioUrl(url);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      void audioContextRef.current.close();
+      audioContextRef.current = null;
+      sourceNodeRef.current = null;
+      processorNodeRef.current = null;
+      silenceNodeRef.current = null;
+      return;
+    }
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
