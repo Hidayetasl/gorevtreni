@@ -227,12 +227,25 @@ export const ParentModal: React.FC<ParentModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors"
-          >
-            <X className="w-5 h-5 text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className="min-h-9 rounded-xl bg-white/20 hover:bg-white/40 px-2.5 flex items-center gap-1.5 text-xs font-game font-bold transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Ayarlar</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors"
+              aria-label="Ebeveyn panelini kapat"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
 
         {/* PIN Security Gate if not authenticated */}
