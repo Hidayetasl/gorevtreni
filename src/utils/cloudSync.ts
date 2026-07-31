@@ -171,11 +171,27 @@ export async function familyExists(code: string) {
   return (await getDoc(familyRef(code))).exists();
 }
 
-export async function subscribeToFamily(code: string, onData: (data: FamilyData) => void, onError: (message: string) => void) {
+export async function getFamilyData(code: string) {
+  const normalized = saveFamilyCode(code);
+  await getServices();
+  const snapshot = await getDoc(familyRef(normalized));
+  return snapshot.exists() ? (snapshot.data() as FamilyData) : null;
+}
+
+export async function subscribeToFamily(
+  code: string,
+  onData: (data: FamilyData, metadata: { fromCache: boolean; hasPendingWrites: boolean }) => void,
+  onError: (message: string) => void,
+) {
   await getServices();
   return onSnapshot(familyRef(code), { includeMetadataChanges: true }, (snapshot) => {
     if (!snapshot.exists()) return;
     const data = snapshot.data() as FamilyData;
-    if (data.user && data.tasks && data.shop) onData(data);
+    if (data.user && data.tasks && data.shop) {
+      onData(data, {
+        fromCache: snapshot.metadata.fromCache,
+        hasPendingWrites: snapshot.metadata.hasPendingWrites,
+      });
+    }
   }, (error) => onError(error.message));
 }

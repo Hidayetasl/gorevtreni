@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile, TabType } from '../types';
-import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play } from 'lucide-react';
+import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play, RefreshCw } from 'lucide-react';
 import familyPhoto from '../assets/images/rb-family.jpg';
 
 interface HeaderProps {
@@ -16,6 +16,9 @@ interface HeaderProps {
   pendingCount?: number;
   onOpenVoiceModal?: () => void;
   unreadVoiceCount?: number;
+  cloudStatus?: string;
+  onManualSync?: () => void;
+  isSyncing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,6 +34,9 @@ export const Header: React.FC<HeaderProps> = ({
   pendingCount = 0,
   onOpenVoiceModal,
   unreadVoiceCount = 0,
+  cloudStatus,
+  onManualSync,
+  isSyncing = false,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -108,6 +114,18 @@ export const Header: React.FC<HeaderProps> = ({
                     {unreadVoiceCount}
                   </span>
                 )}
+              </button>
+            )}
+
+            {onManualSync && (
+              <button
+                onClick={onManualSync}
+                disabled={isSyncing}
+                className="bg-[#183644] hover:bg-[#204558] disabled:opacity-60 border border-slate-600 text-sky-200 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm"
+                title={cloudStatus || 'Şimdi bulutla eşitle'}
+                aria-label="Şimdi bulutla eşitle"
+              >
+                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isSyncing ? 'animate-spin' : ''}`} />
               </button>
             )}
 

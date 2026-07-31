@@ -43,7 +43,7 @@ import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { SimpleAccessGate } from './components/SimpleAccessGate';
-import { createFamilyCode, familyExists, getFamilyCode, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { createFamilyCode, familyExists, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
@@ -63,8 +63,12 @@ export default function App() {
   const [videos, setVideos] = useState<StoryVideo[]>(() => getStoredVideos());
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [networkEpoch, setNetworkEpoch] = useState(0);
   const remoteUpdateRef = useRef(false);
   const syncReadyRef = useRef(false);
+  const pendingSyncRef = useRef(false);
+  const latestFamilyDataRef = useRef<import('./utils/cloudSync').FamilyData | null>(null);
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
 
@@ -113,6 +117,10 @@ export default function App() {
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
 
   useEffect(() => {
+    latestFamilyDataRef.current = currentFamilyData();
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos]);
+
+  useEffect(() => {
     if (!cloudEnabled || !isCloudConfigured || !familyCode) return;
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
@@ -121,21 +129,19 @@ export default function App() {
       try {
         if (!(await familyExists(familyCode))) await uploadFamilyData(familyCode, currentFamilyData());
         if (cancelled) return;
-        unsubscribe = await subscribeToFamily(familyCode, (remote) => {
+        unsubscribe = await subscribeToFamily(familyCode, (remote, metadata) => {
+          if (metadata.fromCache) {
+            setCloudStatus(navigator.onLine ? 'Bulut doğrulanıyor…' : 'Çevrimdışı: kayıtlı oyun açık');
+            return;
+          }
           remoteUpdateRef.current = true;
-          const needsStartLevel = remote.user.progressVersion !== START_LEVEL_VERSION;
-          const startLevelUser: UserProfile = needsStartLevel
-            ? {
-                ...remote.user,
-                coins: 6,
-                totalCompletedTasks: 0,
-                currentStreak: 0,
-                progressVersion: START_LEVEL_VERSION,
-              }
-            : remote.user;
+          const syncedUser: UserProfile = {
+            ...INITIAL_USER,
+            ...remote.user,
+          };
 
-          setUser(startLevelUser); setParentConfig(remote.parentConfig);
-          setTasks(needsStartLevel ? INITIAL_TASKS.map((task) => ({ ...task })) : remote.tasks);
+          setUser(syncedUser); setParentConfig(remote.parentConfig);
+          setTasks(remote.tasks);
           setShop(remote.shop); setWorld(remote.world); setBonuses(remote.bonuses);
           const remoteMessages = remote.voiceMessages || [];
           const localMessages = voiceMessagesRef.current;
@@ -152,15 +158,9 @@ export default function App() {
           }
           setVideos(combinedVideos);
           setCloudStatus('Eşitlendi ✓');
+          pendingSyncRef.current = false;
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
           syncReadyRef.current = true;
-          if (needsStartLevel) {
-            uploadFamilyData(familyCode, {
-              ...remote,
-              user: startLevelUser,
-              tasks: INITIAL_TASKS.map((task) => ({ ...task })),
-            }).catch(() => setCloudStatus('Çevrimdışı: başlangıç seviyesi bu cihazda bekliyor'));
-          }
           if (combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length) {
             // Bu cihazda olup henüz buluta gitmemiş videoyu koru. Sadece video
             // veya sesli not listesi eklenir; buluttan gelen diğer güncel veriler
@@ -176,17 +176,73 @@ export default function App() {
     return () => { cancelled = true; unsubscribe?.(); syncReadyRef.current = false; };
   // family code changes intentionally recreate the subscription.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [familyCode, cloudEnabled]);
+  }, [familyCode, cloudEnabled, networkEpoch]);
 
   useEffect(() => {
     if (!cloudEnabled || !isCloudConfigured || !familyCode || !syncReadyRef.current || remoteUpdateRef.current) return;
+    if (!navigator.onLine) {
+      pendingSyncRef.current = true;
+      setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor');
+      return;
+    }
     const timer = window.setTimeout(() => {
       uploadFamilyData(familyCode, currentFamilyData())
-        .then(() => setCloudStatus('Eşitlendi ✓'))
-        .catch(() => setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'));
+        .then(() => { pendingSyncRef.current = false; setCloudStatus('Eşitlendi ✓'); })
+        .catch(() => { pendingSyncRef.current = true; setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'); });
     }, 900);
     return () => window.clearTimeout(timer);
   }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, familyCode, cloudEnabled]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setCloudStatus('İnternet geldi, bulutla eşitleniyor…');
+      setNetworkEpoch((value) => value + 1);
+    };
+    const handleOffline = () => setCloudStatus('Çevrimdışı: kayıtlı oyun açık');
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleManualSync = async () => {
+    if (!familyCode) {
+      setCloudStatus('Önce Ebeveyn > Ayarlar bölümünden aile eşitlemesini başlatın.');
+      return;
+    }
+    if (!navigator.onLine) {
+      pendingSyncRef.current = true;
+      setCloudStatus('Çevrimdışısınız. İnternet gelince otomatik eşitlenecek.');
+      return;
+    }
+    setIsManualSyncing(true);
+    setCloudStatus('Şimdi eşitleniyor…');
+    try {
+      if (pendingSyncRef.current && latestFamilyDataRef.current) {
+        await uploadFamilyData(familyCode, latestFamilyDataRef.current);
+        pendingSyncRef.current = false;
+      }
+      const remote = await getFamilyData(familyCode);
+      if (!remote) throw new Error('Bu aile kaydı bulunamadı.');
+      remoteUpdateRef.current = true;
+      setUser({
+        ...INITIAL_USER,
+        ...remote.user,
+      });
+      setParentConfig(remote.parentConfig); setTasks(remote.tasks); setShop(remote.shop);
+      setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(remote.voiceMessages || []); setVideos(remote.videos || []);
+      window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
+      syncReadyRef.current = true;
+      setCloudStatus('Eşitlendi ✓');
+    } catch (error) {
+      pendingSyncRef.current = true;
+      setCloudStatus(error instanceof Error ? `Eşitleme hatası: ${error.message}` : 'Eşitleme tamamlanamadı.');
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
 
   const handleCreateFamily = async () => {
     const code = createFamilyCode();
@@ -407,6 +463,9 @@ export default function App() {
           pendingCount={pendingCount}
           onOpenVoiceModal={() => openVoiceModal('inbox')}
           unreadVoiceCount={unreadVoiceCount}
+          cloudStatus={cloudStatus}
+          onManualSync={handleManualSync}
+          isSyncing={isManualSyncing}
         />
 
         {/* Main Content Body */}
