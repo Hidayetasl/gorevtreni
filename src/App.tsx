@@ -471,11 +471,23 @@ export default function App() {
       id: `v-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    setVideos((prev) => [video, ...prev]);
+    pendingSyncRef.current = true;
+    setVideos((prev) => {
+      const nextVideos = sortVideosNewestFirst([video, ...prev]);
+      latestFamilyDataRef.current = { ...currentFamilyData(), videos: nextVideos };
+      return nextVideos;
+    });
+    setCloudStatus('Video eklendi, bulut eşitlemesi bekliyor…');
   };
 
   const handleDeleteVideo = (id: string) => {
-    setVideos((prev) => prev.filter((v) => v.id !== id));
+    pendingSyncRef.current = true;
+    setVideos((prev) => {
+      const nextVideos = prev.filter((v) => v.id !== id);
+      latestFamilyDataRef.current = { ...currentFamilyData(), videos: nextVideos };
+      return nextVideos;
+    });
+    setCloudStatus('Video listesi güncellendi, bulut eşitlemesi bekliyor…');
   };
 
   const handleSendVoiceMessage = (msgData: Omit<VoiceMessage, 'id' | 'createdAt' | 'isNew'>) => {
