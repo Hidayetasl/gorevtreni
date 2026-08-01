@@ -46,6 +46,30 @@ const SCENE_ANCHORS: Record<string, SceneAnchor[]> = {
   'scenery-house': [
     { left: '34%', top: '42%', size: 'text-4xl sm:text-6xl' },
   ],
+  'scenery-traffic-light': [
+    { left: '40%', top: '62%', size: 'text-2xl sm:text-4xl' },
+    { left: '57%', top: '58%', size: 'text-2xl sm:text-4xl' },
+  ],
+  'scenery-park': [
+    { left: '72%', top: '58%', size: 'text-3xl sm:text-5xl' },
+    { left: '47%', top: '55%', size: 'text-3xl sm:text-5xl' },
+  ],
+  'scenery-windmill': [
+    { left: '80%', top: '26%', size: 'text-3xl sm:text-5xl' },
+    { left: '63%', top: '24%', size: 'text-2xl sm:text-4xl' },
+  ],
+  'scenery-market': [
+    { left: '25%', top: '45%', size: 'text-4xl sm:text-6xl' },
+  ],
+  'scenery-school': [
+    { left: '48%', top: '40%', size: 'text-4xl sm:text-6xl' },
+  ],
+  'scenery-hospital': [
+    { left: '56%', top: '36%', size: 'text-4xl sm:text-6xl' },
+  ],
+  'scenery-train-repair': [
+    { left: '56%', top: '68%', size: 'text-3xl sm:text-5xl' },
+  ],
   'scenery-ferris': [
     { left: '79%', top: '24%', size: 'text-5xl sm:text-7xl' },
   ],

@@ -165,6 +165,13 @@ export const INITIAL_SHOP: ShopItem[] = [
   { id: 'scenery-flower', name: 'Neşeli Ayçiçeği', category: 'scenery', price: 1, icon: '🌻', description: 'Güneşe bakan renkli büyük çiçek', unlocked: true, type: 'decoration' },
   { id: 'scenery-cow', name: 'Çiftlik İneği', category: 'scenery', price: 2, icon: '🐄', description: 'Möö diyen sevimli çiftlik arkadaşı', unlocked: false, type: 'decoration' },
   { id: 'scenery-house', name: 'Kırmızı Çatı Evi', category: 'scenery', price: 3, icon: '🏠', description: 'İstasyon kasabasının tatlı evi', unlocked: true, type: 'decoration' },
+  { id: 'scenery-traffic-light', name: 'Trafik Işığı', category: 'scenery', price: 2, icon: '🚦', description: 'Kasaba yollarına düzen getiren renkli trafik ışığı', unlocked: false, type: 'decoration' },
+  { id: 'scenery-park', name: 'Kasaba Parkı', category: 'scenery', price: 3, icon: '🛝', description: 'Çocukların oynadığı küçük yeşil park alanı', unlocked: false, type: 'decoration' },
+  { id: 'scenery-windmill', name: 'Rüzgar Gülü', category: 'scenery', price: 3, icon: '🌬️', description: 'Tepede dönen neşeli rüzgar gülü', unlocked: false, type: 'decoration' },
+  { id: 'scenery-market', name: 'Kasaba Marketi', category: 'scenery', price: 4, icon: '🏪', description: 'Sincap Köyü için küçük mahalle marketi', unlocked: false, type: 'decoration' },
+  { id: 'scenery-school', name: 'Okul', category: 'scenery', price: 4, icon: '🏫', description: 'Öğrenme ve oyun dolu sevimli kasaba okulu', unlocked: false, type: 'decoration' },
+  { id: 'scenery-hospital', name: 'Hastane', category: 'scenery', price: 5, icon: '🏥', description: 'Kasabadaki herkese yardım eden sağlık binası', unlocked: false, type: 'decoration' },
+  { id: 'scenery-train-repair', name: 'Tren Tamirhanesi', category: 'scenery', price: 5, icon: '🛠️', description: 'Lokomotiflerin bakım gördüğü tamir atölyesi', unlocked: false, type: 'decoration' },
   { id: 'scenery-ferris', name: 'Lunapark Dönme Dolabı', category: 'scenery', price: 6, icon: '🎡', description: 'Işıl ışıl dönen dev dönme dolap', unlocked: false, type: 'decoration' },
 
   // Real World Rewards (Scaled to 1-Day, 2-Day, and 3-Day efforts)
