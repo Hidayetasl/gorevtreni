@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { RoutineTask } from '../types';
 import { playPopSound, speakText } from '../utils/audio';
 import confetti from 'canvas-confetti';
-import { Clock, Star } from 'lucide-react';
+import { CheckCircle2, Clock, Star } from 'lucide-react';
 
 interface TaskCardProps {
   task: RoutineTask;
@@ -21,9 +21,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 }) => {
   const [isPressing, setIsPressing] = useState(false);
   const isJournalTask = task.id === 'task-8';
+  const isActiveTask = task.status === 'todo';
 
   const handleClickDone = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (task.status !== 'todo' || isPressing) return;
     setIsPressing(true);
     playPopSound(soundEnabled);
 
@@ -45,6 +47,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
+      onClick={isActiveTask ? handleClickDone : undefined}
+      role={isActiveTask ? 'button' : undefined}
+      tabIndex={isActiveTask ? 0 : undefined}
+      onKeyDown={(event) => {
+        if (!isActiveTask) return;
+        if (event.key === 'Enter' || event.key === ' ') handleClickDone(event as unknown as React.MouseEvent);
+      }}
       className={`relative rounded-2xl sm:rounded-3xl p-2.5 sm:p-3 transition-all duration-200 flex flex-col justify-between border-2 sm:border-3 shadow-sm hover:shadow-md ${
         task.isExtra
           ? 'ring-2 ring-purple-400/80 bg-gradient-to-b from-purple-50/60 to-white border-purple-300'
@@ -53,7 +62,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           : task.status === 'pending_approval'
           ? 'bg-amber-50/90 border-amber-300 animate-pulse'
           : 'bg-white border-sky-200 hover:border-sky-300'
-      }`}
+      } ${isActiveTask ? 'cursor-pointer ring-2 ring-emerald-300/70' : ''}`}
 	    >
 	      {task.status === 'todo' && (
 	        <div className="absolute left-2 top-2 z-10 rounded-full border border-emerald-200 bg-emerald-500 px-2 py-0.5 font-game text-[9px] font-black uppercase tracking-wide text-white shadow-md">
@@ -107,19 +116,34 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
       {/* Bottom Action / Status Area */}
       <div className="mt-1.5 pt-1 border-t border-gray-100">
-	        {task.status === 'todo' && (
-	          <button
-	            onClick={isJournalTask ? onStartJournal : handleClickDone}
-	            disabled={isPressing}
-	            className={`w-full py-2 px-3 rounded-xl font-game text-xs sm:text-sm font-black text-white uppercase tracking-wide transition-all duration-150 shadow-lg ring-2 ring-emerald-200/80 active:translate-y-0.5 active:border-b-0 ${
-	              isPressing
-	                ? 'bg-yellow-500 border-yellow-700 scale-95'
-	                : 'bg-gradient-to-b from-emerald-400 via-green-500 to-emerald-700 border-b-4 border-green-900 hover:brightness-110'
-	            }`}
-	          >
-	            {isJournalTask ? 'AKTİF - GÜNÜMÜ ANLAT' : isPressing ? 'SÜPER! 🌟' : 'AKTİF - YAPTIM! 👍'}
-	          </button>
-	        )}
+		        {task.status === 'todo' && (
+              <div className="space-y-2">
+		          <button
+		            onClick={handleClickDone}
+		            disabled={isPressing}
+		            className={`w-full min-h-12 py-2 px-3 rounded-2xl font-game text-xs sm:text-sm font-black text-white uppercase tracking-wide transition-all duration-150 shadow-xl ring-4 ring-emerald-200/80 active:translate-y-0.5 active:border-b-0 flex items-center justify-center gap-2 ${
+		              isPressing
+		                ? 'bg-yellow-500 border-yellow-700 scale-95'
+		                : 'bg-gradient-to-b from-emerald-400 via-green-500 to-emerald-700 border-b-4 border-green-900 hover:brightness-110'
+		            }`}
+		          >
+                <CheckCircle2 className="h-4 w-4" />
+		            {isPressing ? 'SÜPER! 🌟' : 'GÖREVİ İŞARETLE 👍'}
+		          </button>
+              {isJournalTask && onStartJournal && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStartJournal();
+                  }}
+                  className="w-full rounded-xl border border-sky-400/70 bg-sky-950/70 px-3 py-2 font-game text-[11px] font-black text-sky-100 shadow-md"
+                >
+                  GÜNÜMÜ ANLAT
+                </button>
+              )}
+              </div>
+		        )}
 
         {task.status === 'pending_approval' && (
           <div className="space-y-1">
