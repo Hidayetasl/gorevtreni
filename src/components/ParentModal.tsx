@@ -3,7 +3,7 @@ import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo } from '.
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
 import { extractYoutubeId, hashParentPin } from '../utils/storage';
 import { getFamilyInviteLink } from '../utils/cloudSync';
-import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube } from 'lucide-react';
+import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw } from 'lucide-react';
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -14,6 +14,7 @@ interface ParentModalProps {
   onApproveTask: (taskId: string) => void;
   onApproveAllTasks: () => void;
   onRejectTask: (taskId: string) => void;
+  onReactivateTask: (taskId: string) => void;
   onAddTask: (task: Omit<RoutineTask, 'id' | 'status'>) => void;
   onDeleteTask: (taskId: string) => void;
   onSendBonus: (bonus: Omit<BonusCard, 'id' | 'claimed' | 'createdAt'>) => void;
@@ -42,6 +43,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onApproveTask,
   onApproveAllTasks,
   onRejectTask,
+  onReactivateTask,
   onAddTask,
   onDeleteTask,
   onSendBonus,
@@ -164,6 +166,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending_approval');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
+  const completedRoutineTasks = completedTasks.filter((t) => !t.isExtra);
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,11 +471,61 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+	                    ))}
+	                  </div>
+	                )}
+
+	                {completedRoutineTasks.length > 0 && (
+	                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
+	                    <div className="mb-2 flex items-center justify-between gap-2">
+	                      <div>
+	                        <h4 className="font-game text-sm font-black text-emerald-900">
+	                          Tamamlanan Rutinler
+	                        </h4>
+	                        <p className="text-xs font-semibold text-emerald-700">
+	                          Yeni güne veya tekrar denemeye açmak istediğin görevi seç.
+	                        </p>
+	                      </div>
+	                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-700 shadow-sm">
+	                        {completedRoutineTasks.length}
+	                      </span>
+	                    </div>
+	                    <div className="grid gap-2 sm:grid-cols-2">
+	                      {completedRoutineTasks.map((t) => (
+	                        <div
+	                          key={t.id}
+	                          className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white p-2"
+	                        >
+	                          <div className="flex min-w-0 items-center gap-2">
+	                            <span className="text-2xl">{t.icon}</span>
+	                            <div className="min-w-0">
+	                              <div className="truncate font-game text-xs font-black text-gray-800">
+	                                {t.title}
+	                              </div>
+	                              <div className="text-[10px] font-bold text-emerald-700">
+	                                Tamamlandı
+	                              </div>
+	                            </div>
+	                          </div>
+	                          <button
+	                            type="button"
+	                            onClick={() => {
+	                              onReactivateTask(t.id);
+	                              playPopSound(soundEnabled);
+	                              speakText(`${t.title} tekrar aktif edildi`, speechEnabled);
+	                            }}
+	                            className="flex shrink-0 items-center gap-1 rounded-lg border-b-2 border-sky-700 bg-sky-500 px-2.5 py-1.5 font-game text-[10px] font-bold text-white shadow hover:bg-sky-600"
+	                          >
+	                            <RotateCcw className="h-3.5 w-3.5" />
+	                            <span>Tekrar Aktif Et</span>
+	                          </button>
+	                        </div>
+	                      ))}
+	                    </div>
+	                  </div>
+	                )}
+	              </div>
+	            )}
 
             {/* TAB 2: ADD TASK */}
             {activeTab === 'add_task' && (

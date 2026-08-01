@@ -57,10 +57,6 @@ function getLocalDateKey(value: Date | string = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function getTaskDay(task: RoutineTask) {
-  return getLocalDateKey(task.completedAt || task.approvedAt || '');
-}
-
 function isRoutineTask(task: RoutineTask) {
   return !task.isExtra && routineTaskIds.has(task.id);
 }
@@ -74,19 +70,6 @@ function reopenRoutineTask(task: RoutineTask): RoutineTask {
     completedAt: undefined,
     approvedAt: undefined,
   };
-}
-
-function reopenOldCompletedRoutineTasks(tasks: RoutineTask[], todayKey: string) {
-  let changed = false;
-  const nextTasks = tasks.map((task) => {
-    if (isRoutineTask(task) && task.status === 'completed' && getTaskDay(task) !== todayKey) {
-      changed = true;
-      return reopenRoutineTask(task);
-    }
-    return task;
-  });
-
-  return { tasks: nextTasks, changed };
 }
 
 export default function App() {
@@ -157,19 +140,6 @@ export default function App() {
   useEffect(() => { voiceMessagesRef.current = voiceMessages; }, [voiceMessages]);
   useEffect(() => saveStoredVideos(videos), [videos]);
   useEffect(() => { videosRef.current = videos; }, [videos]);
-
-  useEffect(() => {
-    const todayKey = getLocalDateKey();
-    const normalized = reopenOldCompletedRoutineTasks(tasks, todayKey);
-    if (normalized.changed) setTasks(normalized.tasks);
-    if (user.lastTaskResetDate !== todayKey) {
-      setUser((prev) => (
-        prev.lastTaskResetDate === todayKey
-          ? prev
-          : { ...prev, lastTaskResetDate: todayKey }
-      ));
-    }
-  }, [tasks, user.lastTaskResetDate]);
 
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
 
@@ -338,17 +308,7 @@ export default function App() {
     const todayKey = getLocalDateKey(now);
 
     setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const approvedTask = { ...t, approvedAt: now };
-          return isRoutineTask(t) && getTaskDay(t) !== todayKey
-            ? reopenRoutineTask(approvedTask)
-            : { ...approvedTask, status: 'completed' };
-        }
-
-        if (isRoutineTask(t) && t.status === 'completed' && getTaskDay(t) !== todayKey) return reopenRoutineTask(t);
-        return t;
-      })
+      prev.map((t) => (t.id === taskId ? { ...t, status: 'completed', approvedAt: now } : t))
     );
 
     setUser((prev) => ({
@@ -368,17 +328,7 @@ export default function App() {
     const todayKey = getLocalDateKey(now);
 
     setTasks((prev) =>
-      prev.map((t) => {
-        if (t.status === 'pending_approval') {
-          const approvedTask = { ...t, approvedAt: now };
-          return isRoutineTask(t) && getTaskDay(t) !== todayKey
-            ? reopenRoutineTask(approvedTask)
-            : { ...approvedTask, status: 'completed' };
-        }
-
-        if (isRoutineTask(t) && t.status === 'completed' && getTaskDay(t) !== todayKey) return reopenRoutineTask(t);
-        return t;
-      })
+      prev.map((t) => (t.status === 'pending_approval' ? { ...t, status: 'completed', approvedAt: now } : t))
     );
 
     setUser((prev) => ({
@@ -391,6 +341,12 @@ export default function App() {
 
   const handleRejectTask = (taskId: string) => {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'todo' } : t)));
+  };
+
+  const handleReactivateTask = (taskId: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId && isRoutineTask(t) ? reopenRoutineTask(t) : t))
+    );
   };
 
   const handleAddTask = (newTaskData: Omit<RoutineTask, 'id' | 'status'>) => {
@@ -620,6 +576,7 @@ export default function App() {
           onApproveTask={handleApproveTask}
           onApproveAllTasks={handleApproveAllTasks}
           onRejectTask={handleRejectTask}
+          onReactivateTask={handleReactivateTask}
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
           onSendBonus={handleSendBonus}
