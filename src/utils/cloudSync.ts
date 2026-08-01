@@ -147,6 +147,25 @@ function mergeVideos(remote: StoryVideo[], local: StoryVideo[]) {
   return sortVideosNewestFirst([...videos.values()]);
 }
 
+function removeUndefinedFields(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      const cleaned = removeUndefinedFields(item);
+      return cleaned === undefined ? null : cleaned;
+    });
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .map(([key, entryValue]) => [key, removeUndefinedFields(entryValue)]),
+    );
+  }
+
+  return value;
+}
+
 export async function uploadFamilyData(code: string, data: FamilyData) {
   const normalized = saveFamilyCode(code);
   await getServices();
@@ -164,7 +183,8 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
     mergeVoiceMessages(remoteMessages, data.voiceMessages),
   );
   const videos = mergeVideos(remoteVideos, data.videos);
-  await setDoc(familyRef(normalized), { ...data, voiceMessages, videos, updatedAt: Date.now(), schemaVersion: 1 }, { merge: false });
+  const payload = removeUndefinedFields({ ...data, voiceMessages, videos, updatedAt: Date.now(), schemaVersion: 1 });
+  await setDoc(familyRef(normalized), payload, { merge: false });
 }
 
 export async function familyExists(code: string) {
