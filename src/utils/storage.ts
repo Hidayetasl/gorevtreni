@@ -255,14 +255,18 @@ export const getStoredTasks = (): RoutineTask[] => {
 };
 export const saveStoredTasks = (tasks: RoutineTask[]) => saveToStorage(STORAGE_KEYS.TASKS, tasks);
 
-export const getStoredShop = (): ShopItem[] => {
-  const stored = loadFromStorage<ShopItem[]>(STORAGE_KEYS.SHOP, INITIAL_SHOP);
+export const mergeShopItemsWithCatalog = (stored: ShopItem[] = INITIAL_SHOP): ShopItem[] => {
   return INITIAL_SHOP.map((initial) => {
     const existing = stored.find((s) => s.id === initial.id);
     return existing
       ? { ...initial, unlocked: existing.unlocked || initial.unlocked }
       : initial;
   });
+};
+
+export const getStoredShop = (): ShopItem[] => {
+  const stored = loadFromStorage<ShopItem[]>(STORAGE_KEYS.SHOP, INITIAL_SHOP);
+  return mergeShopItemsWithCatalog(stored);
 };
 export const saveStoredShop = (shop: ShopItem[]) => saveToStorage(STORAGE_KEYS.SHOP, shop);
 
