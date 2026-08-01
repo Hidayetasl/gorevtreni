@@ -111,7 +111,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
               : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
           }`}
         >
-          <span>🌳 Dekorasyon</span>
+          <span>🏙️ Kent & Dekorasyon</span>
         </button>
 
         <button
