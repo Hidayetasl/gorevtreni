@@ -66,6 +66,8 @@ export interface UserProfile {
   activeTrainIcon: string;
   /** Ortak aile verisinde başlangıç seviyesinin bir kez uygulanmasını sağlar. */
   progressVersion?: string;
+  /** Rutin görevlerin en son hangi yerel takvim gününde açıldığını tutar. */
+  lastTaskResetDate?: string;
 }
 
 export interface ParentConfig {

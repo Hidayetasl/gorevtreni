@@ -45,6 +45,50 @@ import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { SimpleAccessGate } from './components/SimpleAccessGate';
 import { createFamilyCode, familyExists, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 
+const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
+const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
+
+function getLocalDateKey(value: Date | string = new Date()) {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTaskDay(task: RoutineTask) {
+  return getLocalDateKey(task.completedAt || task.approvedAt || '');
+}
+
+function isRoutineTask(task: RoutineTask) {
+  return !task.isExtra && routineTaskIds.has(task.id);
+}
+
+function reopenRoutineTask(task: RoutineTask): RoutineTask {
+  const template = routineTaskTemplates.get(task.id);
+  return {
+    ...task,
+    imageUrl: template?.imageUrl || task.imageUrl,
+    status: 'todo',
+    completedAt: undefined,
+    approvedAt: undefined,
+  };
+}
+
+function reopenOldCompletedRoutineTasks(tasks: RoutineTask[], todayKey: string) {
+  let changed = false;
+  const nextTasks = tasks.map((task) => {
+    if (isRoutineTask(task) && task.status === 'completed' && getTaskDay(task) !== todayKey) {
+      changed = true;
+      return reopenRoutineTask(task);
+    }
+    return task;
+  });
+
+  return { tasks: nextTasks, changed };
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
   // Kullanıcı Google hesabı görmez. Firebase anonim oturumu arka planda
@@ -113,6 +157,19 @@ export default function App() {
   useEffect(() => { voiceMessagesRef.current = voiceMessages; }, [voiceMessages]);
   useEffect(() => saveStoredVideos(videos), [videos]);
   useEffect(() => { videosRef.current = videos; }, [videos]);
+
+  useEffect(() => {
+    const todayKey = getLocalDateKey();
+    const normalized = reopenOldCompletedRoutineTasks(tasks, todayKey);
+    if (normalized.changed) setTasks(normalized.tasks);
+    if (user.lastTaskResetDate !== todayKey) {
+      setUser((prev) => (
+        prev.lastTaskResetDate === todayKey
+          ? prev
+          : { ...prev, lastTaskResetDate: todayKey }
+      ));
+    }
+  }, [tasks, user.lastTaskResetDate]);
 
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
 
@@ -277,15 +334,28 @@ export default function App() {
   const handleApproveTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.status === 'completed') return;
+    const now = new Date().toISOString();
+    const todayKey = getLocalDateKey(now);
 
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: 'completed', approvedAt: new Date().toISOString() } : t))
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const approvedTask = { ...t, approvedAt: now };
+          return isRoutineTask(t) && getTaskDay(t) !== todayKey
+            ? reopenRoutineTask(approvedTask)
+            : { ...approvedTask, status: 'completed' };
+        }
+
+        if (isRoutineTask(t) && t.status === 'completed' && getTaskDay(t) !== todayKey) return reopenRoutineTask(t);
+        return t;
+      })
     );
 
     setUser((prev) => ({
       ...prev,
       coins: prev.coins + task.rewardCoins,
       totalCompletedTasks: prev.totalCompletedTasks + 1,
+      lastTaskResetDate: todayKey,
     }));
   };
 
@@ -294,15 +364,28 @@ export default function App() {
     if (pending.length === 0) return;
 
     const totalReward = pending.reduce((sum, t) => sum + t.rewardCoins, 0);
+    const now = new Date().toISOString();
+    const todayKey = getLocalDateKey(now);
 
     setTasks((prev) =>
-      prev.map((t) => (t.status === 'pending_approval' ? { ...t, status: 'completed', approvedAt: new Date().toISOString() } : t))
+      prev.map((t) => {
+        if (t.status === 'pending_approval') {
+          const approvedTask = { ...t, approvedAt: now };
+          return isRoutineTask(t) && getTaskDay(t) !== todayKey
+            ? reopenRoutineTask(approvedTask)
+            : { ...approvedTask, status: 'completed' };
+        }
+
+        if (isRoutineTask(t) && t.status === 'completed' && getTaskDay(t) !== todayKey) return reopenRoutineTask(t);
+        return t;
+      })
     );
 
     setUser((prev) => ({
       ...prev,
       coins: prev.coins + totalReward,
       totalCompletedTasks: prev.totalCompletedTasks + pending.length,
+      lastTaskResetDate: todayKey,
     }));
   };
 

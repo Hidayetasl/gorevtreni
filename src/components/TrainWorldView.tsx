@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playPopSound, speakText } from '../utils/audio';
-import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers } from 'lucide-react';
+import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/cartoon_train_background_1785400076710.jpg';
@@ -105,6 +105,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Builder grid states
   const [isBuildMode, setIsBuildMode] = useState(false);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<ShopItem | null>(null);
+  const [draggedInventoryItem, setDraggedInventoryItem] = useState<ShopItem | null>(null);
   const [trainPositionIndex, setTrainPositionIndex] = useState(0);
 
   // Continuous loop for Straight Line Railway Track Motion
@@ -290,6 +291,134 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
   const GRID_COLS = 8;
   const GRID_ROWS = 7;
+  const builderItems = unlockedItems.filter((item) => item.type !== 'real_reward');
+  const placedByCell = new Map<string, PlacedWorldItem>(
+    worldItems.map((item) => [`${item.x}:${item.y}`, item] as [string, PlacedWorldItem])
+  );
+
+  const itemKindLabel = (item: ShopItem) => {
+    if (item.type === 'train') return 'LOKOMOTİF 🚂';
+    if (item.type === 'wagon' || item.category === 'wagons') return 'VAGON 🚃';
+    if (item.type === 'track') return 'RAY & YAPI 🛤️';
+    return 'DEKORASYON 🌳';
+  };
+
+  const placedItemAccent = (item: PlacedWorldItem) => {
+    if (item.itemId.startsWith('track-')) {
+      return {
+        ring: 'ring-sky-300/90 border-sky-200/90 bg-sky-950/40',
+        glow: 'bg-sky-300/35',
+        label: 'bg-sky-950/90 text-sky-100 border-sky-300/70',
+      };
+    }
+    if (item.itemId.startsWith('train-')) {
+      return {
+        ring: 'ring-rose-300/90 border-rose-200/90 bg-rose-950/35',
+        glow: 'bg-rose-300/35',
+        label: 'bg-rose-950/90 text-rose-100 border-rose-300/70',
+      };
+    }
+    if (item.itemId.startsWith('wagon-')) {
+      return {
+        ring: 'ring-amber-300/90 border-amber-200/90 bg-amber-950/40',
+        glow: 'bg-amber-300/35',
+        label: 'bg-amber-950/90 text-amber-100 border-amber-300/70',
+      };
+    }
+    return {
+      ring: 'ring-emerald-300/90 border-emerald-200/90 bg-emerald-950/35',
+      glow: 'bg-emerald-300/35',
+      label: 'bg-emerald-950/90 text-emerald-100 border-emerald-300/70',
+    };
+  };
+
+  const selectInventoryForMap = (item: ShopItem) => {
+    playPopSound(soundEnabled);
+    setSelectedInventoryItem(item);
+    setIsBuildMode(true);
+    setInteractiveMessage(`${item.name} seçildi. Haritada istediğin yere dokun veya kartı sürükle! ✨`);
+  };
+
+  const placeInventoryOnMap = (item: ShopItem, x: number, y: number) => {
+    const existingAtCell = worldItems.find((placed) => placed.x === x && placed.y === y);
+    const existingSameItem = worldItems.find((placed) => placed.itemId === item.id);
+
+    if (existingAtCell) {
+      onRemoveItem(existingAtCell.id);
+    }
+    if (existingSameItem && existingSameItem.id !== existingAtCell?.id) {
+      onRemoveItem(existingSameItem.id);
+    }
+
+    onPlaceItem({
+      itemId: item.id,
+      x,
+      y,
+      icon: item.icon,
+      name: item.name,
+    });
+
+    if (item.type === 'train' && onSetActiveTrain) {
+      onSetActiveTrain(item.icon);
+    }
+    if (item.type === 'wagon' || item.category === 'wagons') {
+      const wagonType = item.wagonType || 'passenger';
+      if (!attachedWagons.includes(wagonType)) {
+        setAttachedWagons((prev) => [...prev, wagonType]);
+      }
+    }
+
+    playPopSound(soundEnabled);
+    setSelectedInventoryItem(item);
+    setInteractiveMessage(`${item.name} haritaya yerleştirildi! ✨`);
+  };
+
+  const handleMapCellDrop = (event: React.DragEvent<HTMLButtonElement>, x: number, y: number) => {
+    event.preventDefault();
+    const draggedId = event.dataTransfer.getData('text/plain');
+    const item = draggedInventoryItem || builderItems.find((candidate) => candidate.id === draggedId);
+    if (item) {
+      placeInventoryOnMap(item, x, y);
+    }
+    setDraggedInventoryItem(null);
+  };
+
+  const handleInventoryDragStart = (event: React.DragEvent<HTMLDivElement>, item: ShopItem) => {
+    setDraggedInventoryItem(item);
+    setSelectedInventoryItem(item);
+    setIsBuildMode(true);
+    event.dataTransfer.effectAllowed = 'copyMove';
+    event.dataTransfer.setData('text/plain', item.id);
+  };
+
+  const handleMapCellClick = (x: number, y: number) => {
+    if (selectedInventoryItem) {
+      placeInventoryOnMap(selectedInventoryItem, x, y);
+      return;
+    }
+    handleTileClick(x, y);
+  };
+
+  const renderSincapStation = (compact = false) => (
+    <div className={`relative ${compact ? 'w-20 sm:w-24' : 'w-24 sm:w-32'} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`}>
+      <div className="absolute -top-2 left-1/2 h-6 w-6 -translate-x-1/2 rotate-45 rounded-sm border-2 border-red-900 bg-red-500" />
+      <div className="relative overflow-hidden rounded-t-xl border-2 border-amber-900 bg-amber-100">
+        <div className="h-4 border-b-2 border-red-900 bg-red-500" />
+        <div className="absolute left-1/2 top-0.5 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border-2 border-amber-900 bg-yellow-100 text-[7px] font-black text-amber-950">
+          12
+        </div>
+        <div className="mx-1.5 mt-0.5 rounded-md border border-amber-900 bg-yellow-50 px-1 py-0.5 text-center font-game text-[7px] font-black leading-none text-amber-950 sm:text-[8px]">
+          Sincap Köy Garı
+        </div>
+        <div className="flex items-end justify-between px-2 pb-1 pt-1">
+          <div className="h-4 w-7 rounded-sm border border-amber-900 bg-sky-100" />
+          <div className="h-6 w-4 rounded-t-md border border-amber-900 bg-orange-700" />
+          <div className="h-2 w-5 rounded-sm bg-amber-700" />
+        </div>
+      </div>
+      <div className="mx-auto h-2 w-[85%] rounded-b-lg border-x-2 border-b-2 border-amber-900 bg-amber-700" />
+    </div>
+  );
 
   return (
     <div className="space-y-2.5 pb-20">
@@ -469,7 +598,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <div
                 key={puff.id}
                 className="absolute bottom-[48%] z-30 text-2xl sm:text-4xl animate-float-smoke pointer-events-none"
-                style={{ left: `${puff.left}%` }}
+                style={{ left: `${puff.x}%` }}
               >
                 💨
               </div>
@@ -647,22 +776,19 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </div>
 
             {/* Merkezî Tren Garı — mağazadan alındığında ana ray hattında görünür. */}
-            {hasPlacedStation && <div
-              onClick={() => {
-                playPopSound(soundEnabled);
-                setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
-                speakText('Tren istasyonundaki yolcular el sallıyor!', speechEnabled);
-              }}
-              className="absolute bottom-[24%] left-[6%] z-20 cursor-pointer hover:scale-105 transition-transform"
-              title="Sincap Köy Garına tıkla!"
-            >
-              <div className="flex items-center gap-1.5 bg-amber-950/90 border-2 border-amber-500/80 px-2.5 py-1 rounded-xl shadow-xl">
-                <span className="text-2xl sm:text-4xl">🚉</span>
-                <span className="font-game text-[10px] sm:text-xs text-amber-300 font-bold whitespace-nowrap">
-                  Sincap Köy Garı
-                </span>
+            {hasPlacedStation && (
+              <div
+                onClick={() => {
+                  playPopSound(soundEnabled);
+                  setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
+                  speakText('Sincap Köy Garı yolcuları treni bekliyor!', speechEnabled);
+                }}
+                className="absolute bottom-[20.2%] left-[42%] z-20 cursor-pointer transition-transform hover:scale-105"
+                title="Sincap Köy Garı"
+              >
+                {renderSincapStation()}
               </div>
-            </div>}
+            )}
 
             {/* Floating Smoke Puff Bubbles generated from whistle */}
             {smokePuffs.map((puff) => (
@@ -1016,10 +1142,18 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* ===================================================================== */}
       {viewMode === 'builder' && (
         <div className="space-y-4">
-          <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white flex items-center justify-between">
-            <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-emerald-400" />
-              <span>Haritana istediğin rayı ve süsü yerleştirmek için aşağıdaki parçaları seç!</span>
+          <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+              {selectedInventoryItem ? (
+                <MousePointer2 className="w-4 h-4 text-amber-300" />
+              ) : (
+                <Plus className="w-4 h-4 text-emerald-400" />
+              )}
+              <span>
+                {selectedInventoryItem
+                  ? `${selectedInventoryItem.name} seçili. Haritada bir noktaya dokun veya kartı sürükle.`
+                  : 'Satın alınan bir parçayı seç; kasaba haritasında istediğin noktaya yerleştir.'}
+              </span>
             </div>
             <button
               onClick={() => {
@@ -1036,78 +1170,121 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </button>
           </div>
 
-          {/* Living Grid Canvas Map */}
-          <div className="relative bg-gradient-to-b from-emerald-400 via-green-500 to-emerald-600 rounded-3xl p-3 sm:p-4 border-4 border-emerald-700 shadow-2xl overflow-hidden min-h-[380px]">
-            {/* Grid Map */}
-            <div className="relative z-10 grid grid-cols-8 gap-1.5 sm:gap-2">
+          {/* Living Graphic Builder Map */}
+          <div className="relative rounded-[2rem] border-4 border-sky-800 shadow-2xl overflow-hidden bg-sky-200 min-h-[420px] aspect-[16/9] select-none">
+            <img
+              src={stableCartoonBackground}
+              alt="Harita çizimi kasaba arka planı"
+              className="absolute inset-0 h-full w-full object-cover"
+              draggable={false}
+              onError={(event) => {
+                const image = event.currentTarget;
+                if (image.src !== cartoonBg) image.src = cartoonBg;
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-emerald-950/10 pointer-events-none" />
+
+            {/* Soft railway reference, matching ride mode instead of a flat green board */}
+            <div className="absolute bottom-[14%] left-0 w-full h-12 sm:h-16 z-10 pointer-events-none">
+              <svg className="w-full h-full" viewBox="0 0 1000 44" preserveAspectRatio="none">
+                <rect x="0" y="7" width="1000" height="30" fill="#1e293b" opacity="0.75" />
+                <rect x="0" y="11" width="1000" height="22" fill="#78350f" opacity="0.32" />
+                <line x1="0" y1="22" x2="1000" y2="22" stroke="#451a03" strokeWidth="16" strokeDasharray="6 10" opacity="0.9" />
+                <rect x="0" y="13" width="1000" height="3" fill="#e2e8f0" />
+                <rect x="0" y="29" width="1000" height="3" fill="#94a3b8" />
+              </svg>
+            </div>
+
+            {hasPlacedStation && (
+              <div className="absolute bottom-[18%] left-[42%] z-[15] pointer-events-none opacity-95">
+                {renderSincapStation(true)}
+              </div>
+            )}
+
+            {/* Gentle placement cells over the living town */}
+            <div className="absolute inset-3 sm:inset-5 z-30 grid grid-cols-8 gap-1.5 sm:gap-2">
               {Array.from({ length: GRID_ROWS }).map((_, r) =>
-                Array.from({ length: GRID_COLS }).map((_, c) => {
-                  const placed = worldItems.find((item) => item.x === c && item.y === r);
-                  const isTrainHere = currentTrainTrack.x === c && currentTrainTrack.y === r;
+	                Array.from({ length: GRID_COLS }).map((_, c) => {
+	                  const placed = placedByCell.get(`${c}:${r}`);
+	                  const isSelectedTarget = Boolean(selectedInventoryItem);
+	                  const accent = placed ? placedItemAccent(placed) : null;
 
-                  return (
-                    <div
+	                  return (
+                    <button
                       key={`${r}-${c}`}
-                      onClick={() => handleTileClick(c, r)}
-                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center relative cursor-pointer transition-all ${
-                        isBuildMode
-                          ? 'border-2 border-dashed border-white/60 bg-emerald-600/30 hover:bg-white/40'
-                          : 'bg-emerald-400/30 hover:bg-white/20'
+                      type="button"
+                      data-testid={`map-cell-${c}-${r}`}
+                      onClick={() => handleMapCellClick(c, r)}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'copy';
+                      }}
+                      onDrop={(event) => handleMapCellDrop(event, c, r)}
+                      className={`relative rounded-2xl border transition-all focus:outline-none focus:ring-4 focus:ring-amber-300/70 ${
+                        isSelectedTarget || isBuildMode
+                          ? 'border-white/45 bg-white/10 hover:border-amber-200 hover:bg-amber-200/20'
+                          : 'border-transparent bg-transparent hover:bg-white/10'
                       }`}
-                    >
-                      {placed && (
-                        <span className="text-2xl sm:text-4xl filter drop-shadow-md transform hover:scale-125 transition-transform">
-                          {placed.icon}
-                        </span>
-                      )}
-
-                      {/* Moving Locomotive on grid */}
-                      {isTrainHere && (
-                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center animate-bounce">
-                          <span className="absolute -top-3 text-xs animate-ping opacity-75">💨</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleWhistleBlow();
-                            }}
-                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-red-500 to-amber-500 text-2xl sm:text-3xl flex items-center justify-center border-2 border-white shadow-xl ring-4 ring-yellow-400/80 active:scale-125"
-                          >
-                            {user.activeTrainIcon || '🚂'}
-                          </button>
-                        </div>
-                      )}
+                      aria-label={`${c + 1}. sütun ${r + 1}. satır`}
+	                    >
+	                      {placed && (
+	                        <span className="absolute inset-0 flex items-center justify-center">
+	                          <span className={`absolute h-[72%] w-[72%] rounded-2xl blur-md ${accent?.glow}`} />
+	                          <span className={`relative flex h-[78%] w-[78%] items-center justify-center rounded-2xl border-2 shadow-[0_10px_16px_rgba(15,23,42,0.42)] ring-2 ${accent?.ring}`}>
+	                            <span className="absolute inset-1 rounded-xl bg-white/10" />
+	                            <span className="relative text-2xl sm:text-4xl drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)] transition-transform hover:scale-110">
+	                              {placed.icon}
+	                            </span>
+	                          </span>
+	                          <span className={`absolute -bottom-1 left-1/2 max-w-[92%] -translate-x-1/2 truncate rounded-full border px-1.5 py-0.5 text-[8px] font-black leading-none shadow-md ${accent?.label}`}>
+	                            {placed.name}
+	                          </span>
+	                        </span>
+	                      )}
 
                       {/* Delete button in build mode */}
                       {isBuildMode && placed && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                        <span
+                          onClick={(event) => {
+                            event.stopPropagation();
                             onRemoveItem(placed.id);
                             playPopSound(soundEnabled);
                           }}
-                          className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700"
+                          className="absolute -right-1 -top-1 z-30 rounded-full bg-rose-600 p-1 text-white shadow-lg ring-2 ring-white/80"
+                          role="button"
+                          aria-label={`${placed.name} kaldır`}
                         >
                           <Trash2 className="w-3 h-3" />
-                        </button>
+                        </span>
                       )}
-                    </div>
+                    </button>
                   );
                 })
               )}
+            </div>
+
+            <div className="absolute left-4 top-4 z-30 rounded-2xl bg-slate-950/70 px-3 py-2 text-xs font-black text-white shadow-lg backdrop-blur-sm">
+              Harita Çizimi
+            </div>
+            <div className="absolute bottom-4 right-4 z-30 flex items-center gap-2 rounded-2xl bg-slate-950/70 px-3 py-2 text-xs font-bold text-sky-100 shadow-lg backdrop-blur-sm">
+              <Move className="h-4 w-4 text-amber-300" />
+              <span>Sürükle veya seçip dokun</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Inventory Panel */}
+      {/* Purchased Items Panel */}
       <div className="bg-[#0e2531]/80 backdrop-blur-md border border-slate-700/80 rounded-3xl p-4 text-white shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div>
             <h3 className="font-game text-white text-base sm:text-lg font-bold flex items-center gap-2">
-              <span>📦</span> Mağazadan Kazanılan Tren & Dünya Parçaları
+              <span>📦</span> Satın Alınanlar
             </h3>
             <p className="text-xs text-slate-300">
-              Dokunarak dünyana yerleştir, tren lokomotifini değiştir veya haritada çiz!
+              {viewMode === 'builder'
+                ? 'Kartı sürükle ya da seçip kasaba haritasında bir noktaya dokun.'
+                : 'Dokunarak dünyana yerleştir, tren lokomotifini değiştir veya haritada çiz!'}
             </p>
           </div>
           <span className="bg-sky-900/80 text-sky-200 border border-sky-600/60 text-xs font-bold px-3 py-1 rounded-full w-fit">
@@ -1133,11 +1310,20 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               return (
                 <div
                   key={item.id}
+                  data-testid={`inventory-item-${item.id}`}
+                  draggable={viewMode === 'builder'}
+                  onDragStart={(event) => handleInventoryDragStart(event, item)}
+                  onDragEnd={() => setDraggedInventoryItem(null)}
+                  onClick={() => {
+                    if (viewMode === 'builder') {
+                      selectInventoryForMap(item);
+                    }
+                  }}
                   className={`bg-[#15303d] border rounded-2xl p-3 flex flex-col justify-between transition-all shadow-md ${
                     selectedInventoryItem?.id === item.id
-                      ? 'border-sky-400 ring-2 ring-sky-500/50 bg-[#1e4152]'
+                      ? 'border-amber-300 ring-2 ring-amber-300/50 bg-[#1e4152]'
                       : 'border-slate-700/70 hover:border-slate-500'
-                  }`}
+                  } ${viewMode === 'builder' ? 'cursor-grab active:cursor-grabbing' : ''}`}
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-12 h-12 rounded-xl bg-[#0a1820] border border-slate-700 flex items-center justify-center text-3xl shadow-inner flex-shrink-0">
@@ -1148,13 +1334,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                         {item.name}
                       </h4>
                       <span className="text-[10px] text-sky-300 uppercase tracking-wider font-bold">
-                        {item.type === 'train'
-                          ? 'Lokomotif 🚂'
-                          : item.type === 'wagon' || item.category === 'wagons'
-                          ? 'Vagon 🚃'
-                          : item.type === 'track'
-                          ? 'Ray & Yapı 🌉'
-                          : 'Dekorasyon 🌳'}
+                        {itemKindLabel(item)}
                       </span>
                     </div>
                   </div>
@@ -1162,34 +1342,69 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700/60">
                     {item.type === 'train' ? (
                       <button
-                        onClick={() => handleUseInventoryItem(item)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
+                        }}
                         className={`w-full py-2 px-3 rounded-xl font-game text-xs font-bold border transition-all ${
-                          isTrainActive
+                          viewMode === 'builder'
+                            ? 'bg-amber-500 text-amber-950 border-amber-300'
+                            : isTrainActive
                             ? 'bg-emerald-600 text-white border-emerald-400'
                             : 'bg-[#2263df] hover:bg-[#1c55c5] text-white border-blue-400'
                         }`}
                       >
-                        {isTrainActive ? 'Sürüşte Etkin 🚂' : 'Bu Treni Sür 🚂'}
+                        {viewMode === 'builder'
+                          ? selectedInventoryItem?.id === item.id
+                            ? 'Seçildi, Haritaya Dokun'
+                            : isPlaced
+                            ? 'Yerini Değiştir'
+                            : 'Haritaya Yerleştir'
+                          : isTrainActive
+                          ? 'Sürüşte Etkin 🚂'
+                          : 'Bu Treni Sür 🚂'}
                       </button>
                     ) : item.type === 'wagon' || item.category === 'wagons' ? (
                       <button
-                        onClick={() => handleUseInventoryItem(item)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
+                        }}
                         className={`w-full py-2 px-3 rounded-xl font-game text-xs font-bold border transition-all ${
-                          attachedWagons.includes(item.wagonType || 'passenger')
+                          viewMode === 'builder'
+                            ? 'bg-amber-500 text-amber-950 border-amber-300'
+                            : attachedWagons.includes(item.wagonType || 'passenger')
                             ? 'bg-emerald-600 text-white border-emerald-400'
                             : 'bg-[#2263df] hover:bg-[#1c55c5] text-white border-blue-400'
                         }`}
                       >
-                        {attachedWagons.includes(item.wagonType || 'passenger')
+                        {viewMode === 'builder'
+                          ? selectedInventoryItem?.id === item.id
+                            ? 'Seçildi, Haritaya Dokun'
+                            : isPlaced
+                            ? 'Yerini Değiştir'
+                            : 'Haritaya Yerleştir'
+                          : attachedWagons.includes(item.wagonType || 'passenger')
                           ? 'Trene Bağlı 🚃'
                           : 'Trene Bağla 🚃'}
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleUseInventoryItem(item)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
+                        }}
                         className="w-full py-2 px-3 rounded-xl font-game text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-500 text-amber-950 border border-amber-300 hover:brightness-105 shadow-sm"
                       >
-                        {isPlaced ? 'Dünyanda Yayında ✨' : 'Dünyana Ekle 🪄'}
+                        {viewMode === 'builder'
+                          ? selectedInventoryItem?.id === item.id
+                            ? 'Seçildi, Haritaya Dokun'
+                            : isPlaced
+                            ? 'Yerini Değiştir'
+                            : 'Haritaya Yerleştir'
+                          : isPlaced
+                          ? 'Dünyanda Yayında ✨'
+                          : 'Dünyana Ekle 🪄'}
                       </button>
                     )}
                   </div>
