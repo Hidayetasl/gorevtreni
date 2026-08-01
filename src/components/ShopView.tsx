@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShopItem, ShopCategory, UserProfile } from '../types';
 import { playCoinSound, playFanfare, speakText } from '../utils/audio';
+import { mergeShopItemsWithCatalog } from '../utils/storage';
 import confetti from 'canvas-confetti';
 import { ShoppingBag, Check, Sparkles, Gift } from 'lucide-react';
 
@@ -25,7 +26,8 @@ export const ShopView: React.FC<ShopViewProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<ShopCategory>('tracks');
 
-  const filteredItems = shopItems.filter((item) => item.category === activeCategory);
+  const catalogItems = mergeShopItemsWithCatalog(shopItems);
+  const filteredItems = catalogItems.filter((item) => item.category === activeCategory);
 
   const handleBuy = (item: ShopItem) => {
     if (user.coins < item.price) {
