@@ -54,8 +54,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           ? 'bg-amber-50/90 border-amber-300 animate-pulse'
           : 'bg-white border-sky-200 hover:border-sky-300'
       }`}
-    >
-      {/* Task Image / Visual Header */}
+	    >
+	      {task.status === 'todo' && (
+	        <div className="absolute left-2 top-2 z-10 rounded-full border border-emerald-200 bg-emerald-500 px-2 py-0.5 font-game text-[9px] font-black uppercase tracking-wide text-white shadow-md">
+	          Aktif Görev
+	        </div>
+	      )}
+
+	      {/* Task Image / Visual Header */}
       <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full overflow-hidden mb-1.5 border-3 border-sky-500 ring-2 ring-white bg-gradient-to-b from-sky-50 to-blue-50/60 flex items-center justify-center p-0.5 shadow-lg">
         {task.imageUrl ? (
           <img
@@ -101,19 +107,19 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
       {/* Bottom Action / Status Area */}
       <div className="mt-1.5 pt-1 border-t border-gray-100">
-        {task.status === 'todo' && (
-          <button
-            onClick={isJournalTask ? onStartJournal : handleClickDone}
-            disabled={isPressing}
-            className={`w-full py-1.5 px-3 rounded-xl font-game text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all duration-150 shadow border-b-3 active:translate-y-0.5 active:border-b-0 ${
-              isPressing
-                ? 'bg-yellow-500 border-yellow-700 scale-95'
-                : 'bg-gradient-to-b from-emerald-500 to-green-600 border-green-800 hover:brightness-105'
-            }`}
-          >
-            {isJournalTask ? '🎙️ GÜNÜMÜ ANLAT' : isPressing ? 'SÜPER! 🌟' : 'YAPTIM! 👍'}
-          </button>
-        )}
+	        {task.status === 'todo' && (
+	          <button
+	            onClick={isJournalTask ? onStartJournal : handleClickDone}
+	            disabled={isPressing}
+	            className={`w-full py-2 px-3 rounded-xl font-game text-xs sm:text-sm font-black text-white uppercase tracking-wide transition-all duration-150 shadow-lg ring-2 ring-emerald-200/80 active:translate-y-0.5 active:border-b-0 ${
+	              isPressing
+	                ? 'bg-yellow-500 border-yellow-700 scale-95'
+	                : 'bg-gradient-to-b from-emerald-400 via-green-500 to-emerald-700 border-b-4 border-green-900 hover:brightness-110'
+	            }`}
+	          >
+	            {isJournalTask ? 'AKTİF - GÜNÜMÜ ANLAT' : isPressing ? 'SÜPER! 🌟' : 'AKTİF - YAPTIM! 👍'}
+	          </button>
+	        )}
 
         {task.status === 'pending_approval' && (
           <div className="space-y-1">
