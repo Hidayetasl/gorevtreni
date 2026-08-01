@@ -183,12 +183,12 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </span>
         </div>
 
-        <div className="bg-[#091720]/90 border border-amber-500/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-xs">
-          <span className="text-[11px] sm:text-xs font-bold text-amber-300 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <div className="bg-[#091720]/90 border border-emerald-500/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-xs">
+          <span className="text-[11px] sm:text-xs font-bold text-emerald-300 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             Onay Bekleyen
           </span>
-          <span className="font-game text-xs sm:text-sm font-black text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-600/50">
+          <span className="font-game text-xs sm:text-sm font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-600/50">
             {pendingCount}
           </span>
         </div>

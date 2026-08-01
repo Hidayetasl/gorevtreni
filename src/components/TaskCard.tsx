@@ -62,11 +62,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           : task.status === 'pending_approval'
           ? 'bg-amber-50/90 border-amber-300 animate-pulse'
           : 'bg-white border-sky-200 hover:border-sky-300'
-      } ${isActiveTask ? 'cursor-pointer ring-2 ring-emerald-300/70' : ''}`}
+      } ${isActiveTask ? 'cursor-pointer ring-2 ring-amber-300/80' : ''}`}
 	    >
 	      {task.status === 'todo' && (
-	        <div className="absolute left-2 top-2 z-10 rounded-full border border-emerald-200 bg-emerald-500 px-2 py-0.5 font-game text-[9px] font-black uppercase tracking-wide text-white shadow-md">
-	          Aktif Görev
+	        <div className="absolute left-2 top-2 z-10 rounded-full border border-yellow-200 bg-amber-400 px-2 py-0.5 font-game text-[9px] font-black uppercase tracking-wide text-amber-950 shadow-md">
+	          Görev Tamamla
 	        </div>
 	      )}
 
@@ -121,14 +121,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 		          <button
 		            onClick={handleClickDone}
 		            disabled={isPressing}
-		            className={`w-full min-h-12 py-2 px-3 rounded-2xl font-game text-xs sm:text-sm font-black text-white uppercase tracking-wide transition-all duration-150 shadow-xl ring-4 ring-emerald-200/80 active:translate-y-0.5 active:border-b-0 flex items-center justify-center gap-2 ${
+		            className={`w-full min-h-12 py-2 px-3 rounded-2xl font-game text-xs sm:text-sm font-black uppercase tracking-wide transition-all duration-150 shadow-xl ring-4 ring-yellow-200/80 active:translate-y-0.5 active:border-b-0 flex items-center justify-center gap-2 ${
 		              isPressing
-		                ? 'bg-yellow-500 border-yellow-700 scale-95'
-		                : 'bg-gradient-to-b from-emerald-400 via-green-500 to-emerald-700 border-b-4 border-green-900 hover:brightness-110'
+		                ? 'bg-yellow-300 text-amber-950 border-yellow-700 scale-95'
+		                : 'bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500 text-amber-950 border-b-4 border-orange-800 hover:brightness-110'
 		            }`}
 		          >
                 <CheckCircle2 className="h-4 w-4" />
-		            {isPressing ? 'SÜPER! 🌟' : 'GÖREVİ İŞARETLE 👍'}
+		            {isPressing ? 'SÜPER! 🌟' : 'GÖREVİ TAMAMLADIM 👍'}
 		          </button>
               {isJournalTask && onStartJournal && (
                 <button

@@ -324,11 +324,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar border-b border-gray-100">
               <button
                 onClick={() => setActiveTab('approvals')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'approvals'
-                    ? 'bg-rose-500 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+	                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
+	                  activeTab === 'approvals'
+	                    ? 'bg-emerald-600 text-white shadow-sm'
+	                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+	                }`}
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>Onay Bekleyenler ({pendingTasks.length})</span>
@@ -438,19 +438,19 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 ) : (
                   <div className="space-y-3">
                     {pendingTasks.map((t) => (
-                      <div
-                        key={t.id}
-                        className="bg-amber-50 border border-amber-300 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm"
-                      >
+	                      <div
+	                        key={t.id}
+	                        className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm"
+	                      >
                         <div className="flex items-center gap-3">
                           <span className="text-3xl">{t.icon}</span>
                           <div>
                             <h4 className="font-game text-sm font-bold text-gray-800">
                               {t.title}
                             </h4>
-                            <p className="text-xs text-amber-700 font-bold">
-                              Ödül: +{t.rewardCoins} Tren Parası 🪙
-                            </p>
+	                            <p className="text-xs text-emerald-700 font-bold">
+	                              Ödül: +{t.rewardCoins} Tren Parası 🪙
+	                            </p>
                           </div>
                         </div>
 
