@@ -45,6 +45,7 @@ import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { SimpleAccessGate } from './components/SimpleAccessGate';
 import { createFamilyCode, familyExists, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { sortVideosNewestFirst } from './utils/videoOrder';
 
 const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
 const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
@@ -218,7 +219,8 @@ export default function App() {
           for (const video of localVideos) {
             if (!combinedVideos.some((remoteVideo) => remoteVideo.id === video.id)) combinedVideos.push(video);
           }
-          setVideos(combinedVideos);
+          const syncedVideos = sortVideosNewestFirst(combinedVideos);
+          setVideos(syncedVideos);
           setCloudStatus('Eşitlendi ✓');
           pendingSyncRef.current = false;
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
@@ -226,7 +228,7 @@ export default function App() {
           if (shopCatalogChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length) {
             // Bu cihazda olup henüz buluta gitmemiş videoyu/notu ve yeni mağaza
             // katalog parçalarını koru; buluttaki diğer güncel veriler aynen kalır.
-            uploadFamilyData(familyCode, { ...remote, shop: syncedShop, videos: combinedVideos, voiceMessages: combinedMessages })
+            uploadFamilyData(familyCode, { ...remote, shop: syncedShop, videos: syncedVideos, voiceMessages: combinedMessages })
               .catch(() => setCloudStatus('Çevrimdışı: yerel not veya video bu cihazda güvenle bekliyor'));
           }
         }, (message) => setCloudStatus(`Eşitleme hatası: ${message}`));
@@ -293,7 +295,7 @@ export default function App() {
         ...remote.user,
       });
       setParentConfig(remote.parentConfig); setTasks(remote.tasks); setShop(mergeShopItemsWithCatalog(remote.shop));
-      setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(remote.voiceMessages || []); setVideos(remote.videos || []);
+      setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(remote.voiceMessages || []); setVideos(sortVideosNewestFirst(remote.videos || []));
       window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
@@ -467,6 +469,7 @@ export default function App() {
     const video: StoryVideo = {
       ...newVid,
       id: `v-${Date.now()}`,
+      createdAt: new Date().toISOString(),
     };
     setVideos((prev) => [video, ...prev]);
   };

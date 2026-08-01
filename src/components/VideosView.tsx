@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ParentConfig, StoryVideo } from '../types';
 import { hashParentPin } from '../utils/storage';
+import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { Tv, Play, X, Youtube, LockKeyhole, Timer } from 'lucide-react';
 
 interface VideosViewProps {
@@ -12,6 +13,7 @@ export const VideosView: React.FC<VideosViewProps> = ({
   videos,
   parentConfig,
 }) => {
+  const orderedVideos = sortVideosNewestFirst(videos);
   const [activeVideo, setActiveVideo] = useState<StoryVideo | null>(null);
   const [lockedVideo, setLockedVideo] = useState<StoryVideo | null>(null);
   const [pin, setPin] = useState('');
@@ -93,7 +95,7 @@ export const VideosView: React.FC<VideosViewProps> = ({
       </div>
 
       {/* Video Cards Grid */}
-      {videos.length === 0 ? (
+      {orderedVideos.length === 0 ? (
         <div className="bg-[#122834] border border-slate-700/80 rounded-3xl p-8 text-center text-slate-300 space-y-3">
           <div className="text-5xl animate-bounce">📺</div>
           <h3 className="font-game text-lg font-bold text-white">Henüz Eklenmiş Video Yok</h3>
@@ -103,7 +105,7 @@ export const VideosView: React.FC<VideosViewProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {videos.map((video) => (
+          {orderedVideos.map((video) => (
             <div
               key={video.id}
               className="bg-[#15303e] rounded-3xl p-3.5 border-2 border-slate-600 shadow-lg hover:border-sky-400 transition-all group text-white relative flex flex-col justify-between"

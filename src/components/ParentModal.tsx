@@ -3,6 +3,7 @@ import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo } from '.
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
 import { extractYoutubeId, hashParentPin } from '../utils/storage';
 import { getFamilyInviteLink } from '../utils/cloudSync';
+import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw } from 'lucide-react';
 
 interface ParentModalProps {
@@ -78,6 +79,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [videoDesc, setVideoDesc] = useState('');
   const [videoError, setVideoError] = useState('');
   const [videoSuccess, setVideoSuccess] = useState(false);
+  const orderedVideos = sortVideosNewestFirst(videos);
 
   // New Task Form State
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -769,11 +771,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 </form>
 
                 {/* List of existing videos to delete if needed */}
-                {videos.length > 0 && (
+                {orderedVideos.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-game text-xs font-bold text-gray-700">Mevcut Çizgi Film / Videolar ({videos.length})</h4>
+                    <h4 className="font-game text-xs font-bold text-gray-700">Mevcut Çizgi Film / Videolar ({orderedVideos.length})</h4>
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {videos.map((vid) => (
+                      {orderedVideos.map((vid) => (
                         <div key={vid.id} className="p-2.5 bg-white border border-gray-200 rounded-xl flex items-center justify-between gap-2 shadow-sm">
                           <div className="flex items-center gap-2 overflow-hidden">
                             <img src={vid.thumbnailUrl} alt={vid.title} className="w-12 h-8 rounded object-cover flex-shrink-0" />

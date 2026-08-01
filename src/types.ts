@@ -94,4 +94,5 @@ export interface StoryVideo {
   youtubeId: string;
   description: string;
   category: string;
+  createdAt?: string;
 }

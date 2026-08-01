@@ -3,6 +3,7 @@ import { getAuth, signInAnonymously } from 'firebase/auth';
 import { doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
+import { sortVideosNewestFirst } from './videoOrder';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
 // Davet başka cihazda açılacağı için yerel geliştirme adresi (localhost) asla
@@ -143,7 +144,7 @@ function mergeVideos(remote: StoryVideo[], local: StoryVideo[]) {
   const videos = new Map<string, StoryVideo>();
   for (const video of remote) videos.set(video.id, video);
   for (const video of local) videos.set(video.id, { ...videos.get(video.id), ...video });
-  return [...videos.values()];
+  return sortVideosNewestFirst([...videos.values()]);
 }
 
 export async function uploadFamilyData(code: string, data: FamilyData) {
