@@ -15,6 +15,7 @@ interface ParentModalProps {
   onApproveAllTasks: () => void;
   onRejectTask: (taskId: string) => void;
   onReactivateTask: (taskId: string) => void;
+  onReactivateAllRoutineTasks: () => void;
   onAddTask: (task: Omit<RoutineTask, 'id' | 'status'>) => void;
   onDeleteTask: (taskId: string) => void;
   onSendBonus: (bonus: Omit<BonusCard, 'id' | 'claimed' | 'createdAt'>) => void;
@@ -44,6 +45,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onApproveAllTasks,
   onRejectTask,
   onReactivateTask,
+  onReactivateAllRoutineTasks,
   onAddTask,
   onDeleteTask,
   onSendBonus,
@@ -477,7 +479,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
 
 	                {completedRoutineTasks.length > 0 && (
 	                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
-	                    <div className="mb-2 flex items-center justify-between gap-2">
+	                    <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 	                      <div>
 	                        <h4 className="font-game text-sm font-black text-emerald-900">
 	                          Tamamlanan Rutinler
@@ -486,9 +488,23 @@ export const ParentModal: React.FC<ParentModalProps> = ({
 	                          Yeni güne veya tekrar denemeye açmak istediğin görevi seç.
 	                        </p>
 	                      </div>
-	                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-700 shadow-sm">
-	                        {completedRoutineTasks.length}
-	                      </span>
+	                      <div className="flex items-center gap-2">
+	                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-700 shadow-sm">
+	                          {completedRoutineTasks.length}
+	                        </span>
+	                        <button
+	                          type="button"
+	                          onClick={() => {
+	                            onReactivateAllRoutineTasks();
+	                            playPopSound(soundEnabled);
+	                            speakText('Tamamlanan rutin görevler tekrar aktif edildi', speechEnabled);
+	                          }}
+	                          className="flex items-center gap-1 rounded-xl border-b-2 border-emerald-800 bg-emerald-600 px-3 py-2 font-game text-[11px] font-black text-white shadow hover:bg-emerald-700"
+	                        >
+	                          <RotateCcw className="h-4 w-4" />
+	                          <span>Tümünü Aktif Et</span>
+	                        </button>
+	                      </div>
 	                    </div>
 	                    <div className="grid gap-2 sm:grid-cols-2">
 	                      {completedRoutineTasks.map((t) => (

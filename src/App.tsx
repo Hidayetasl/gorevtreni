@@ -61,6 +61,10 @@ function isRoutineTask(task: RoutineTask) {
   return !task.isExtra && routineTaskIds.has(task.id);
 }
 
+function getTaskDateKey(task: RoutineTask) {
+  return getLocalDateKey(task.approvedAt || task.completedAt || '');
+}
+
 function reopenRoutineTask(task: RoutineTask): RoutineTask {
   const template = routineTaskTemplates.get(task.id);
   return {
@@ -70,6 +74,20 @@ function reopenRoutineTask(task: RoutineTask): RoutineTask {
     completedAt: undefined,
     approvedAt: undefined,
   };
+}
+
+function reopenCompletedRoutineTasksFromPastDays(tasks: RoutineTask[], todayKey: string) {
+  let changed = false;
+  const nextTasks = tasks.map((task) => {
+    const taskDateKey = getTaskDateKey(task);
+    if (isRoutineTask(task) && task.status === 'completed' && taskDateKey !== todayKey) {
+      changed = true;
+      return reopenRoutineTask(task);
+    }
+    return task;
+  });
+
+  return { tasks: nextTasks, changed };
 }
 
 export default function App() {
@@ -140,6 +158,19 @@ export default function App() {
   useEffect(() => { voiceMessagesRef.current = voiceMessages; }, [voiceMessages]);
   useEffect(() => saveStoredVideos(videos), [videos]);
   useEffect(() => { videosRef.current = videos; }, [videos]);
+
+  useEffect(() => {
+    const todayKey = getLocalDateKey();
+    const normalized = reopenCompletedRoutineTasksFromPastDays(tasks, todayKey);
+    if (normalized.changed) setTasks(normalized.tasks);
+    if (user.lastTaskResetDate !== todayKey) {
+      setUser((prev) => (
+        prev.lastTaskResetDate === todayKey
+          ? prev
+          : { ...prev, lastTaskResetDate: todayKey }
+      ));
+    }
+  }, [tasks, user.lastTaskResetDate]);
 
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
 
@@ -344,9 +375,17 @@ export default function App() {
   };
 
   const handleReactivateTask = (taskId: string) => {
+    const todayKey = getLocalDateKey();
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId && isRoutineTask(t) ? reopenRoutineTask(t) : t))
     );
+    setUser((prev) => ({ ...prev, lastTaskResetDate: todayKey }));
+  };
+
+  const handleReactivateAllRoutineTasks = () => {
+    const todayKey = getLocalDateKey();
+    setTasks((prev) => prev.map((t) => (isRoutineTask(t) && t.status === 'completed' ? reopenRoutineTask(t) : t)));
+    setUser((prev) => ({ ...prev, lastTaskResetDate: todayKey }));
   };
 
   const handleAddTask = (newTaskData: Omit<RoutineTask, 'id' | 'status'>) => {
@@ -577,6 +616,7 @@ export default function App() {
           onApproveAllTasks={handleApproveAllTasks}
           onRejectTask={handleRejectTask}
           onReactivateTask={handleReactivateTask}
+          onReactivateAllRoutineTasks={handleReactivateAllRoutineTasks}
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
           onSendBonus={handleSendBonus}
