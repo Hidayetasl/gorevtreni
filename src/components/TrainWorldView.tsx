@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playPopSound, speakText } from '../utils/audio';
 import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
@@ -10,6 +10,12 @@ import cartoonBg from '../assets/images/cartoon_train_background_1785400076710.j
 // yedek manzarayı yükleyebilir. `?v=3` eski görsel önbelleğini geçersiz kılar.
 const stableCartoonBackground = `${import.meta.env.BASE_URL}train-world.jpg?v=3`;
 import pandaLocomotive from '../assets/images/cartoon_panda_locomotive_1785400092467.jpg';
+import merkezGarImg from '../assets/images/merkez-tren-gari.png';
+import lokomotifImg from '../assets/images/lokomotif-yesil.png';
+import yolcuVagonuKirmiziImg from '../assets/images/yolcu-vagonu-kirmizi.png';
+import yolcuVagonuYesilImg from '../assets/images/yolcu-vagonu-yesil.png';
+import yukVagonuImg from '../assets/images/yuk-vagonu.png';
+import sipaMaskotImg from '../assets/images/sipa-maskot.png';
 
 interface TrainWorldViewProps {
   worldItems: PlacedWorldItem[];
@@ -95,7 +101,65 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [trainDirection, setTrainDirection] = useState<'right' | 'left'>('right');
   const [isWhistling, setIsWhistling] = useState(false);
   const [smokePuffs, setSmokePuffs] = useState<{ id: number; x: number }[]>([]);
-  const [attachedWagons, setAttachedWagons] = useState<string[]>(['passenger', 'cargo_coins', 'cargo_fruits']);
+  const [attachedWagons, setAttachedWagons] = useState<string[]>(['passenger', 'passenger_green', 'cargo_coins']);
+
+  // Katar görsellerini (lokomotif + vagonlar) animasyon başlamadan ÖNCE tarayıcı
+  // belleğine tam yükleyip decode ediyoruz. Bu sayede <img> elemanları ilk kareden
+  // itibaren kesin boyutlarıyla render edilir; "auto" genişlik resmin geç
+  // yüklenmesi yüzünden geçici olarak yanlış hesaplanmaz.
+  const [trainImagesReady, setTrainImagesReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const sources = [lokomotifImg, yolcuVagonuKirmiziImg, yolcuVagonuYesilImg, yukVagonuImg];
+    Promise.all(
+      sources.map(
+        (src) =>
+          new Promise<void>((resolve) => {
+            const img = new window.Image();
+            img.src = src;
+            const done = () => resolve();
+            if (img.decode) {
+              img.decode().then(done).catch(done);
+            } else {
+              img.onload = done;
+              img.onerror = done;
+            }
+          })
+      )
+    ).then(() => {
+      if (!cancelled) setTrainImagesReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rideCanvasRef = useRef<HTMLDivElement | null>(null);
+  const trainAssemblyRef = useRef<HTMLDivElement | null>(null);
+  // Katarın gerçek genişliğini kanvasa oranla ölçüyoruz; döngü sınırlarını
+  // tahmine dayalı sabit yüzdeler yerine bu ölçüme göre kuruyoruz ki katar
+  // ekrandan TAMAMEN çıkmadan diğer taraftan "sıçramasın".
+  const [assemblyWidthPercent, setAssemblyWidthPercent] = useState(45);
+
+  useEffect(() => {
+    const canvasEl = rideCanvasRef.current;
+    const assemblyEl = trainAssemblyRef.current;
+    if (!canvasEl || !assemblyEl || viewMode !== 'ride' || !trainImagesReady) return;
+
+    const measure = () => {
+      const canvasWidth = canvasEl.offsetWidth;
+      const assemblyWidth = assemblyEl.offsetWidth;
+      if (canvasWidth > 0 && assemblyWidth > 0) {
+        setAssemblyWidthPercent((assemblyWidth / canvasWidth) * 100);
+      }
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(canvasEl);
+    observer.observe(assemblyEl);
+    return () => observer.disconnect();
+  }, [viewMode, attachedWagons, user.activeTrainIcon, trainImagesReady]);
   const [interactiveMessage, setInteractiveMessage] = useState<string>('Panda Kaptan Rayların Üzerinde Düz Hatta İlerliyor! 🚂💨');
 
   // Check unlocked structures from inventory
@@ -136,19 +200,23 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   useEffect(() => {
     if (!isTrainRunning || viewMode !== 'ride') return;
 
+    if (!trainImagesReady) return;
+
     const speedStep = trainSpeed === 'fast' ? 0.65 : trainSpeed === 'slow' ? 0.25 : 0.45;
+    const maxBound = 100 + 5;
+    const minBound = -(assemblyWidthPercent + 5);
     const interval = setInterval(() => {
       setTrainXPos((prev) => {
         if (trainDirection === 'right') {
-          return prev >= 110 ? -50 : prev + speedStep;
+          return prev >= maxBound ? minBound : prev + speedStep;
         } else {
-          return prev <= -50 ? 110 : prev - speedStep;
+          return prev <= minBound ? maxBound : prev - speedStep;
         }
       });
     }, 30);
 
     return () => clearInterval(interval);
-  }, [isTrainRunning, trainSpeed, trainDirection, viewMode]);
+  }, [isTrainRunning, trainSpeed, trainDirection, viewMode, assemblyWidthPercent, trainImagesReady]);
 
   // Whistle horn action
   const handleWhistleBlow = () => {
@@ -424,23 +492,13 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const renderSincapStation = (compact = false) => (
-    <div className={`relative ${compact ? 'w-20 sm:w-24' : 'w-24 sm:w-32'} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`}>
-      <div className="absolute -top-2 left-1/2 h-6 w-6 -translate-x-1/2 rotate-45 rounded-sm border-2 border-red-900 bg-red-500" />
-      <div className="relative overflow-hidden rounded-t-xl border-2 border-amber-900 bg-amber-100">
-        <div className="h-4 border-b-2 border-red-900 bg-red-500" />
-        <div className="absolute left-1/2 top-0.5 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border-2 border-amber-900 bg-yellow-100 text-[7px] font-black text-amber-950">
-          12
-        </div>
-        <div className="mx-1.5 mt-0.5 rounded-md border border-amber-900 bg-yellow-50 px-1 py-0.5 text-center font-game text-[7px] font-black leading-none text-amber-950 sm:text-[8px]">
-          Sincap Köy Garı
-        </div>
-        <div className="flex items-end justify-between px-2 pb-1 pt-1">
-          <div className="h-4 w-7 rounded-sm border border-amber-900 bg-sky-100" />
-          <div className="h-6 w-4 rounded-t-md border border-amber-900 bg-orange-700" />
-          <div className="h-2 w-5 rounded-sm bg-amber-700" />
-        </div>
-      </div>
-      <div className="mx-auto h-2 w-[85%] rounded-b-lg border-x-2 border-b-2 border-amber-900 bg-amber-700" />
+    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : 'w-[95px] sm:w-[199px]'} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`}>
+      <img
+        src={merkezGarImg}
+        alt="Sincap Köy Garı"
+        className="w-full h-auto object-contain"
+        draggable={false}
+      />
     </div>
   );
 
@@ -523,7 +581,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {viewMode === 'ride' && (
         <div className="space-y-4">
           {/* Main Graphic Canvas Box */}
-          <div className="relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl group select-none">
+          <div ref={rideCanvasRef} className="relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl group select-none">
             {/* Background Illustration Image */}
             <img
               src={cartoonBg}
@@ -814,6 +872,21 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             )}
 
+            {/* Sıpa Maskotu — Gar satın alınınca hemen yanında beliren, ücretsiz dekor */}
+            {hasPlacedStation && (
+              <div
+                onClick={() => {
+                  playPopSound(soundEnabled);
+                  setInteractiveMessage('Sıpa Sincap Ekspres\'i meraklı gözlerle izliyor! 🫏✨');
+                  speakText('Sevimli sıpa treni izliyor!', speechEnabled);
+                }}
+                className="absolute bottom-[27%] left-[30%] z-20 w-[85px] sm:w-[120px] cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
+                title="Sıpa"
+              >
+                <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
+              </div>
+            )}
+
             {/* Floating Smoke Puff Bubbles generated from whistle */}
             {smokePuffs.map((puff) => (
               <div
@@ -830,77 +903,27 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
             {/* 6. DYNAMIC HORIZONTAL TRAIN ASSEMBLY MOVING ON THE STRAIGHT TRACK */}
             <div
-              className="absolute bottom-[16.2%] z-30 transition-all duration-75 flex items-end flex-row-reverse pointer-events-auto cursor-pointer"
+              ref={trainAssemblyRef}
+              className="absolute bottom-[16.2%] z-30 transition-transform duration-75 flex items-end flex-row-reverse pointer-events-auto cursor-pointer"
               style={{
                 left: `${trainXPos}%`,
+                width: 'max-content',
                 transform: trainDirection === 'left' ? 'scaleX(-1)' : 'none',
               }}
               onClick={handleWhistleBlow}
-              title="Panda Kaptan Treni! Tıkla ve düdük çal!"
+              title="Sincap Ekspres! Tıkla ve düdük çal!"
             >
               {/* Locomotive (Leading at the front of the train!) */}
               <div className="relative flex items-end drop-shadow-xl z-10">
-                <div className="relative w-18 sm:w-28 h-14 sm:h-20 flex items-end">
-                  <svg viewBox="0 0 120 75" className="w-full h-full overflow-visible">
-                    {/* Front Headlight Beam */}
-                    <polygon points="100,42 140,20 140,65" fill="#fef08a" opacity="0.45" />
-
-                    {/* Main Steam Engine Red Boiler Body */}
-                    <rect x="32" y="28" width="65" height="30" rx="6" fill="#dc2626" stroke="#7f1d1d" strokeWidth="2" />
-                    <rect x="42" y="28" width="5" height="30" fill="#fbbf24" opacity="0.9" />
-                    <rect x="72" y="28" width="5" height="30" fill="#fbbf24" opacity="0.9" />
-
-                    {/* Boiler Nose Front */}
-                    <path d="M97,28 Q107,43 97,58 Z" fill="#b91c1c" stroke="#7f1d1d" strokeWidth="2" />
-
-                    {/* Headlight Lamp */}
-                    <circle cx="103" cy="43" r="5" fill="#f59e0b" stroke="#78350f" strokeWidth="1.5" />
-                    <circle cx="103" cy="43" r="2.5" fill="#fef08a" />
-
-                    {/* Steam Chimney Funnel */}
-                    <path d="M84,28 L82,14 L92,14 L90,28 Z" fill="#1e293b" stroke="#0f172a" strokeWidth="1.5" />
-                    <rect x="80" y="12" width="14" height="4" rx="1" fill="#f59e0b" />
-
-                    {/* Driver Cabin (Royal Blue) */}
-                    <rect x="4" y="10" width="34" height="48" rx="5" fill="#2563eb" stroke="#1e3a8a" strokeWidth="2" />
-                    <rect x="2" y="8" width="38" height="6" rx="2" fill="#dc2626" />
-
-                    {/* Cabin Window with Panda Driver */}
-                    <rect x="9" y="18" width="24" height="20" rx="4" fill="#e0f2fe" stroke="#0284c7" strokeWidth="1.5" />
-
-                    {/* Panda Face inside window */}
-                    <circle cx="21" cy="28" r="7" fill="#ffffff" stroke="#1e293b" strokeWidth="0.8" />
-                    <circle cx="16" cy="22" r="2.5" fill="#0f172a" />
-                    <circle cx="26" cy="22" r="2.5" fill="#0f172a" />
-                    <circle cx="18" cy="27" r="1.2" fill="#0f172a" />
-                    <circle cx="24" cy="27" r="1.2" fill="#0f172a" />
-                    <ellipse cx="21" cy="30" rx="1.5" ry="1" fill="#0f172a" />
-                    <path d="M15,20 Q21,15 27,20 Z" fill="#1e3a8a" />
-                    <rect x="15" y="19" width="12" height="2" fill="#fbbf24" />
-
-                    {/* Front Cow Catcher Grill */}
-                    <polygon points="98,58 112,58 107,50 98,50" fill="#334155" stroke="#0f172a" strokeWidth="1" />
-
-                    {/* Steel Wheels Sitting Directly on Rails */}
-                    <g className="animate-spin-slow" style={{ transformOrigin: '20px 60px' }}>
-                      <circle cx="20" cy="60" r="9" fill="#0f172a" stroke="#fbbf24" strokeWidth="2" />
-                      <circle cx="20" cy="60" r="3" fill="#94a3b8" />
-                      <line x1="12" y1="60" x2="28" y2="60" stroke="#fbbf24" strokeWidth="1.5" />
-                    </g>
-                    <g className="animate-spin-slow" style={{ transformOrigin: '48px 60px' }}>
-                      <circle cx="48" cy="60" r="7.5" fill="#0f172a" stroke="#fbbf24" strokeWidth="2" />
-                      <circle cx="48" cy="60" r="2.5" fill="#94a3b8" />
-                      <line x1="42" y1="60" x2="54" y2="60" stroke="#fbbf24" strokeWidth="1.5" />
-                    </g>
-                    <g className="animate-spin-slow" style={{ transformOrigin: '76px 60px' }}>
-                      <circle cx="76" cy="60" r="7.5" fill="#0f172a" stroke="#fbbf24" strokeWidth="2" />
-                      <circle cx="76" cy="60" r="2.5" fill="#94a3b8" />
-                      <line x1="70" y1="60" x2="82" y2="60" stroke="#fbbf24" strokeWidth="1.5" />
-                    </g>
-
-                    {/* Side Rod */}
-                    <rect x="20" y="58" width="56" height="4" rx="2" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
-                  </svg>
+                <div className="relative w-20 sm:w-32 h-14 sm:h-20 flex items-end">
+                  <img
+                    src={lokomotifImg}
+                    alt="Sincap Ekspres Lokomotifi"
+                    width={480}
+                    height={319}
+                    className="w-full h-auto object-contain"
+                    draggable={false}
+                  />
                 </div>
                 {/* Steam Smoke Puff from Chimney */}
                 <span className="absolute -top-4 right-3 text-xs sm:text-base animate-ping opacity-80">
@@ -920,86 +943,41 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                     )}
 
                     {type === 'passenger' && (
-                      <div className="relative shrink-0 bg-red-700 h-9 sm:h-14 w-14 sm:w-24 rounded-xl border-2 border-red-950 ring-1 ring-red-300/80 shadow-lg flex items-center justify-around px-1 mb-0.5 opacity-100">
-                        <div className="w-3 sm:w-5 h-4 sm:h-6 bg-amber-200 rounded flex items-center justify-center text-[10px] sm:text-xs">
-                          🐱
-                        </div>
-                        <div className="w-3 sm:w-5 h-4 sm:h-6 bg-amber-200 rounded flex items-center justify-center text-[10px] sm:text-xs">
-                          🐰
-                        </div>
-                        <div className="w-3 sm:w-5 h-4 sm:h-6 bg-amber-200 rounded flex items-center justify-center text-[10px] sm:text-xs">
-                          🐻
-                        </div>
-                        {/* Wheels directly touching top steel rail */}
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                      </div>
+                      <img
+                        src={yolcuVagonuKirmiziImg}
+                        alt="Yolcu Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
                     )}
 
-                    {type === 'cargo_coins' && (
-                      <div className="relative shrink-0 bg-amber-600 h-8 sm:h-12 w-12 sm:w-20 rounded-lg border-2 border-amber-950 ring-1 ring-amber-200/80 shadow-lg flex items-center justify-center mb-0.5 opacity-100">
-                        <div className="absolute -top-3 text-xs sm:text-lg flex items-center gap-0.5 animate-bounce">
-                          <span>🪙</span>
-                          <span>🪙</span>
-                        </div>
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                      </div>
+                    {type === 'passenger_green' && (
+                      <img
+                        src={yolcuVagonuYesilImg}
+                        alt="Yeşil Yolcu Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
                     )}
 
-                    {type === 'cargo_fruits' && (
-                      <div className="relative shrink-0 bg-emerald-600 h-8 sm:h-12 w-12 sm:w-20 rounded-lg border-2 border-emerald-950 ring-1 ring-emerald-200/80 shadow-lg flex items-center justify-center mb-0.5 opacity-100">
-                        <div className="absolute -top-3 text-xs sm:text-lg flex items-center gap-0.5">
-                          <span>🍎</span>
-                          <span>🍌</span>
-                        </div>
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                      </div>
-                    )}
-
-                    {type === 'cargo_toys' && (
-                      <div className="relative shrink-0 bg-purple-600 h-8 sm:h-12 w-12 sm:w-20 rounded-lg border-2 border-purple-950 ring-1 ring-purple-200/80 shadow-lg flex items-center justify-center mb-0.5 opacity-100">
-                        <div className="absolute -top-3 text-xs sm:text-lg flex items-center gap-0.5">
-                          <span>🧸</span>
-                          <span>🎁</span>
-                        </div>
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                      </div>
-                    )}
-
-                    {type === 'cargo_animals' && (
-                      <div className="relative shrink-0 bg-orange-600 h-8 sm:h-12 w-12 sm:w-20 rounded-lg border-2 border-orange-950 ring-1 ring-orange-200/80 shadow-lg flex items-center justify-center mb-0.5 opacity-100">
-                        <div className="absolute -top-3 text-xs sm:text-lg flex items-center gap-0.5 animate-bounce">
-                          <span>🦁</span>
-                          <span>🦒</span>
-                        </div>
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                      </div>
-                    )}
-
-                    {type === 'cargo_candy' && (
-                      <div className="relative shrink-0 bg-pink-600 h-8 sm:h-12 w-12 sm:w-20 rounded-lg border-2 border-pink-950 ring-1 ring-pink-200/80 shadow-lg flex items-center justify-center mb-0.5 opacity-100">
-                        <div className="absolute -top-3 text-xs sm:text-lg flex items-center gap-0.5">
-                          <span>🍦</span>
-                          <span>🍭</span>
-                        </div>
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-amber-400 animate-spin-slow" />
-                      </div>
-                    )}
-
-                    {type === 'cargo_space' && (
-                      <div className="relative shrink-0 bg-indigo-700 h-8 sm:h-12 w-12 sm:w-20 rounded-lg border-2 border-indigo-950 ring-1 ring-indigo-200/80 shadow-lg flex items-center justify-center mb-0.5 opacity-100">
-                        <div className="absolute -top-3 text-xs sm:text-lg flex items-center gap-0.5 animate-pulse">
-                          <span>🚀</span>
-                          <span>⭐</span>
-                        </div>
-                        <div className="absolute -bottom-2 left-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-cyan-400 animate-spin-slow" />
-                        <div className="absolute -bottom-2 right-1.5 w-3 sm:w-5 h-3 sm:h-5 rounded-full bg-slate-900 border-2 border-cyan-400 animate-spin-slow" />
-                      </div>
+                    {(type === 'cargo_coins' ||
+                      type === 'cargo_fruits' ||
+                      type === 'cargo_toys' ||
+                      type === 'cargo_animals' ||
+                      type === 'cargo_candy' ||
+                      type === 'cargo_space') && (
+                      <img
+                        src={yukVagonuImg}
+                        alt="Yük Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-8 sm:h-12 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
                     )}
                   </React.Fragment>
                 ))}

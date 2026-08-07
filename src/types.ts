@@ -30,7 +30,7 @@ export interface ShopItem {
   unlocked: boolean;
   type: 'track' | 'train' | 'wagon' | 'decoration' | 'real_reward';
   trackType?: 'straight' | 'curve' | 'bridge' | 'station' | 'tunnel';
-  wagonType?: 'passenger' | 'cargo_coins' | 'cargo_fruits' | 'cargo_toys' | 'cargo_animals' | 'cargo_candy' | 'cargo_space';
+  wagonType?: 'passenger' | 'passenger_green' | 'cargo_coins' | 'cargo_fruits' | 'cargo_toys' | 'cargo_animals' | 'cargo_candy' | 'cargo_space';
 }
 
 export interface PlacedWorldItem {
