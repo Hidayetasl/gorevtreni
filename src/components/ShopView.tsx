@@ -4,6 +4,7 @@ import { playCoinSound, playFanfare, speakText } from '../utils/audio';
 import { mergeShopItemsWithCatalog } from '../utils/storage';
 import confetti from 'canvas-confetti';
 import { ShoppingBag, Check, Sparkles, Gift } from 'lucide-react';
+import { SCENERY_IMAGES } from '../utils/sceneryImages';
 
 interface ShopViewProps {
   shopItems: ShopItem[];
@@ -146,8 +147,12 @@ export const ShopView: React.FC<ShopViewProps> = ({
               }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-[#254b5e] to-[#0a1820] border-2 border-sky-400/70 flex items-center justify-center text-4xl sm:text-5xl shadow-lg relative game-icon">
-                  {item.icon}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-[#254b5e] to-[#0a1820] border-2 border-sky-400/70 flex items-center justify-center text-4xl sm:text-5xl shadow-lg relative game-icon overflow-hidden">
+                  {SCENERY_IMAGES[item.id] ? (
+                    <img src={SCENERY_IMAGES[item.id]} alt={item.name} className="w-full h-full object-contain p-1" draggable={false} />
+                  ) : (
+                    item.icon
+                  )}
                   {item.category === 'rewards' && (
                     <div className="absolute -top-1.5 -left-1.5 bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md border border-white shadow">
                       ÖDÜL

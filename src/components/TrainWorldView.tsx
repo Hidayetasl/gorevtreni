@@ -16,6 +16,7 @@ import yolcuVagonuKirmiziImg from '../assets/images/yolcu-vagonu-kirmizi.png';
 import yolcuVagonuYesilImg from '../assets/images/yolcu-vagonu-yesil.png';
 import yukVagonuImg from '../assets/images/yuk-vagonu.png';
 import sipaMaskotImg from '../assets/images/sipa-maskot.png';
+import { SCENERY_IMAGES } from '../utils/sceneryImages';
 
 interface TrainWorldViewProps {
   worldItems: PlacedWorldItem[];
@@ -31,55 +32,36 @@ interface TrainWorldViewProps {
 type ViewMode = 'ride' | 'builder';
 type EnvironmentTheme = 'farm' | 'mountains' | 'sunset' | 'night';
 
-type SceneAnchor = { left: string; top: string; size: string };
+// Harita Çizimi'ndeki 8x7'lik yerleşim ızgarasıyla aynı boyut; ana sahnedeki
+// dekor pozisyonu artık bu ızgar üzerinden (item.x / item.y) hesaplanıyor —
+// böylece çocuğun yerleştirdiği kare ile ana dünyada göründüğü yer birebir eşleşir.
+const GRID_COLS = 8;
+const GRID_ROWS = 7;
 
-// Ana dünya bir oyun sahnesi; kareli "Harita Çizimi" görünümü ise ayrı bir
-// düzenleme ekranı. Her eşyanın sahnede doğal ve sabit bir yeri vardır.
-// Aynı türden birden çok eşya alındığında sıradaki alternatif nokta kullanılır.
-const SCENE_ANCHORS: Record<string, SceneAnchor[]> = {
-  'scenery-tree': [
-    { left: '13%', top: '30%', size: 'text-4xl sm:text-6xl' },
-    { left: '70%', top: '29%', size: 'text-4xl sm:text-6xl' },
-    { left: '84%', top: '43%', size: 'text-3xl sm:text-5xl' },
-  ],
-  'scenery-flower': [
-    { left: '76%', top: '62%', size: 'text-3xl sm:text-5xl' },
-    { left: '46%', top: '63%', size: 'text-2xl sm:text-4xl' },
-  ],
-  'scenery-cow': [
-    { left: '67%', top: '48%', size: 'text-4xl sm:text-6xl' },
-  ],
-  'scenery-house': [
-    { left: '34%', top: '42%', size: 'text-4xl sm:text-6xl' },
-  ],
-  'scenery-traffic-light': [
-    { left: '40%', top: '62%', size: 'text-2xl sm:text-4xl' },
-    { left: '57%', top: '58%', size: 'text-2xl sm:text-4xl' },
-  ],
-  'scenery-park': [
-    { left: '72%', top: '58%', size: 'text-3xl sm:text-5xl' },
-    { left: '47%', top: '55%', size: 'text-3xl sm:text-5xl' },
-  ],
-  'scenery-windmill': [
-    { left: '80%', top: '26%', size: 'text-3xl sm:text-5xl' },
-    { left: '63%', top: '24%', size: 'text-2xl sm:text-4xl' },
-  ],
-  'scenery-market': [
-    { left: '25%', top: '45%', size: 'text-4xl sm:text-6xl' },
-  ],
-  'scenery-school': [
-    { left: '48%', top: '40%', size: 'text-4xl sm:text-6xl' },
-  ],
-  'scenery-hospital': [
-    { left: '56%', top: '36%', size: 'text-4xl sm:text-6xl' },
-  ],
-  'scenery-train-repair': [
-    { left: '56%', top: '68%', size: 'text-3xl sm:text-5xl' },
-  ],
-  'scenery-ferris': [
-    { left: '79%', top: '24%', size: 'text-5xl sm:text-7xl' },
-  ],
+// Her eşya türünün ana sahnede kaç büyük çizileceği (konum artık sabit değil,
+// sadece görsel boyut sabit kalıyor).
+const SCENE_ITEM_SIZE: Record<string, string> = {
+  'scenery-tree': 'text-4xl sm:text-6xl',
+  'scenery-flower': 'text-3xl sm:text-5xl',
+  'scenery-cow': 'text-4xl sm:text-6xl',
+  'scenery-house': 'text-2xl sm:text-4xl',
+  'scenery-traffic-light': 'text-2xl sm:text-4xl',
+  'scenery-park': 'text-3xl sm:text-5xl',
+  'scenery-windmill': 'text-3xl sm:text-5xl',
+  'scenery-market': 'text-2xl sm:text-4xl',
+  'scenery-school': 'text-2xl sm:text-4xl',
+  'scenery-hospital': 'text-2xl sm:text-4xl',
+  'scenery-train-repair': 'text-3xl sm:text-5xl',
+  'scenery-ferris': 'text-5xl sm:text-7xl',
 };
+
+// Izgara hücresini (0..7, 0..6) ana sahnenin güvenli görüntü alanına (bulut ve
+// ray şeridi hariç) eşleyen yardımcı fonksiyon.
+function gridCellToScenePercent(x: number, y: number) {
+  const left = 4 + (x / Math.max(GRID_COLS - 1, 1)) * 90; // %4 .. %94
+  const top = 9 + (y / Math.max(GRID_ROWS - 1, 1)) * 62; // %9 .. %71
+  return { left: `${left}%`, top: `${top}%` };
+}
 
 export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   worldItems,
@@ -167,21 +149,27 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const hasPlacedTunnel = worldItems.some((item) => item.itemId === 'track-tunnel');
   const hasPlacedStation = worldItems.some((item) => item.itemId === 'track-station');
 
+  // Gar, Harita Çizimi'nde seçilen sütuna (x) göre ray hattı üzerinde kayar;
+  // ray hep aynı yükseklikte kaldığından dikey konum sabit tutulur.
+  const placedStation = worldItems.find((item) => item.itemId === 'track-station');
+  const stationLeftPercent = placedStation
+    ? Math.min(88, Math.max(8, 8 + (placedStation.x / Math.max(GRID_COLS - 1, 1)) * 80))
+    : 42;
+  const sipaLeftPercent = Math.min(90, Math.max(2, stationLeftPercent - 12));
+
   // Mağazadan "Dünyana Ekle" ile bırakılan her dekor ana manzarada da görünür.
   // Ray yapıları kendi, raya hizalı katmanlarında çizilir.
   const placedSceneItems = worldItems.filter((item) => ![
     'track-straight', 'track-curve', 'track-bridge', 'track-tunnel', 'track-station',
-  ].includes(item.itemId) && SCENE_ANCHORS[item.itemId]);
+  ].includes(item.itemId) && SCENE_ITEM_SIZE[item.itemId]);
 
-  const sceneItems = (() => {
-    const usedAnchors = new Map<string, number>();
-    return placedSceneItems.map((item) => {
-      const anchors = SCENE_ANCHORS[item.itemId];
-      const used = usedAnchors.get(item.itemId) || 0;
-      usedAnchors.set(item.itemId, used + 1);
-      return { item, anchor: anchors[used % anchors.length] };
-    });
-  })();
+  // Konum artık sabit bir tablodan değil, çocuğun Harita Çizimi'nde seçtiği
+  // gerçek (x, y) hücresinden geliyor — yerleştirdiği yer ile ana dünyada
+  // gördüğü yer artık birebir aynı.
+  const sceneItems = placedSceneItems.map((item) => ({
+    item,
+    anchor: { ...gridCellToScenePercent(item.x, item.y), size: SCENE_ITEM_SIZE[item.itemId] || 'text-2xl sm:text-4xl' },
+  }));
 
   // Interactive village elements states
   const [cowMooing, setCowMooing] = useState(false);
@@ -381,8 +369,6 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
   const unlockedItems = inventory.filter((i) => i.unlocked);
 
-  const GRID_COLS = 8;
-  const GRID_ROWS = 7;
   const builderItems = unlockedItems.filter((item) => item.type !== 'real_reward');
   const placedByCell = new Map<string, PlacedWorldItem>(
     worldItems.map((item) => [`${item.x}:${item.y}`, item] as [string, PlacedWorldItem])
@@ -697,7 +683,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   style={{ left: anchor.left, top: anchor.top }}
                   title={`${item.name} — dokun ve keşfet`}
                 >
-                  <span className={`${anchor.size} leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]`}>{item.icon}</span>
+                  {SCENERY_IMAGES[item.itemId] ? (
+                    <img src={SCENERY_IMAGES[item.itemId]} alt={item.name} className="w-14 h-14 sm:w-24 sm:h-24 object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.45)]" draggable={false} />
+                  ) : (
+                    <span className={`${anchor.size} leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]`}>{item.icon}</span>
+                  )}
                   <span className="max-w-20 truncate rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[8px] font-black text-white shadow-sm sm:text-[10px]">
                     {item.name}
                   </span>
@@ -865,7 +855,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
                   speakText('Sincap Köy Garı yolcuları treni bekliyor!', speechEnabled);
                 }}
-                className="absolute bottom-[20.2%] left-[42%] z-20 cursor-pointer transition-transform hover:scale-105"
+                className="absolute bottom-[20.2%] z-20 cursor-pointer transition-transform hover:scale-105"
+                style={{ left: `${stationLeftPercent}%` }}
                 title="Sincap Köy Garı"
               >
                 {renderSincapStation()}
@@ -880,7 +871,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   setInteractiveMessage('Sıpa Sincap Ekspres\'i meraklı gözlerle izliyor! 🫏✨');
                   speakText('Sevimli sıpa treni izliyor!', speechEnabled);
                 }}
-                className="absolute bottom-[27%] left-[30%] z-20 w-[85px] sm:w-[120px] cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
+                className="absolute bottom-[27%] z-20 w-[100px] sm:w-[140px] cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
+                style={{ left: `${sipaLeftPercent}%` }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
@@ -1234,8 +1226,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 	                          <span className={`absolute h-[72%] w-[72%] rounded-2xl blur-md ${accent?.glow}`} />
 	                          <span className={`relative flex h-[78%] w-[78%] items-center justify-center rounded-2xl border-2 shadow-[0_10px_16px_rgba(15,23,42,0.42)] ring-2 ${accent?.ring}`}>
 	                            <span className="absolute inset-1 rounded-xl bg-white/10" />
-	                            <span className="relative text-2xl sm:text-4xl drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)] transition-transform hover:scale-110">
-	                              {placed.icon}
+	                            <span className="relative flex h-full w-full items-center justify-center text-2xl sm:text-4xl drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)] transition-transform hover:scale-110">
+	                              {SCENERY_IMAGES[placed.itemId] ? (
+	                                <img src={SCENERY_IMAGES[placed.itemId]} alt={placed.name} className="h-full w-full object-contain" draggable={false} />
+	                              ) : (
+	                                placed.icon
+	                              )}
 	                            </span>
 	                          </span>
 	                          <span className={`absolute -bottom-1 left-1/2 max-w-[92%] -translate-x-1/2 truncate rounded-full border px-1.5 py-0.5 text-[8px] font-black leading-none shadow-md ${accent?.label}`}>
@@ -1328,8 +1324,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   } ${viewMode === 'builder' ? 'cursor-grab active:cursor-grabbing' : ''}`}
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-xl bg-[#0a1820] border border-slate-700 flex items-center justify-center text-3xl shadow-inner flex-shrink-0">
-                      {item.icon}
+                    <div className="w-12 h-12 rounded-xl bg-[#0a1820] border border-slate-700 flex items-center justify-center text-3xl shadow-inner flex-shrink-0 overflow-hidden">
+                      {SCENERY_IMAGES[item.id] ? (
+                        <img src={SCENERY_IMAGES[item.id]} alt={item.name} className="w-full h-full object-contain p-0.5" draggable={false} />
+                      ) : (
+                        item.icon
+                      )}
                     </div>
                     <div>
                       <h4 className="font-game text-sm font-bold text-white line-clamp-1">

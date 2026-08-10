@@ -86,6 +86,16 @@ export interface BonusCard {
   claimed: boolean;
 }
 
+export interface ActivityLogEntry {
+  id: string;
+  type: 'app_open' | 'task_complete' | 'purchase';
+  label: string;
+  detail?: string;
+  timestamp: string;
+  /** Uygulama açılışları için: oturumun ne kadar sürdüğü (ms). */
+  durationMs?: number;
+}
+
 export interface StoryVideo {
   id: string;
   title: string;

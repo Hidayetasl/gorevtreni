@@ -1,4 +1,4 @@
-import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo } from '../types';
+import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from '../types';
 import taskBrushTeethImg from '../assets/images/ruzgar-disfircalama.jpg';
 import taskTidyToysImg from '../assets/images/ruzgar-oyuncak.jpg';
 import taskEatMealImg from '../assets/images/ruzgar-yemek.jpg';
@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   BONUSES: 'ruzgar_bonuses_v4',
   VOICE_MESSAGES: 'ruzgar_voice_messages_v1',
   VIDEOS: 'ruzgar_videos_v1',
+  ACTIVITY_LOG: 'ruzgar_activity_log_v1',
 };
 
 const FIRST_DAY_RESET_VERSION = 'ruzgar_first_day_reset_v1';
@@ -174,6 +175,13 @@ export const INITIAL_SHOP: ShopItem[] = [
   { id: 'scenery-hospital', name: 'Hastane', category: 'scenery', price: 25, icon: '🏥', description: 'Kasabadaki herkese yardım eden sağlık binası', unlocked: false, type: 'decoration' },
   { id: 'scenery-train-repair', name: 'Tren Tamirhanesi', category: 'scenery', price: 25, icon: '🛠️', description: 'Lokomotiflerin bakım gördüğü tamir atölyesi', unlocked: false, type: 'decoration' },
   { id: 'scenery-ferris', name: 'Lunapark Dönme Dolabı', category: 'scenery', price: 30, icon: '🎡', description: 'Işıl ışıl dönen dev dönme dolap', unlocked: false, type: 'decoration' },
+  { id: 'scenery-house-2', name: 'Bacalı Kırmızı Ev', category: 'scenery', price: 15, icon: '🏠', description: 'Bacasından duman tüten, çiçek bahçeli şirin ev', unlocked: false, type: 'decoration' },
+  { id: 'scenery-house-3', name: 'Fenerli Bahçe Evi', category: 'scenery', price: 15, icon: '🏠', description: 'Kapısında kalp, bahçesinde laleler olan ev', unlocked: false, type: 'decoration' },
+  { id: 'scenery-house-4', name: 'Salıncaklı Ev', category: 'scenery', price: 15, icon: '🏡', description: 'Bahçesinde salıncak ve köpek kulübesi olan ev', unlocked: false, type: 'decoration' },
+  { id: 'scenery-house-5', name: 'Bisikletli Mavi Ev', category: 'scenery', price: 15, icon: '🏡', description: 'Mavi çatılı, bisikletli, topu bahçeli ev', unlocked: false, type: 'decoration' },
+  { id: 'scenery-house-6', name: 'Verandalı Bahçe Evi', category: 'scenery', price: 15, icon: '🏡', description: 'Sallanan sandalyeli veranda ve sebze bahçesi olan ev', unlocked: false, type: 'decoration' },
+  { id: 'scenery-cinema', name: 'Kasaba Sineması', category: 'scenery', price: 25, icon: '🎬', description: 'Filmlerin oynadığı sevimli kasaba sineması', unlocked: false, type: 'decoration' },
+  { id: 'scenery-airplane', name: 'Küçük Uçak', category: 'scenery', price: 20, icon: '✈️', description: 'Kasabanın üzerinde uçan küçük uçak', unlocked: false, type: 'decoration' },
 
   // Real World Rewards (Scaled to 1-Day, 2-Day, and 3-Day efforts)
   { id: 'reward-icecream', name: 'Dondurma Keyfi', category: 'rewards', price: 24, icon: '🍦', description: 'En sevdiğin 2 top dondurma ödülü! ⭐ (1 Günlük Başarı)', unlocked: false, type: 'real_reward' },
@@ -391,3 +399,7 @@ export const saveStoredVoiceMessages = (msgs: VoiceMessage[]) => saveToStorage(S
 
 export const getStoredVideos = () => loadFromStorage<StoryVideo[]>(STORAGE_KEYS.VIDEOS, INITIAL_VIDEOS);
 export const saveStoredVideos = (videos: StoryVideo[]) => saveToStorage(STORAGE_KEYS.VIDEOS, videos);
+
+export const INITIAL_ACTIVITY_LOG: ActivityLogEntry[] = [];
+export const getStoredActivityLog = () => loadFromStorage<ActivityLogEntry[]>(STORAGE_KEYS.ACTIVITY_LOG, INITIAL_ACTIVITY_LOG);
+export const saveStoredActivityLog = (log: ActivityLogEntry[]) => saveToStorage(STORAGE_KEYS.ACTIVITY_LOG, log);

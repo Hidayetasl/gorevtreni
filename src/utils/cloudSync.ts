@@ -2,7 +2,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import type { BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
+import type { ActivityLogEntry, BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeVideosById } from './videoOrder';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
@@ -30,6 +30,7 @@ export type FamilyData = {
   bonuses: BonusCard[];
   voiceMessages: VoiceMessage[];
   videos: StoryVideo[];
+  activityLog?: ActivityLogEntry[];
 };
 
 export const isCloudConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]));
@@ -144,6 +145,15 @@ function mergeVideos(remote: StoryVideo[], local: StoryVideo[]) {
   return mergeVideosById(remote, local);
 }
 
+// Etkinlik geçmişi (uygulama açılışı, görev onayı, satın alma) kimliğe göre
+// birleştirilir; hiçbir cihaz diğerinin kaydını manuel/otomatik eşitlemede silemez.
+function mergeActivityLog(remote: ActivityLogEntry[] = [], local: ActivityLogEntry[] = []) {
+  const entries = new Map<string, ActivityLogEntry>();
+  for (const entry of remote) entries.set(entry.id, entry);
+  for (const entry of local) entries.set(entry.id, entry);
+  return [...entries.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 300);
+}
+
 function removeUndefinedFields(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => {
@@ -175,12 +185,16 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
   const remoteVideos = existing.exists()
     ? ((existing.data().videos || []) as StoryVideo[])
     : [];
+  const remoteActivityLog = existing.exists()
+    ? ((existing.data().activityLog || []) as ActivityLogEntry[])
+    : [];
   const voiceMessages = await moveAudioToStorage(
     normalized,
     mergeVoiceMessages(remoteMessages, data.voiceMessages),
   );
   const videos = mergeVideos(remoteVideos, data.videos);
-  const payload = removeUndefinedFields({ ...data, voiceMessages, videos, updatedAt: Date.now(), schemaVersion: 1 });
+  const activityLog = mergeActivityLog(remoteActivityLog, data.activityLog);
+  const payload = removeUndefinedFields({ ...data, voiceMessages, videos, activityLog, updatedAt: Date.now(), schemaVersion: 1 });
   await setDoc(familyRef(normalized), payload, { merge: false });
 }
 

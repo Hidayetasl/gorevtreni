@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo } from '../types';
+import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo, ActivityLogEntry, VoiceMessage } from '../types';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
 import { extractYoutubeId, hashParentPin } from '../utils/storage';
 import { getFamilyInviteLink } from '../utils/cloudSync';
 import { sortVideosNewestFirst } from '../utils/videoOrder';
-import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw } from 'lucide-react';
+import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw, History, LogIn, ShoppingBag, BookOpen } from 'lucide-react';
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -34,6 +34,8 @@ interface ParentModalProps {
   familyCode: string;
   onCreateFamily: () => Promise<string>;
   onJoinFamily: (code: string) => Promise<void>;
+  activityLog?: ActivityLogEntry[];
+  voiceMessages?: VoiceMessage[];
 }
 
 export const ParentModal: React.FC<ParentModalProps> = ({
@@ -64,13 +66,15 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   familyCode,
   onCreateFamily,
   onJoinFamily,
+  activityLog = [],
+  voiceMessages = [],
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
   const [inviteMessage, setInviteMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'approvals' | 'add_task' | 'bonus' | 'videos' | 'stats' | 'settings'>('approvals');
+  const [activeTab, setActiveTab] = useState<'approvals' | 'add_task' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings'>('approvals');
 
   // Video Form State
   const [videoUrl, setVideoUrl] = useState('');
@@ -171,6 +175,39 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const pendingTasks = tasks.filter((t) => t.status === 'pending_approval');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
   const completedRoutineTasks = completedTasks.filter((t) => !t.isExtra);
+
+  // Etkinlik geçmişi: uygulama açılışları + görev onayları + mağaza alımları
+  // (App.tsx'teki activityLog) ile günlük kayıtlarını (voiceMessages, kind:
+  // 'journal') tek, zaman damgasına göre sıralı bir akışta birleştiriyoruz.
+  type ActivityFeedItem = { id: string; icon: string; title: string; detail?: string; timestamp: string; durationMs?: number };
+  const activityFeed: ActivityFeedItem[] = [
+    ...activityLog.map((entry): ActivityFeedItem => ({
+      id: entry.id,
+      icon: entry.type === 'app_open' ? '📱' : entry.type === 'task_complete' ? '✅' : '🛍️',
+      title: entry.label,
+      detail: entry.detail,
+      timestamp: entry.timestamp,
+      durationMs: entry.durationMs,
+    })),
+    ...voiceMessages
+      .filter((m) => m.kind === 'journal')
+      .map((m): ActivityFeedItem => ({
+        id: m.id,
+        icon: '📔',
+        title: 'Günlük kaydı yaptı',
+        detail: m.transcript || undefined,
+        timestamp: m.createdAt,
+      })),
+  ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const formatActivityTime = (iso: string) =>
+    new Date(iso).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const formatActivityDuration = (ms?: number) => {
+    if (!ms || ms < 1000) return '';
+    const totalSeconds = Math.round(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes > 0 ? `${minutes} dk ${seconds} sn kaldı` : `${seconds} sn kaldı`;
+  };
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,6 +432,18 @@ export const ParentModal: React.FC<ParentModalProps> = ({
               >
                 <BarChart3 className="w-4 h-4" />
                 <span>İstatistikler</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('activity')}
+                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
+                  activeTab === 'activity'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                <span>Etkinlik Geçmişi</span>
               </button>
 
               <button
@@ -832,6 +881,47 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: ETKİNLİK GEÇMİŞİ */}
+            {activeTab === 'activity' && (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-3">
+                  <h3 className="font-game text-sm font-bold text-indigo-900 flex items-center gap-1.5">
+                    <History className="w-4 h-4 text-indigo-600" />
+                    <span>Uygulamada Ne Zaman Ne Yapıldı</span>
+                  </h3>
+                  <p className="text-[11px] font-semibold text-indigo-800 mt-0.5">
+                    Uygulama açılışları, tamamlanan görevler, mağaza alımları ve günlük kayıtları burada, en yeniden eskiye listelenir.
+                  </p>
+                </div>
+
+                {activityFeed.length === 0 ? (
+                  <div className="bg-gray-50 rounded-2xl p-6 text-center border-2 border-dashed border-gray-200 text-gray-500 space-y-2">
+                    <div className="text-4xl">🕰️</div>
+                    <div className="font-game text-sm font-bold text-gray-700">Henüz kayıtlı bir etkinlik yok.</div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    {activityFeed.map((item) => (
+                      <div key={item.id} className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm">
+                        <span className="text-xl leading-none mt-0.5">{item.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-game text-xs font-bold text-gray-800 truncate">{item.title}</span>
+                            <span className="text-[10px] font-bold text-gray-400 whitespace-nowrap">{formatActivityTime(item.timestamp)}</span>
+                          </div>
+                          {(item.detail || item.durationMs) && (
+                            <p className="text-[11px] text-gray-500 font-semibold mt-0.5 truncate">
+                              {[item.detail, formatActivityDuration(item.durationMs)].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

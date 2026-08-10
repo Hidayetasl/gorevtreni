@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { TabType, RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo } from './types';
+import { TabType, RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from './types';
 import {
   getStoredTasks,
   saveStoredTasks,
@@ -23,6 +23,8 @@ import {
   saveStoredVoiceMessages,
   getStoredVideos,
   saveStoredVideos,
+  getStoredActivityLog,
+  saveStoredActivityLog,
   INITIAL_TASKS,
   INITIAL_SHOP,
   INITIAL_WORLD,
@@ -49,6 +51,27 @@ import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 
 const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
 const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
+
+function getBrowserDeviceLabel(): string {
+  if (typeof navigator === 'undefined') return '';
+  const ua = navigator.userAgent;
+  let browser = 'Bilinmeyen Tarayıcı';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/OPR\//.test(ua)) browser = 'Opera';
+  else if (/CriOS/.test(ua)) browser = 'Chrome (iOS)';
+  else if (/FxiOS/.test(ua)) browser = 'Firefox (iOS)';
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Safari\//.test(ua) && /Version\//.test(ua)) browser = 'Safari';
+  let device = '';
+  if (/iPhone/.test(ua)) device = 'iPhone';
+  else if (/iPad/.test(ua)) device = 'iPad';
+  else if (/Android/.test(ua)) device = 'Android';
+  else if (/Macintosh/.test(ua)) device = 'Mac';
+  else if (/Windows/.test(ua)) device = 'Windows';
+  else if (/Linux/.test(ua)) device = 'Linux';
+  return device ? `${browser} · ${device}` : browser;
+}
 
 function getLocalDateKey(value: Date | string = new Date()) {
   const date = typeof value === 'string' ? new Date(value) : value;
@@ -108,6 +131,7 @@ export default function App() {
   const [bonuses, setBonuses] = useState<BonusCard[]>(() => getStoredBonuses());
   const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>(() => getStoredVoiceMessages());
   const [videos, setVideos] = useState<StoryVideo[]>(() => getStoredVideos());
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>(() => getStoredActivityLog());
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
   const [isManualSyncing, setIsManualSyncing] = useState(false);
@@ -118,6 +142,7 @@ export default function App() {
   const latestFamilyDataRef = useRef<import('./utils/cloudSync').FamilyData | null>(null);
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
+  const activityLogRef = useRef(activityLog);
 
   // Davet bağlantısı (?aile=...) başka bir telefonda açıldığında aile kodu
   // otomatik doğrulanır. PIN sadece ebeveyn kilididir; eşitleme anahtarı
@@ -160,6 +185,8 @@ export default function App() {
   useEffect(() => { voiceMessagesRef.current = voiceMessages; }, [voiceMessages]);
   useEffect(() => saveStoredVideos(videos), [videos]);
   useEffect(() => { videosRef.current = videos; }, [videos]);
+  useEffect(() => saveStoredActivityLog(activityLog), [activityLog]);
+  useEffect(() => { activityLogRef.current = activityLog; }, [activityLog]);
 
   useEffect(() => {
     const todayKey = getLocalDateKey();
@@ -174,11 +201,11 @@ export default function App() {
     }
   }, [tasks, user.lastTaskResetDate]);
 
-  const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos });
+  const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog });
 
   useEffect(() => {
     latestFamilyDataRef.current = currentFamilyData();
-  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos]);
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog]);
 
   useEffect(() => {
     if (!cloudEnabled || !isCloudConfigured || !familyCode) return;
@@ -221,14 +248,21 @@ export default function App() {
           }
           const syncedVideos = sortVideosNewestFirst(combinedVideos);
           setVideos(syncedVideos);
+          const remoteActivityLog = remote.activityLog || [];
+          const localActivityLog = activityLogRef.current;
+          const combinedActivityLog = [...remoteActivityLog];
+          for (const entry of localActivityLog) {
+            if (!combinedActivityLog.some((remoteEntry) => remoteEntry.id === entry.id)) combinedActivityLog.push(entry);
+          }
+          setActivityLog(combinedActivityLog);
           setCloudStatus('Eşitlendi ✓');
           pendingSyncRef.current = false;
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
           syncReadyRef.current = true;
-          if (shopCatalogChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length) {
-            // Bu cihazda olup henüz buluta gitmemiş videoyu/notu ve yeni mağaza
-            // katalog parçalarını koru; buluttaki diğer güncel veriler aynen kalır.
-            uploadFamilyData(familyCode, { ...remote, shop: syncedShop, videos: syncedVideos, voiceMessages: combinedMessages })
+          if (shopCatalogChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
+            // Bu cihazda olup henüz buluta gitmemiş videoyu/notu/etkinliği ve yeni
+            // mağaza katalog parçalarını koru; buluttaki diğer güncel veriler aynen kalır.
+            uploadFamilyData(familyCode, { ...remote, shop: syncedShop, videos: syncedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog })
               .catch(() => setCloudStatus('Çevrimdışı: yerel not veya video bu cihazda güvenle bekliyor'));
           }
         }, (message) => setCloudStatus(`Eşitleme hatası: ${message}`));
@@ -254,7 +288,39 @@ export default function App() {
         .catch(() => { pendingSyncRef.current = true; setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'); });
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, familyCode, cloudEnabled]);
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog, familyCode, cloudEnabled]);
+
+  // Uygulama her açıldığında (sekme/sayfa yüklendiğinde) hangi tarayıcı/cihazdan
+  // girildiğini kaydeder; sekme arka plana alınınca veya kapanınca aynı kaydın
+  // üzerine ne kadar süre kaldığını (durationMs) yazar. Ebeveyn panelindeki
+  // etkinlik geçmişinde görünür.
+  useEffect(() => {
+    const id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sessionStart = Date.now();
+    const entry: ActivityLogEntry = {
+      id,
+      type: 'app_open',
+      label: 'Uygulama açıldı',
+      detail: getBrowserDeviceLabel(),
+      timestamp: new Date().toISOString(),
+    };
+    setActivityLog((prev) => [entry, ...prev].slice(0, 300));
+
+    const updateDuration = () => {
+      const durationMs = Date.now() - sessionStart;
+      setActivityLog((prev) => prev.map((e) => (e.id === id ? { ...e, durationMs } : e)));
+    };
+    const handleVisibility = () => { if (document.hidden) updateDuration(); };
+    window.addEventListener('pagehide', updateDuration);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      updateDuration();
+      window.removeEventListener('pagehide', updateDuration);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  // Yalnızca ilk yüklemede bir kez çalışsın istiyoruz.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -291,8 +357,23 @@ export default function App() {
       if (!remote) throw new Error('Bu aile kaydı bulunamadı.');
       const remoteVideos = remote.videos || [];
       const combinedVideos = mergeVideosById(remoteVideos, videosRef.current);
-      if (combinedVideos.length > remoteVideos.length) {
-        await uploadFamilyData(familyCode, { ...remote, shop: mergeShopItemsWithCatalog(remote.shop), videos: combinedVideos, voiceMessages: remote.voiceMessages || [] });
+      // Sesli notları/günlükleri de video birleştirmesiyle aynı güvenli mantıkla
+      // birleştiriyoruz: buluta henüz ulaşmamış yerel bir kayıt manuel eşitlemeyle
+      // asla silinmemeli (otomatik arka plan eşitlemesiyle aynı davranış).
+      const remoteMessages = remote.voiceMessages || [];
+      const localMessages = voiceMessagesRef.current;
+      const combinedMessages = [...remoteMessages];
+      for (const message of localMessages) {
+        if (!combinedMessages.some((remoteMessage) => remoteMessage.id === message.id)) combinedMessages.push(message);
+      }
+      const remoteActivityLog = remote.activityLog || [];
+      const localActivityLog = activityLogRef.current;
+      const combinedActivityLog = [...remoteActivityLog];
+      for (const entry of localActivityLog) {
+        if (!combinedActivityLog.some((remoteEntry) => remoteEntry.id === entry.id)) combinedActivityLog.push(entry);
+      }
+      if (combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
+        await uploadFamilyData(familyCode, { ...remote, shop: mergeShopItemsWithCatalog(remote.shop), videos: combinedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog });
       }
       remoteUpdateRef.current = true;
       setUser({
@@ -300,7 +381,7 @@ export default function App() {
         ...remote.user,
       });
       setParentConfig(remote.parentConfig); setTasks(remote.tasks); setShop(mergeShopItemsWithCatalog(remote.shop));
-      setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(remote.voiceMessages || []); setVideos(combinedVideos);
+      setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
       window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
@@ -335,6 +416,19 @@ export default function App() {
     setCloudStatus('Aile verisi yükleniyor…');
   };
 
+  // Etkinlik geçmişi: ebeveyn panelindeki "ne zaman girmiş, ne yapmış" akışı
+  // için tek, hafif bir kayıt fonksiyonu. Liste 300 kayıtla sınırlı tutulur.
+  const logActivity = (type: ActivityLogEntry['type'], label: string, detail?: string) => {
+    const entry: ActivityLogEntry = {
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type,
+      label,
+      detail,
+      timestamp: new Date().toISOString(),
+    };
+    setActivityLog((prev) => [entry, ...prev].slice(0, 300));
+  };
+
   // Task Completion / Approval Logic
   const handleMarkTaskDone = (taskId: string) => {
     setTasks((prev) =>
@@ -358,6 +452,7 @@ export default function App() {
       totalCompletedTasks: prev.totalCompletedTasks + 1,
       lastTaskResetDate: todayKey,
     }));
+    logActivity('task_complete', task.title, `+${task.rewardCoins} Tren Parası`);
   };
 
   const handleApproveAllTasks = () => {
@@ -378,6 +473,7 @@ export default function App() {
       totalCompletedTasks: prev.totalCompletedTasks + pending.length,
       lastTaskResetDate: todayKey,
     }));
+    pending.forEach((task) => logActivity('task_complete', task.title, `+${task.rewardCoins} Tren Parası`));
   };
 
   const handleRejectTask = (taskId: string) => {
@@ -413,8 +509,10 @@ export default function App() {
 
   // Shop & Inventory Handlers
   const handleBuyItem = (itemId: string, price: number) => {
+    const item = shop.find((s) => s.id === itemId);
     setUser((prev) => ({ ...prev, coins: Math.max(0, prev.coins - price) }));
     setShop((prev) => prev.map((item) => (item.id === itemId ? { ...item, unlocked: true } : item)));
+    logActivity('purchase', item?.name || itemId, `-${price} Tren Parası`);
   };
 
   const handleSetActiveTrain = (icon: string) => {
@@ -657,6 +755,8 @@ export default function App() {
           familyCode={familyCode}
           onCreateFamily={handleCreateFamily}
           onJoinFamily={handleJoinFamily}
+          activityLog={activityLog}
+          voiceMessages={voiceMessages}
         />
 
         {/* Voice Messages Modal */}
