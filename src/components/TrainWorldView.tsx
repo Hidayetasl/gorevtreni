@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playPopSound, speakText, startTrainEngineLoop, stopTrainEngineLoop } from '../utils/audio';
-import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2, Lightbulb } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -20,6 +20,10 @@ import altinVagonuImg from '../assets/images/altin-vagonu.webp';
 import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
+import kontrolDurKalkImg from '../assets/images/kontrol-dur-kalk.webp';
+import kontrolKornaImg from '../assets/images/kontrol-korna.webp';
+import kontrolIsikImg from '../assets/images/kontrol-isik.webp';
+import kontrolTrenSesiImg from '../assets/images/kontrol-tren-sesi.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
 
 interface TrainWorldViewProps {
@@ -126,6 +130,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [isTrainRunning, setIsTrainRunning] = useState(true);
   // Lokomotifin ön farı — kapalı/açık; açıkken önünde sarı bir ışık halesi görünür.
   const [lightsOn, setLightsOn] = useState(false);
+  // Motor (çuf-çuf) sesi için ayrı bir aç/kapat — genel ses ayarından bağımsız
+  // olarak sadece bu sesi susturabilmek için.
+  const [engineSoundOn, setEngineSoundOn] = useState(true);
   const [trainSpeed, setTrainSpeed] = useState<'normal' | 'fast' | 'slow'>('normal');
   const [trainDirection, setTrainDirection] = useState<'right' | 'left'>('right');
   const [isWhistling, setIsWhistling] = useState(false);
@@ -292,13 +299,13 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Tren çalışırken sürekli "çuf-çuf" motor sesi — durunca, sekme değişince
   // veya ses kapatılınca otomatik susturuluyor.
   useEffect(() => {
-    if (isTrainRunning && viewMode === 'ride') {
+    if (isTrainRunning && viewMode === 'ride' && engineSoundOn) {
       startTrainEngineLoop(soundEnabled, trainSpeed);
     } else {
       stopTrainEngineLoop();
     }
     return () => stopTrainEngineLoop();
-  }, [isTrainRunning, viewMode, soundEnabled, trainSpeed]);
+  }, [isTrainRunning, viewMode, soundEnabled, trainSpeed, engineSoundOn]);
 
   // Tren ana rayın ucuna varınca yönünü tersine çevirir (sağdan sola, sonra
   // soldan sağa) — Yedek Hat sadece görsel/dekoratif kalır, tren ona hiç
@@ -1154,39 +1161,81 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </div>
           </div>
 
+          {/* Ana Kumanda Paneli — çocuklar için büyük ikonlu, yuvarlatılmış
+              koyu lacivert panel. Dur/Kalk tek düğmede birleşik (ikili kol
+              görseli), Korna/Işık/Motor Sesi ayrı aç-kapat düğmeleri. */}
+          <div className="rounded-3xl bg-[#0a1830] border-2 border-[#1c3a5e] p-3.5 sm:p-4 shadow-xl">
+            <div className="text-[10px] sm:text-xs font-black text-sky-300 uppercase tracking-widest mb-2.5 text-center">
+              🎮 Kumanda Paneli
+            </div>
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setIsTrainRunning(!isTrainRunning)}
+                className={`flex flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90 bg-[#102544] ring-2 ${
+                  isTrainRunning ? 'ring-emerald-400/80' : 'ring-rose-400/80'
+                }`}
+                title={isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}
+              >
+                <img src={kontrolDurKalkImg} alt="Dur / Kalk" className="w-11 h-11 sm:w-14 sm:h-14 object-contain" draggable={false} />
+                <span className="text-[8px] sm:text-[10px] font-black text-white">{isTrainRunning ? 'DUR' : 'KALK'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleWhistleBlow}
+                className="flex flex-col items-center gap-1 rounded-2xl py-2 bg-[#102544] transition-all active:scale-90"
+                title="Korna Çal"
+              >
+                <img src={kontrolKornaImg} alt="Korna" className="w-11 h-11 sm:w-14 sm:h-14 object-contain" draggable={false} />
+                <span className="text-[8px] sm:text-[10px] font-black text-white">KORNA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLightsOn(!lightsOn)}
+                className={`flex flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90 bg-[#102544] ${
+                  lightsOn ? 'ring-2 ring-yellow-300/90' : ''
+                }`}
+                title={lightsOn ? 'Işıkları Kapat' : 'Işıkları Aç'}
+              >
+                <img
+                  src={kontrolIsikImg}
+                  alt="Işık"
+                  className={`w-11 h-11 sm:w-14 sm:h-14 object-contain transition-opacity ${lightsOn ? 'opacity-100' : 'opacity-45'}`}
+                  draggable={false}
+                />
+                <span className="text-[8px] sm:text-[10px] font-black text-white">{lightsOn ? 'AÇIK' : 'IŞIK'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEngineSoundOn(!engineSoundOn)}
+                className={`flex flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90 bg-[#102544] ${
+                  engineSoundOn ? 'ring-2 ring-orange-300/90' : ''
+                }`}
+                title={engineSoundOn ? 'Tren Sesini Kapat' : 'Tren Sesini Aç'}
+              >
+                <img
+                  src={kontrolTrenSesiImg}
+                  alt="Tren Sesi"
+                  className={`w-11 h-11 sm:w-14 sm:h-14 object-contain transition-opacity ${engineSoundOn ? 'opacity-100' : 'opacity-45'}`}
+                  draggable={false}
+                />
+                <span className="text-[8px] sm:text-[10px] font-black text-white">{engineSoundOn ? 'AÇIK' : 'SES'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Controls & Customizer Toolbar */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Speed & Direction Controls */}
             <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white space-y-2">
               <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
                 <FastForward className="w-4 h-4 text-sky-300" />
-                <span>Tren Sürüş Kontrolleri</span>
+                <span>Hız & Yön</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => setIsTrainRunning(!isTrainRunning)}
-                  className={`px-3.5 py-2 rounded-2xl font-game text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                    isTrainRunning
-                      ? 'bg-amber-500 hover:bg-amber-600 text-amber-950 border-amber-300'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-400'
-                  }`}
-                >
-                  {isTrainRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  <span>{isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}</span>
-                </button>
-
-                <button
-                  onClick={() => setLightsOn(!lightsOn)}
-                  className={`px-3.5 py-2 rounded-2xl font-game text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                    lightsOn
-                      ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 border-yellow-200'
-                      : 'bg-[#0e2531] hover:bg-[#1a3a4d] text-slate-300 border-slate-700'
-                  }`}
-                >
-                  <Lightbulb className="w-4 h-4" />
-                  <span>{lightsOn ? 'Işıklar Açık' : 'Işıkları Aç'}</span>
-                </button>
-
                 <div className="flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">
                   <button
                     onClick={() => setTrainSpeed('slow')}
