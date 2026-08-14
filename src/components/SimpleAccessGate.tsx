@@ -4,6 +4,12 @@ import { createFamilyCode, familyExists, isCloudConfigured } from '../utils/clou
 
 const ACCESS_PINS = new Set(['1234', '0123']);
 
+// Aile üyeleri için kolay giriş: uzun aile kodu yerine tek, ortak bir PIN.
+// Bu PIN'i giren herkes (baba, anne, anneanne) doğrudan Rüzgar'ın gerçek
+// ailesine bağlanır — kod kopyalamaya/yazmaya gerek kalmaz.
+const QUICK_ACCESS_PIN = '1234';
+const QUICK_ACCESS_FAMILY_CODE = 'XJSKGCJMBPJ6';
+
 interface SimpleAccessGateProps {
   /** Bulut açıksa geçerli aile kodunu taşır; kapalıysa hiç çağrılmaz. */
   onUnlock: (familyCode?: string) => void;
@@ -45,20 +51,23 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
   };
 
   const normalizedCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const isQuickPin = normalizedCode === QUICK_ACCESS_PIN;
+  const resolvedCode = isQuickPin ? QUICK_ACCESS_FAMILY_CODE : normalizedCode;
+  const canSubmit = isQuickPin || normalizedCode.length >= 8;
 
   const handleEnter = async () => {
-    if (normalizedCode.length < 8 || status === 'checking') return;
+    if (!canSubmit || status === 'checking') return;
     setStatus('checking');
     setErrorMessage('');
     try {
-      const exists = await familyExists(normalizedCode);
+      const exists = await familyExists(resolvedCode);
       if (!exists) {
         setStatus('error');
         setErrorMessage('Bu aile koduyla kayıt bulunamadı. Kodu kontrol edin.');
         return;
       }
       localStorage.setItem('ruzgar_game_access_v1', 'open');
-      onUnlock(normalizedCode);
+      onUnlock(resolvedCode);
     } catch {
       setStatus('error');
       setErrorMessage('Bağlantı hatası. İnternetinizi kontrol edip tekrar deneyin.');
@@ -120,7 +129,7 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-blue-700 text-4xl shadow-lg">🚂</div>
         <p className="font-game text-sm font-black text-sky-700">RÜZGAR'IN</p>
         <h1 className="mt-1 font-game text-3xl font-black text-slate-900">Görev Treni</h1>
-        <p className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-relaxed text-slate-600">Oyuna girmek için aile giriş kodunu yazın.</p>
+        <p className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-relaxed text-slate-600">Oyuna girmek için aile giriş kodunu yazın (kolay giriş: <span className="font-mono font-black">1234</span>).</p>
 
         <input
           type="text"
@@ -140,7 +149,7 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
         <button
           type="button"
           onClick={handleEnter}
-          disabled={normalizedCode.length < 8 || status === 'checking'}
+          disabled={!canSubmit || status === 'checking'}
           className="mt-4 w-full min-h-12 rounded-2xl bg-sky-600 text-white font-game text-sm font-bold shadow-md disabled:opacity-50"
         >
           {status === 'checking' ? 'Kontrol ediliyor…' : 'Oyuna Gir 🚂'}
