@@ -634,7 +634,14 @@ export default function App() {
   const unreadVoiceCount = voiceMessages.filter((m) => m.isNew).length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
-  if (!hasGameAccess) {
+  // ÖNEMLİ: "ruzgar_game_access_v1" eski (bulut öncesi) sabit PIN döneminden
+  // kalma bir bayraktı. Bir cihazda bir kez "açık" olarak kaydedildiyse,
+  // sonradan site verisi kısmen temizlenip aile kodu kaybolsa bile bu bayrak
+  // kalıcı olarak kalabiliyor ve giriş ekranı hiç açılmadan uygulama boş/
+  // yanlış aile koduyla başlıyordu — veriler "gelmiyor" gibi görünüyordu.
+  // Bulut açıkken geçerli bir aile kodu yoksa giriş ekranı her zaman gösterilir.
+  const needsFamilyCode = isCloudConfigured && !familyCode;
+  if (!hasGameAccess || needsFamilyCode) {
     // Giriş kodu artık doğrudan aile kodu: doğru kod hem oyunu açar hem bu
     // cihazı aynı aile verisine bağlar, ayrı bir "eşleşme" adımına gerek kalmaz.
     return (
