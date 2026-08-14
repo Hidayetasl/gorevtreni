@@ -228,8 +228,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // görsel olarak birleşiyor.
   const secondRailStartLeft = 13;
   const secondRailEndLeft = secondRailStartLeft + secondRailWidthPercent;
-  const secondRailStartTop = 34;
-  const secondRailEndTop = 46;
+  // top değerleri, hattın binaların ÖNÜNDEN değil arkasından (yeşil
+  // tepelerin içinden) geçmesi için düşürüldü — önceki 34/46 değeri okulun
+  // çatısı ve ayçiçeğiyle çakışıp kasabanın ortasından geçiyormuş gibi
+  // görünüyordu.
+  const secondRailStartTop = 14;
+  const secondRailEndTop = 22;
   const frontRailTopPercent = 85;
   const trainTransform = trainDirection === 'left' ? 'scaleX(-1)' : 'none';
 
