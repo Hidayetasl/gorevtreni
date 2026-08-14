@@ -237,12 +237,13 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // görsel olarak birleşiyor.
   const secondRailStartLeft = 13;
   const secondRailEndLeft = secondRailStartLeft + secondRailWidthPercent;
-  // top değerleri, hattın binaların ÖNÜNDEN değil arkasından (yeşil
-  // tepelerin içinden) geçmesi için düşürüldü — önceki 34/46 değeri okulun
-  // çatısı ve ayçiçeğiyle çakışıp kasabanın ortasından geçiyormuş gibi
-  // görünüyordu.
-  const secondRailStartTop = 14;
-  const secondRailEndTop = 22;
+  // top değerleri: ağaç tepeleri ~%12, bina çatıları ~%61 seviyesinde.
+  // Önceki deneme (14/22) ağaç tepelerinin bile üstüne, gökyüzüne taşıp dev
+  // bir gökkuşağı/halka gibi görünüyordu. 34/46 ise bina çatılarıyla
+  // çakışıyordu. Bu değer ikisinin ortasında: binaların arkasında ama
+  // ağaçların altında kalıyor, kavis çok daha ölçülü.
+  const secondRailStartTop = 36;
+  const secondRailEndTop = 44;
   const frontRailTopPercent = 85;
   const trainTransform = trainDirection === 'left' ? 'scaleX(-1)' : 'none';
 
