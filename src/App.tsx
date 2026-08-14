@@ -41,6 +41,7 @@ import { TasksView } from './components/TasksView';
 import { TrainWorldView } from './components/TrainWorldView';
 import { ShopView } from './components/ShopView';
 import { VideosView } from './components/VideosView';
+import { LearnView } from './components/LearnView';
 import { ParentModal } from './components/ParentModal';
 import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
@@ -633,7 +634,18 @@ export default function App() {
   const unreadVoiceCount = voiceMessages.filter((m) => m.isNew).length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
-  if (!hasGameAccess) return <SimpleAccessGate onUnlock={() => setHasGameAccess(true)} />;
+  if (!hasGameAccess) {
+    // Giriş kodu artık doğrudan aile kodu: doğru kod hem oyunu açar hem bu
+    // cihazı aynı aile verisine bağlar, ayrı bir "eşleşme" adımına gerek kalmaz.
+    return (
+      <SimpleAccessGate
+        onUnlock={(code) => {
+          if (code) setFamilyCode(code);
+          setHasGameAccess(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0e2531] via-[#112f3e] to-[#2f7533] text-slate-100 relative selection:bg-sky-200">
@@ -714,6 +726,14 @@ export default function App() {
             <VideosView
               videos={videos}
               parentConfig={parentConfig}
+            />
+          )}
+
+          {activeTab === 'learn' && (
+            <LearnView
+              soundEnabled={user.soundEnabled}
+              speechEnabled={user.speechEnabled}
+              syllableGameLevels={user.syllableGameLevels}
             />
           )}
         </main>

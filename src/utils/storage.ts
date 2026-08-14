@@ -32,6 +32,7 @@ export const INITIAL_USER: UserProfile = {
   speechEnabled: true,
   activeTrainIcon: '🚂',
   progressVersion: START_LEVEL_VERSION,
+  syllableGameLevels: [1],
 };
 
 export const INITIAL_PARENT: ParentConfig = {
@@ -182,6 +183,12 @@ export const INITIAL_SHOP: ShopItem[] = [
   { id: 'scenery-house-6', name: 'Verandalı Bahçe Evi', category: 'scenery', price: 15, icon: '🏡', description: 'Sallanan sandalyeli veranda ve sebze bahçesi olan ev', unlocked: false, type: 'decoration' },
   { id: 'scenery-cinema', name: 'Kasaba Sineması', category: 'scenery', price: 25, icon: '🎬', description: 'Filmlerin oynadığı sevimli kasaba sineması', unlocked: false, type: 'decoration' },
   { id: 'scenery-airplane', name: 'Küçük Uçak', category: 'scenery', price: 20, icon: '✈️', description: 'Kasabanın üzerinde uçan küçük uçak', unlocked: false, type: 'decoration' },
+  { id: 'scenery-bakery', name: 'Kasaba Fırını', category: 'scenery', price: 12, icon: '🥐', description: 'Taze sıcak simit ve ekmek kokan sevimli fırın', unlocked: false, type: 'decoration' },
+  { id: 'scenery-fountain', name: 'Kasaba Fıskiyesi', category: 'scenery', price: 12, icon: '⛲', description: 'Meydanda köpüren sevimli fıskiye', unlocked: false, type: 'decoration' },
+  { id: 'scenery-ambulance', name: 'Sincap Ambulansı', category: 'scenery', price: 22, icon: '🚑', description: 'Kasabaya yardıma koşan sevimli MAYDAY ambulansı', unlocked: false, type: 'decoration' },
+  { id: 'scenery-firestation', name: 'İtfaiye Aracı', category: 'scenery', price: 22, icon: '🚒', description: 'Sirenini çalarak koşan kırmızı itfaiye aracı', unlocked: false, type: 'decoration' },
+  { id: 'scenery-firestation-building', name: 'İtfaiye İstasyonu', category: 'scenery', price: 25, icon: '🚒', description: 'Kırmızı çanlı kule ve iki garaj kapılı itfaiye binası', unlocked: false, type: 'decoration' },
+  { id: 'scenery-squirrel-courier', name: 'Sincap Postacı', category: 'scenery', price: 18, icon: '🐿️', description: 'Elinde haritayla köyde koşan TCDD sincap postacısı', unlocked: false, type: 'decoration' },
 
   // Real World Rewards (Scaled to 1-Day, 2-Day, and 3-Day efforts)
   { id: 'reward-icecream', name: 'Dondurma Keyfi', category: 'rewards', price: 24, icon: '🍦', description: 'En sevdiğin 2 top dondurma ödülü! ⭐ (1 Günlük Başarı)', unlocked: false, type: 'real_reward' },
@@ -192,28 +199,29 @@ export const INITIAL_SHOP: ShopItem[] = [
 ];
 
 export const INITIAL_WORLD: PlacedWorldItem[] = [
-  // Tracks forming a nice mini world loop
-  { id: 'w-1', itemId: 'track-straight', x: 2, y: 3, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-2', itemId: 'track-straight', x: 3, y: 3, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-3', itemId: 'track-straight', x: 4, y: 3, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-4', itemId: 'track-straight', x: 5, y: 3, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-5', itemId: 'track-curve', x: 6, y: 3, icon: '↩️', name: 'Viraj Ray' },
-  { id: 'w-6', itemId: 'track-straight', x: 6, y: 4, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-7', itemId: 'track-straight', x: 6, y: 5, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-8', itemId: 'track-curve', x: 6, y: 6, icon: '↩️', name: 'Viraj Ray' },
-  { id: 'w-9', itemId: 'track-straight', x: 5, y: 6, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-10', itemId: 'track-straight', x: 4, y: 6, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-11', itemId: 'track-straight', x: 3, y: 6, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-12', itemId: 'track-curve', x: 2, y: 6, icon: '↩️', name: 'Viraj Ray' },
-  { id: 'w-13', itemId: 'track-straight', x: 2, y: 5, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-14', itemId: 'track-curve', x: 2, y: 4, icon: '↩️', name: 'Viraj Ray' },
+  // Tracks forming a nice mini world loop. Izgara artık her zaman boş kalan
+  // en üst gökyüzü satırı olmadan 6 satır olduğu için koordinatlar buna göre.
+  { id: 'w-1', itemId: 'track-straight', x: 2, y: 2, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-2', itemId: 'track-straight', x: 3, y: 2, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-3', itemId: 'track-straight', x: 4, y: 2, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-4', itemId: 'track-straight', x: 5, y: 2, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-5', itemId: 'track-curve', x: 6, y: 2, icon: '↩️', name: 'Viraj Ray' },
+  { id: 'w-6', itemId: 'track-straight', x: 6, y: 3, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-7', itemId: 'track-straight', x: 6, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-8', itemId: 'track-curve', x: 6, y: 5, icon: '↩️', name: 'Viraj Ray' },
+  { id: 'w-9', itemId: 'track-straight', x: 5, y: 5, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-10', itemId: 'track-straight', x: 4, y: 5, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-11', itemId: 'track-straight', x: 3, y: 5, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-12', itemId: 'track-curve', x: 2, y: 5, icon: '↩️', name: 'Viraj Ray' },
+  { id: 'w-13', itemId: 'track-straight', x: 2, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-14', itemId: 'track-curve', x: 2, y: 3, icon: '↩️', name: 'Viraj Ray' },
 
   // Scenery inside and around the track
-  { id: 'w-15', itemId: 'scenery-tree', x: 3, y: 4, icon: '🌳', name: 'Çam Ağacı' },
-  { id: 'w-16', itemId: 'scenery-house', x: 4, y: 4, icon: '🏠', name: 'Kırmızı Ev' },
-  { id: 'w-17', itemId: 'scenery-flower', x: 5, y: 4, icon: '🌻', name: 'Güneş Çiçeği' },
-  { id: 'w-18', itemId: 'scenery-tree', x: 7, y: 2, icon: '🌳', name: 'Çam Ağacı' },
-  { id: 'w-19', itemId: 'scenery-tree', x: 1, y: 2, icon: '🌳', name: 'Çam Ağacı' },
+  { id: 'w-15', itemId: 'scenery-tree', x: 3, y: 3, icon: '🌳', name: 'Çam Ağacı' },
+  { id: 'w-16', itemId: 'scenery-house', x: 4, y: 3, icon: '🏠', name: 'Kırmızı Ev' },
+  { id: 'w-17', itemId: 'scenery-flower', x: 5, y: 3, icon: '🌻', name: 'Güneş Çiçeği' },
+  { id: 'w-18', itemId: 'scenery-tree', x: 7, y: 1, icon: '🌳', name: 'Çam Ağacı' },
+  { id: 'w-19', itemId: 'scenery-tree', x: 1, y: 1, icon: '🌳', name: 'Çam Ağacı' },
 ];
 
 export const INITIAL_BONUSES: BonusCard[] = [];
@@ -279,7 +287,26 @@ export const getStoredShop = (): ShopItem[] => {
 };
 export const saveStoredShop = (shop: ShopItem[]) => saveToStorage(STORAGE_KEYS.SHOP, shop);
 
-export const getStoredWorld = () => loadFromStorage<PlacedWorldItem[]>(STORAGE_KEYS.WORLD, INITIAL_WORLD);
+const WORLD_ROW_SHIFT_VERSION = 'ruzgar_world_row_shift_v1';
+// Harita Çizimi'nde hep boş kalan en üstteki gökyüzü satırı kaldırılıp ızgara
+// 7 satırdan 6 satıra indirildi. Daha önce kaydedilmiş yerleşimlerin hepsi bu
+// yüzden bir satır yukarı kaydırılır; bu geçiş her cihazda sadece bir kez çalışır.
+export const getStoredWorld = () => {
+  if (typeof window !== 'undefined' && window.localStorage.getItem(WORLD_ROW_SHIFT_VERSION) !== 'done') {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.WORLD);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as PlacedWorldItem[];
+        const shifted = parsed.map((item) => ({ ...item, y: Math.max(0, Math.min(5, item.y - 1)) }));
+        saveToStorage(STORAGE_KEYS.WORLD, shifted);
+      } catch (error) {
+        console.error('Dünya satırı kaydırma hatası', error);
+      }
+    }
+    window.localStorage.setItem(WORLD_ROW_SHIFT_VERSION, 'done');
+  }
+  return loadFromStorage<PlacedWorldItem[]>(STORAGE_KEYS.WORLD, INITIAL_WORLD);
+};
 export const saveStoredWorld = (world: PlacedWorldItem[]) => saveToStorage(STORAGE_KEYS.WORLD, world);
 
 export const getStoredUser = (): UserProfile => {
@@ -294,6 +321,7 @@ export const getStoredUser = (): UserProfile => {
       soundEnabled: stored.soundEnabled ?? INITIAL_USER.soundEnabled,
       speechEnabled: stored.speechEnabled ?? INITIAL_USER.speechEnabled,
       activeTrainIcon: stored.activeTrainIcon || INITIAL_USER.activeTrainIcon,
+      syllableGameLevels: stored.syllableGameLevels ?? INITIAL_USER.syllableGameLevels,
     };
     saveToStorage(STORAGE_KEYS.USER, firstDayUser);
     saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));

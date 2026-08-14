@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
-    base: process.env.GITHUB_PAGES === 'true' ? '/ruzgar-rutin-oyunu/' : '/',
+    base: process.env.GITHUB_PAGES === 'true' ? '/gorev-treni/' : '/',
     plugins: [
       react(),
       tailwindcss(),

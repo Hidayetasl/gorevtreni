@@ -247,6 +247,22 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     speakText('Ayarlar kaydedildi', speechEnabled);
   };
 
+  // Heceleme oyunu seviye ayarı: ebeveyn birden fazla seviyeyi aynı anda
+  // açabilir (ör. sadece 2. seviye, ya da 1-2-3 hepsi). En az bir seviye
+  // her zaman açık kalmak zorunda, yoksa oyunda gösterilecek kelime kalmaz.
+  const activeSyllableLevels = userProfile.syllableGameLevels && userProfile.syllableGameLevels.length > 0
+    ? userProfile.syllableGameLevels
+    : [1];
+  const handleToggleSyllableLevel = (level: number) => {
+    const isSelected = activeSyllableLevels.includes(level);
+    if (isSelected && activeSyllableLevels.length === 1) return;
+    const next = isSelected
+      ? activeSyllableLevels.filter((l) => l !== level)
+      : [...activeSyllableLevels, level];
+    playPopSound(soundEnabled);
+    onUpdateUserProfile({ ...userProfile, syllableGameLevels: [...next].sort((a, b) => a - b) });
+  };
+
   const handleJoin = async () => {
     try {
       await onJoinFamily(joiningCode);
@@ -959,6 +975,38 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   >
                     Ayarları Kaydet 💾
                   </button>
+                </div>
+
+                <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-3 space-y-2">
+                  <h3 className="font-game text-sm text-purple-900">🎈 Heceleme Oyunu Seviyesi</h3>
+                  <p className="text-[11px] leading-relaxed text-purple-800">
+                    Hangi seviyeler açık olsun? Birden fazla seçebilirsiniz. Rüzgar bir seviyeyi
+                    tamamlayınca (birkaç kelime doğru bulunca) sıradaki açık seviyeye otomatik geçer.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { level: 1, label: 'Seviye 1', note: '2 Heceli' },
+                      { level: 2, label: 'Seviye 2', note: '3 Heceli' },
+                      { level: 3, label: 'Seviye 3', note: '4 Heceli' },
+                    ].map((item) => {
+                      const isOn = activeSyllableLevels.includes(item.level);
+                      return (
+                        <button
+                          key={item.level}
+                          type="button"
+                          onClick={() => handleToggleSyllableLevel(item.level)}
+                          className={`rounded-xl border-2 py-2 flex flex-col items-center gap-0.5 transition-all active:scale-95 ${
+                            isOn
+                              ? 'bg-purple-600 border-purple-300 text-white shadow-sm'
+                              : 'bg-white border-purple-200 text-purple-400'
+                          }`}
+                        >
+                          <span className="font-game text-xs font-black">{item.label}</span>
+                          <span className="text-[10px] font-bold">{item.note}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border-2 border-sky-200 bg-sky-50 p-3 space-y-2">

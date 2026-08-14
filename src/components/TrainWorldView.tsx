@@ -4,18 +4,22 @@ import { playTrainWhistle, playPopSound, speakText } from '../utils/audio';
 import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 
 // Import generated cartoon assets
-import cartoonBg from '../assets/images/cartoon_train_background_1785400076710.jpg';
+import cartoonBg from '../assets/images/bos-genis.webp';
 
 // Safari eski bir uygulama kabuğunu kısa süre tutsa bile sabit yol üzerinden
-// yedek manzarayı yükleyebilir. `?v=3` eski görsel önbelleğini geçersiz kılar.
-const stableCartoonBackground = `${import.meta.env.BASE_URL}train-world.jpg?v=3`;
-import pandaLocomotive from '../assets/images/cartoon_panda_locomotive_1785400092467.jpg';
-import merkezGarImg from '../assets/images/merkez-tren-gari.png';
-import lokomotifImg from '../assets/images/lokomotif-yesil.png';
-import yolcuVagonuKirmiziImg from '../assets/images/yolcu-vagonu-kirmizi.png';
-import yolcuVagonuYesilImg from '../assets/images/yolcu-vagonu-yesil.png';
-import yukVagonuImg from '../assets/images/yuk-vagonu.png';
-import sipaMaskotImg from '../assets/images/sipa-maskot.png';
+// yedek manzarayı yükleyebilir. `?v=5` eski görsel önbelleğini geçersiz kılar (Ağustos
+// 2026: nehir/ayçiçeği tarlası ile genişletilmiş yeni 21:9 manzara).
+const stableCartoonBackground = `${import.meta.env.BASE_URL}train-world.webp?v=7`;
+import pandaLocomotive from '../assets/images/cartoon_panda_locomotive_1785400092467.webp';
+import merkezGarImg from '../assets/images/sincap-koy-gari-v2.webp';
+import lokomotifImg from '../assets/images/lokomotif-yesil.webp';
+import yolcuVagonuKirmiziImg from '../assets/images/yolcu-vagonu-kirmizi.webp';
+import yolcuVagonuYesilImg from '../assets/images/yolcu-vagonu-yesil.webp';
+import yukVagonuImg from '../assets/images/yuk-vagonu.webp';
+import altinVagonuImg from '../assets/images/altin-vagonu.webp';
+import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
+import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
+import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
 
 interface TrainWorldViewProps {
@@ -35,8 +39,11 @@ type EnvironmentTheme = 'farm' | 'mountains' | 'sunset' | 'night';
 // Harita Çizimi'ndeki 8x7'lik yerleşim ızgarasıyla aynı boyut; ana sahnedeki
 // dekor pozisyonu artık bu ızgar üzerinden (item.x / item.y) hesaplanıyor —
 // böylece çocuğun yerleştirdiği kare ile ana dünyada göründüğü yer birebir eşleşir.
-const GRID_COLS = 8;
-const GRID_ROWS = 7;
+const GRID_COLS = 14; // Kasaba artık yana kaydırmalı: alan kazanmak için sütun sayısı 8'den 14'e çıkarıldı.
+const GRID_ROWS = 6; // Üstteki hep boş kalan gökyüzü satırı kaldırıldı, kalan satırlara daha çok dikey alan kaldı.
+// Hem Harita Çizimi hem Dünya sahnesi, görünür kutunun bu kadar genişinde bir
+// iç içerik barındırır; taşan kısım yana kaydırılarak görülür.
+const WORLD_WIDE_PERCENT = Math.round((GRID_COLS / 8) * 100);
 
 // Her eşya türünün ana sahnede kaç büyük çizileceği (konum artık sabit değil,
 // sadece görsel boyut sabit kalıyor).
@@ -53,13 +60,51 @@ const SCENE_ITEM_SIZE: Record<string, string> = {
   'scenery-hospital': 'text-2xl sm:text-4xl',
   'scenery-train-repair': 'text-3xl sm:text-5xl',
   'scenery-ferris': 'text-5xl sm:text-7xl',
+  'scenery-bakery': 'text-3xl sm:text-5xl',
+  'scenery-fountain': 'text-3xl sm:text-5xl',
+  'scenery-house-2': 'text-2xl sm:text-4xl',
+  'scenery-house-3': 'text-2xl sm:text-4xl',
+  'scenery-house-4': 'text-2xl sm:text-4xl',
+  'scenery-house-5': 'text-2xl sm:text-4xl',
+  'scenery-house-6': 'text-2xl sm:text-4xl',
+  'scenery-cinema': 'text-2xl sm:text-4xl',
+  'scenery-airplane': 'text-3xl sm:text-5xl',
+  'scenery-ambulance': 'text-3xl sm:text-5xl',
+  'scenery-firestation': 'text-3xl sm:text-5xl',
+  'scenery-firestation-building': 'text-2xl sm:text-4xl',
+  'scenery-squirrel-courier': 'text-2xl sm:text-4xl',
 };
+
+// Gerçek görseli olan eşyaların (SCENERY_IMAGES) ana sahnedeki piksel boyutu.
+// Binalar biraz daha büyük ve net görünsün; araçlar (ambulans/itfaiye) ise
+// binaların yaklaşık yarısı büyüklüğünde kalsın ki manzarayı kaplamasınlar.
+const SCENE_IMG_SIZE: Record<string, string> = {
+  'scenery-ambulance': 'w-12 h-12 sm:w-20 sm:h-20',
+  'scenery-firestation': 'w-12 h-12 sm:w-20 sm:h-20',
+  'scenery-squirrel-courier': 'w-10 h-10 sm:w-16 sm:h-16',
+  // Lunapark dönme dolabı + sinema birleşik yapısı, diğer binalardan belirgin
+  // şekilde daha yüksek bir görsel olduğu için kendi kutusunda daha uzun.
+  'scenery-ferris': 'w-16 h-24 sm:w-24 sm:h-36',
+  // Ev modelleri ve okul, diğer binalara göre hafifçe daha büyük görünsün.
+  'scenery-house': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-2': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-3': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-school': 'w-20 h-20 sm:w-28 sm:h-28',
+};
+const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
 
 // Izgara hücresini (0..7, 0..6) ana sahnenin güvenli görüntü alanına (bulut ve
 // ray şeridi hariç) eşleyen yardımcı fonksiyon.
 function gridCellToScenePercent(x: number, y: number) {
-  const left = 4 + (x / Math.max(GRID_COLS - 1, 1)) * 90; // %4 .. %94
-  const top = 9 + (y / Math.max(GRID_ROWS - 1, 1)) * 62; // %9 .. %71
+  // Öğe artık bu noktaya MERKEZLENEREK çizilir (bkz. -translate-x-1/2/-translate-y-1/2),
+  // bu yüzden kenar sütun/satırlarda görsel taşmaması için pay büyütüldü. Satırlar
+  // arası boşluk, 7 satırın küçültülmüş görsellerle bile üst üste binmemesi için
+  // olabildiğince açıldı.
+  const left = 8 + (x / Math.max(GRID_COLS - 1, 1)) * 84; // %8 .. %92
+  const top = 8 + (y / Math.max(GRID_ROWS - 1, 1)) * 76; // %8 .. %84
   return { left: `${left}%`, top: `${top}%` };
 }
 
@@ -92,7 +137,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [trainImagesReady, setTrainImagesReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    const sources = [lokomotifImg, yolcuVagonuKirmiziImg, yolcuVagonuYesilImg, yukVagonuImg];
+    const sources = [lokomotifImg, yolcuVagonuKirmiziImg, yolcuVagonuYesilImg, yukVagonuImg, altinVagonuImg, elmaVagonuImg, oyuncakVagonuImg];
     Promise.all(
       sources.map(
         (src) =>
@@ -155,7 +200,38 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const stationLeftPercent = placedStation
     ? Math.min(88, Math.max(8, 8 + (placedStation.x / Math.max(GRID_COLS - 1, 1)) * 80))
     : 42;
-  const sipaLeftPercent = Math.min(90, Math.max(2, stationLeftPercent - 12));
+  const sipaLeftPercent = Math.min(90, Math.max(2, stationLeftPercent - 6));
+
+  // Köprü ve tünel de artık Harita Çizimi'nde seçilen gerçek x konumuna göre
+  // kayar; önceden sabit bir yüzdede duruyorlardı (gar için yapılan düzeltmenin
+  // aynısı burada da uygulanıyor).
+  const placedBridge = worldItems.find((item) => item.itemId === 'track-bridge');
+  const bridgeLeftPercent = placedBridge
+    ? Math.min(70, Math.max(4, 4 + (placedBridge.x / Math.max(GRID_COLS - 1, 1)) * 80))
+    : 26;
+  const placedTunnel = worldItems.find((item) => item.itemId === 'track-tunnel');
+  const tunnelLeftPercent = placedTunnel
+    ? Math.min(85, Math.max(4, 4 + (placedTunnel.x / Math.max(GRID_COLS - 1, 1)) * 90))
+    : 88;
+
+  // Ray parçası satın almanın dünyada görünür bir karşılığı olsun diye, sahip
+  // olunan düz/viraj parçaları kasabanın arka kısmında ikinci (yedek) bir
+  // tren hattı olarak çiziliyor — bu olmadan ray satın almak görünmez kalıyordu.
+  const secondRailPieceCount = worldItems.filter(
+    (item) => item.itemId === 'track-straight' || item.itemId === 'track-curve',
+  ).length;
+  const secondRailWidthPercent = Math.min(78, Math.max(0, secondRailPieceCount * 6));
+
+  // Yedek Hat'ın gerçek uçları (world-yüzdesi koordinat sisteminde, ana rayla
+  // AYNI sistemde). Tren artık bu tam noktalar arasında ilerliyor, rayın
+  // dışına taşmıyor; ön hattın yüksekliği (frontRailTopPercent) ile virajlarla
+  // görsel olarak birleşiyor.
+  const secondRailStartLeft = 13;
+  const secondRailEndLeft = secondRailStartLeft + secondRailWidthPercent;
+  const secondRailStartTop = 34;
+  const secondRailEndTop = 46;
+  const frontRailTopPercent = 85;
+  const trainTransform = trainDirection === 'left' ? 'scaleX(-1)' : 'none';
 
   // Mağazadan "Dünyana Ekle" ile bırakılan her dekor ana manzarada da görünür.
   // Ray yapıları kendi, raya hizalı katmanlarında çizilir.
@@ -175,8 +251,6 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [cowMooing, setCowMooing] = useState(false);
   const [windmillSpinningFast, setWindmillSpinningFast] = useState(false);
   const [applesFalling, setApplesFalling] = useState(false);
-  const [townFountainActive, setTownFountainActive] = useState(false);
-  const [activeHouseTab, setActiveHouseTab] = useState<string | null>(null);
 
   // Builder grid states
   const [isBuildMode, setIsBuildMode] = useState(false);
@@ -193,18 +267,44 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     const speedStep = trainSpeed === 'fast' ? 0.65 : trainSpeed === 'slow' ? 0.25 : 0.45;
     const maxBound = 100 + 5;
     const minBound = -(assemblyWidthPercent + 5);
+    // NOT: setState updater'ları React StrictMode'da (geliştirmede) birden
+    // fazla kez çağrılabilir; bu yüzden burada SADECE saf pozisyon hesabı
+    // yapılıyor, yön değişimi gibi yan etkiler ayrı bir effect'te (aşağıda)
+    // ref korumasıyla TEK SEFER tetikleniyor.
     const interval = setInterval(() => {
       setTrainXPos((prev) => {
         if (trainDirection === 'right') {
-          return prev >= maxBound ? minBound : prev + speedStep;
-        } else {
-          return prev <= minBound ? maxBound : prev - speedStep;
+          return prev >= maxBound ? maxBound : prev + speedStep;
         }
+        return prev <= minBound ? minBound : prev - speedStep;
       });
     }, 30);
 
     return () => clearInterval(interval);
   }, [isTrainRunning, trainSpeed, trainDirection, viewMode, assemblyWidthPercent, trainImagesReady]);
+
+  // Tren ana rayın ucuna varınca yönünü tersine çevirir (sağdan sola, sonra
+  // soldan sağa) — Yedek Hat sadece görsel/dekoratif kalır, tren ona hiç
+  // uğramaz. Bir ref ile korunuyor ki StrictMode'un çift-çağrısı yönü iki kez
+  // değiştirip birbirini götürmesin.
+  const boundHandledRef = useRef(false);
+  useEffect(() => {
+    if (viewMode !== 'ride') return;
+    const maxBound = 100 + 5;
+    const minBound = -(assemblyWidthPercent + 5);
+    const isAtBound =
+      (trainDirection === 'right' && trainXPos >= maxBound) ||
+      (trainDirection === 'left' && trainXPos <= minBound);
+
+    if (isAtBound && !boundHandledRef.current) {
+      boundHandledRef.current = true;
+      setTrainDirection((dir) => (dir === 'right' ? 'left' : 'right'));
+    }
+
+    if (!isAtBound) {
+      boundHandledRef.current = false;
+    }
+  }, [trainXPos, trainDirection, assemblyWidthPercent, viewMode]);
 
   // Whistle horn action
   const handleWhistleBlow = () => {
@@ -567,7 +667,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {viewMode === 'ride' && (
         <div className="space-y-4">
           {/* Main Graphic Canvas Box */}
-          <div ref={rideCanvasRef} className="relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl group select-none">
+          <div className="relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl group select-none">
+            {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
+                kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
+                tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
+            <div ref={rideCanvasRef} className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-3xl">
+              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%` }}>
             {/* Background Illustration Image */}
             <img
               src={cartoonBg}
@@ -597,6 +702,75 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <div className="absolute top-8 left-1/4 text-yellow-200 text-xs">✨</div>
                 <div className="absolute top-12 left-2/3 text-yellow-200 text-sm">✨</div>
               </div>
+            )}
+
+            {/* Kasabanın arka kısmında ikinci (yedek) tren hattı — sahip olunan
+                düz/viraj ray parçalarının dünyada görünür karşılığı. Ana hatla
+                AYNI yüzde-koordinat sisteminde, tam iki nokta arasında çiziliyor
+                ki tren hiçbir zaman rayın dışına taşmasın; uçlarda ana hatla
+                birleşen görünür virajlar da var. */}
+            {secondRailPieceCount > 0 && (
+              <svg
+                className="absolute inset-0 w-full h-full z-[6] pointer-events-none opacity-80"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                title={`Yedek Hat: ${secondRailPieceCount} ray parçası`}
+              >
+                {/* Sol viraj: Yedek Hat'ın başlangıcını ana hattın yüksekliğine bağlar */}
+                <path
+                  d={`M ${secondRailStartLeft - 7} ${frontRailTopPercent} Q ${secondRailStartLeft - 7} ${secondRailStartTop}, ${secondRailStartLeft} ${secondRailStartTop}`}
+                  fill="none"
+                  stroke="#451a03"
+                  strokeWidth="1.4"
+                  strokeDasharray="1.2 1.4"
+                />
+                <path
+                  d={`M ${secondRailStartLeft - 7} ${frontRailTopPercent} Q ${secondRailStartLeft - 7} ${secondRailStartTop}, ${secondRailStartLeft} ${secondRailStartTop}`}
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="0.4"
+                />
+
+                {/* Sağ viraj: Yedek Hat'ın bitişini ana hattın yüksekliğine bağlar */}
+                <path
+                  d={`M ${secondRailEndLeft} ${secondRailEndTop} Q ${secondRailEndLeft + 7} ${secondRailEndTop}, ${secondRailEndLeft + 7} ${frontRailTopPercent}`}
+                  fill="none"
+                  stroke="#451a03"
+                  strokeWidth="1.4"
+                  strokeDasharray="1.2 1.4"
+                />
+                <path
+                  d={`M ${secondRailEndLeft} ${secondRailEndTop} Q ${secondRailEndLeft + 7} ${secondRailEndTop}, ${secondRailEndLeft + 7} ${frontRailTopPercent}`}
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="0.4"
+                />
+
+                {/* Yedek Hat'ın kendisi: iki nokta arasında düz çizgi (traversler + raylar) */}
+                <line
+                  x1={secondRailStartLeft} y1={secondRailStartTop}
+                  x2={secondRailEndLeft} y2={secondRailEndTop}
+                  stroke="#451a03" strokeWidth="1.4" strokeDasharray="1.2 1.4"
+                />
+                <line
+                  x1={secondRailStartLeft} y1={secondRailStartTop - 0.55}
+                  x2={secondRailEndLeft} y2={secondRailEndTop - 0.55}
+                  stroke="#e2e8f0" strokeWidth="0.4"
+                />
+                <line
+                  x1={secondRailStartLeft} y1={secondRailStartTop + 0.55}
+                  x2={secondRailEndLeft} y2={secondRailEndTop + 0.55}
+                  stroke="#e2e8f0" strokeWidth="0.4"
+                />
+              </svg>
+            )}
+            {secondRailPieceCount > 0 && (
+              <span
+                className="absolute z-[6] rounded-full bg-amber-950/80 text-amber-100 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 shadow whitespace-nowrap pointer-events-none"
+                style={{ left: `${secondRailStartLeft}%`, top: `${secondRailStartTop - 4}%` }}
+              >
+                Yedek Hat 🛤️ {secondRailPieceCount} parça
+              </span>
             )}
 
             {/* Clickable Interactive Scenery Hotspots */}
@@ -679,16 +853,16 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   key={item.id}
                   type="button"
                   onClick={() => handleTileClick(item.x, item.y)}
-                  className="absolute z-25 flex flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-300"
-                  style={{ left: anchor.left, top: anchor.top }}
+                  className="group/item absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  style={{ left: anchor.left, top: anchor.top, zIndex: 20 + item.y }}
                   title={`${item.name} — dokun ve keşfet`}
                 >
                   {SCENERY_IMAGES[item.itemId] ? (
-                    <img src={SCENERY_IMAGES[item.itemId]} alt={item.name} className="w-14 h-14 sm:w-24 sm:h-24 object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.45)]" draggable={false} />
+                    <img src={SCENERY_IMAGES[item.itemId]} alt={item.name} className={`${SCENE_IMG_SIZE[item.itemId] || DEFAULT_SCENE_IMG_SIZE} object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.45)]`} draggable={false} />
                   ) : (
                     <span className={`${anchor.size} leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]`}>{item.icon}</span>
                   )}
-                  <span className="max-w-20 truncate rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[8px] font-black text-white shadow-sm sm:text-[10px]">
+                  <span className="pointer-events-none absolute -bottom-4 max-w-20 truncate rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[8px] font-black text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover/item:opacity-100 group-focus/item:opacity-100 group-active/item:opacity-100 sm:text-[10px]">
                     {item.name}
                   </span>
                 </button>
@@ -732,18 +906,18 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   setInteractiveMessage('Kırmızı Tren Köprüsü: Tren köprünün altından güvenle geçiyor! 🌉✨');
                   speakText('Kırmızı tren köprüsü aktif!', speechEnabled);
                 }}
-                className="absolute bottom-[11%] left-[26%] w-[26%] h-16 sm:h-24 z-25 cursor-pointer hover:scale-105 transition-transform"
+                className="absolute bottom-[11%] w-[21%] h-12 sm:h-16 z-25 cursor-pointer hover:scale-105 transition-transform"
+                style={{ left: `${bridgeLeftPercent}%` }}
                 title="Kırmızı Tren Köprüsü"
               >
-                <div className="relative w-full h-full flex items-end justify-center">
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 200 70">
-                    <path d="M0,60 Q100,-10 200,60" fill="none" stroke="#dc2626" strokeWidth="8" />
-                    <path d="M10,60 Q100,5 190,60" fill="none" stroke="#ef4444" strokeWidth="4" />
-                    <rect x="20" y="45" width="8" height="20" fill="#7f1d1d" />
-                    <rect x="95" y="20" width="10" height="45" fill="#7f1d1d" />
-                    <rect x="170" y="45" width="8" height="20" fill="#7f1d1d" />
-                  </svg>
-                  <span className="absolute -top-2 bg-red-950/90 text-red-200 border border-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                <div className="group/bridge relative w-full h-full flex items-end justify-center">
+                  <img
+                    src={SCENERY_IMAGES['track-bridge']}
+                    alt="Kırmızı Tren Köprüsü"
+                    className="w-full h-full object-contain drop-shadow-[0_8px_8px_rgba(0,0,0,0.4)]"
+                    draggable={false}
+                  />
+                  <span className="pointer-events-none absolute -top-2 bg-red-950/90 text-red-200 border border-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg opacity-0 transition-opacity duration-150 group-hover/bridge:opacity-100 group-focus/bridge:opacity-100 group-active/bridge:opacity-100">
                     Kırmızı Tren Köprüsü 🌉
                   </span>
                 </div>
@@ -758,94 +932,23 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   setInteractiveMessage('Dağ Tüneli: Tren dağın altındaki tünelden çuf çuf geçiyor! 🕳️⛰️');
                   speakText('Dağ tüneli aktif!', speechEnabled);
                 }}
-                className="absolute bottom-[10%] right-[1%] w-24 sm:w-36 h-20 sm:h-28 z-25 cursor-pointer hover:scale-105 transition-transform"
+                className="absolute bottom-[9.5%] w-32 sm:w-48 h-20 sm:h-28 z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
+                style={{ left: `${tunnelLeftPercent}%` }}
                 title="Dağ Tüneli"
               >
-                <div className="relative w-full h-full flex items-end">
-                  <span className="text-5xl sm:text-7xl absolute -top-4 right-2 z-10 drop-shadow-lg">⛰️</span>
-                  <div className="absolute bottom-0 right-1 w-20 sm:w-28 h-14 sm:h-20 bg-slate-950 rounded-t-full border-4 border-amber-900/90 flex items-center justify-center shadow-2xl">
-                    <span className="text-2xl sm:text-4xl">🕳️</span>
-                  </div>
+                <div className="group/tunnel relative w-full h-full flex items-end justify-center">
+                  <img
+                    src={SCENERY_IMAGES['track-tunnel']}
+                    alt="Dağ Tüneli"
+                    className="w-full h-full object-contain drop-shadow-[0_8px_8px_rgba(0,0,0,0.4)]"
+                    draggable={false}
+                  />
+                  <span className="pointer-events-none absolute -top-2 bg-emerald-950/90 text-emerald-200 border border-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg opacity-0 transition-opacity duration-150 group-hover/tunnel:opacity-100 group-focus/tunnel:opacity-100 group-active/tunnel:opacity-100">
+                    Dağ Tüneli ⛰️
+                  </span>
                 </div>
               </div>
             )}
-
-            {/* 5. CUTE CARTOON VILLAGE TOWN CENTER (Above the Straight Track) */}
-            <div className="absolute top-[28%] left-[12%] w-[76%] h-[42%] z-20 pointer-events-auto flex items-center justify-around px-2">
-              {/* House 1: Bakery / Cafe */}
-              <div
-                onClick={() => {
-                  playPopSound(soundEnabled);
-                  setActiveHouseTab('bakery');
-                  setInteractiveMessage('Kasaba Fırını: Taze sıcak simit ve ekmek kokuyor! 🥖🥐');
-                  speakText('Fırından sıcak ekmek kokusu geliyor!', speechEnabled);
-                }}
-                className="cursor-pointer transition-transform hover:scale-110 relative group"
-                title="Fırına tıkla!"
-              >
-                <span className="text-3xl sm:text-5xl drop-shadow-md">🥐</span>
-                <span className="absolute -top-3 left-1 text-xs animate-ping">💨</span>
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-amber-900/90 text-amber-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                  Fırın
-                </div>
-              </div>
-
-              {/* Town Fountain (Centerpiece) */}
-              <div
-                onClick={() => {
-                  playPopSound(soundEnabled);
-                  setTownFountainActive(true);
-                  setInteractiveMessage('Kasaba fıskiyesinden su köpürdü! ⛲💦');
-                  speakText('Kasaba fıskiyesi çalışıyor!', speechEnabled);
-                  setTimeout(() => setTownFountainActive(false), 2500);
-                }}
-                className={`cursor-pointer transition-transform hover:scale-110 relative ${
-                  townFountainActive ? 'scale-125' : ''
-                }`}
-                title="Havuzlu fıskiyeye tıkla!"
-              >
-                <span className="text-3xl sm:text-5xl drop-shadow-md">⛲</span>
-                {townFountainActive && (
-                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-base sm:text-2xl animate-bounce">
-                    💦
-                  </span>
-                )}
-              </div>
-
-              {/* House 2: Village School */}
-              <div
-                onClick={() => {
-                  playPopSound(soundEnabled);
-                  setActiveHouseTab('school');
-                  setInteractiveMessage('Kasaba Okulu: Ziller çalıyor, çocuklar neşeyle ders işliyor! 🔔🏫');
-                  speakText('Kasaba okulunda ders başladı!', speechEnabled);
-                }}
-                className="cursor-pointer transition-transform hover:scale-110 relative group"
-                title="Okula tıkla!"
-              >
-                <span className="text-3xl sm:text-5xl drop-shadow-md">🏫</span>
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-blue-900/90 text-blue-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                  Okul
-                </div>
-              </div>
-
-              {/* House 3: Cute Clockhouse */}
-              <div
-                onClick={() => {
-                  playPopSound(soundEnabled);
-                  setActiveHouseTab('house');
-                  setInteractiveMessage('Sevimli Kasaba Evi: Neşeli aile treni selamlıyor! 🏡👋');
-                  speakText('Evdeki aile treni selamlıyor!', speechEnabled);
-                }}
-                className="cursor-pointer transition-transform hover:scale-110 relative group"
-                title="Ev üzerine tıkla!"
-              >
-                <span className="text-3xl sm:text-5xl drop-shadow-md">🏡</span>
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-emerald-900/90 text-emerald-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                  Kasaba Evi
-                </div>
-              </div>
-            </div>
 
             {/* Merkezî Tren Garı — mağazadan alındığında ana ray hattında görünür. */}
             {hasPlacedStation && (
@@ -893,14 +996,20 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             ))}
 
+              </div>
+            </div>
+
             {/* 6. DYNAMIC HORIZONTAL TRAIN ASSEMBLY MOVING ON THE STRAIGHT TRACK */}
             <div
               ref={trainAssemblyRef}
-              className="absolute bottom-[16.2%] z-30 transition-transform duration-75 flex items-end flex-row-reverse pointer-events-auto cursor-pointer"
+              className="absolute z-30 flex items-end flex-row-reverse pointer-events-auto cursor-pointer"
               style={{
                 left: `${trainXPos}%`,
+                bottom: '16.2%',
                 width: 'max-content',
-                transform: trainDirection === 'left' ? 'scaleX(-1)' : 'none',
+                transform: trainTransform,
+                transformOrigin: trainDirection === 'left' ? 'right bottom' : 'left bottom',
+                transition: 'left 75ms linear, transform 260ms ease-in-out',
               }}
               onClick={handleWhistleBlow}
               title="Sincap Ekspres! Tıkla ve düdük çal!"
@@ -956,10 +1065,40 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                       />
                     )}
 
-                    {(type === 'cargo_coins' ||
-                      type === 'cargo_fruits' ||
-                      type === 'cargo_toys' ||
-                      type === 'cargo_animals' ||
+                    {type === 'cargo_coins' && (
+                      <img
+                        src={altinVagonuImg}
+                        alt="Altın & Hazine Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
+                    )}
+
+                    {type === 'cargo_fruits' && (
+                      <img
+                        src={elmaVagonuImg}
+                        alt="Meyve Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-8 sm:h-12 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
+                    )}
+
+                    {type === 'cargo_toys' && (
+                      <img
+                        src={oyuncakVagonuImg}
+                        alt="Oyuncak Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
+                    )}
+
+                    {(type === 'cargo_animals' ||
                       type === 'cargo_candy' ||
                       type === 'cargo_space') && (
                       <img
@@ -967,7 +1106,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                         alt="Yük Vagonu"
                         width={480}
                         height={319}
-                        className="shrink-0 h-8 sm:h-12 w-auto object-contain mb-0.5"
+                        className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
                         draggable={false}
                       />
                     )}
@@ -1166,6 +1305,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
           {/* Living Graphic Builder Map */}
           <div className="relative rounded-[2rem] border-4 border-sky-800 shadow-2xl overflow-hidden bg-sky-200 min-h-[420px] aspect-[16/9] select-none">
+            {/* Kasaba burada da görünür kutudan daha geniş; taşan kısım yana
+                kaydırılarak keşfedilir. Köşedeki sabit etiketler bu kaydırılabilir
+                katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
+            <div className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-[2rem]">
+              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%` }}>
             <img
               src={stableCartoonBackground}
               alt="Harita çizimi kasaba arka planı"
@@ -1190,13 +1334,19 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </div>
 
             {hasPlacedStation && (
-              <div className="absolute bottom-[18%] left-[42%] z-[15] pointer-events-none opacity-95">
+              <div
+                className="absolute bottom-[18%] z-[15] pointer-events-none opacity-95"
+                style={{ left: `${stationLeftPercent}%` }}
+              >
                 {renderSincapStation(true)}
               </div>
             )}
 
             {/* Gentle placement cells over the living town */}
-            <div className="absolute inset-3 sm:inset-5 z-30 grid grid-cols-8 gap-1.5 sm:gap-2">
+            <div
+              className="absolute inset-3 sm:inset-5 z-30 grid gap-1.5 sm:gap-2"
+              style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}
+            >
               {Array.from({ length: GRID_ROWS }).map((_, r) =>
 	                Array.from({ length: GRID_COLS }).map((_, c) => {
 	                  const placed = placedByCell.get(`${c}:${r}`);
@@ -1259,6 +1409,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   );
                 })
               )}
+            </div>
+              </div>
             </div>
 
             <div className="absolute left-4 top-4 z-30 rounded-2xl bg-slate-950/70 px-3 py-2 text-xs font-black text-white shadow-lg backdrop-blur-sm">

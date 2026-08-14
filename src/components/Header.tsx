@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile, TabType } from '../types';
-import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play, RefreshCw } from 'lucide-react';
+import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play, RefreshCw, BookOpen } from 'lucide-react';
 import familyPhoto from '../assets/images/rb-family.jpg';
 
 interface HeaderProps {
@@ -55,6 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
   const tabs = [
     { id: 'tasks' as TabType, label: 'Görev', icon: '⭐', LucideIcon: Star },
     { id: 'world' as TabType, label: 'Dünya', icon: '🚂', LucideIcon: Train },
+    { id: 'learn' as TabType, label: 'Öğren', icon: '🔤', LucideIcon: BookOpen },
     { id: 'shop' as TabType, label: 'Mağaza', icon: '🏪', LucideIcon: Store },
     { id: 'videos' as TabType, label: 'İzlet', icon: '►', LucideIcon: Play },
   ];
@@ -71,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <img src={familyPhoto} alt="Rüzgar ve babası" className="h-full w-full object-cover object-[50%_30%]" />
               </div>
               <div className="absolute -bottom-1 -right-1 bg-amber-400 text-yellow-950 text-[10px] px-1.5 py-0.2 rounded-full font-black border border-amber-200 shadow-xs">
-                5 Yaş
+                6 Yaş
               </div>
             </div>
 
@@ -184,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Top Horizontal Pill Navigation Bar */}
-        <nav className="grid grid-cols-4 gap-1.5 sm:gap-3 pt-1">
+        <nav className="grid grid-cols-5 gap-1.5 sm:gap-3 pt-1">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (

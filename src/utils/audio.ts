@@ -157,14 +157,14 @@ export function playFanfare(enabled: boolean = true) {
 /**
  * Web Speech API text-to-speech engine for encouraging Turkish feedback
  */
-export function speakText(text: string, enabled: boolean = true) {
+export function speakText(text: string, enabled: boolean = true, rate: number = 0.95) {
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel(); // Stop ongoing speech
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'tr-TR';
     utterance.pitch = 1.2; // Slightly higher energetic pitch for children
-    utterance.rate = 0.95; // Slightly slower clear pace
+    utterance.rate = rate; // Çağıran, gerektiğinde (ör. harf öğretimi) daha yavaş bir hız verebilir
     window.speechSynthesis.speak(utterance);
   } catch (e) {
     console.debug('TTS error', e);

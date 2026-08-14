@@ -1,4 +1,4 @@
-export type TabType = 'tasks' | 'world' | 'shop' | 'videos';
+export type TabType = 'tasks' | 'world' | 'shop' | 'videos' | 'learn';
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening';
 
@@ -64,6 +64,8 @@ export interface UserProfile {
   soundEnabled: boolean;
   speechEnabled: boolean;
   activeTrainIcon: string;
+  /** Ebeveynin açtığı Heceleme oyunu seviyeleri (1=2 heceli, 2=3 heceli, 3=4 heceli). */
+  syllableGameLevels?: number[];
   /** Ortak aile verisinde başlangıç seviyesinin bir kez uygulanmasını sağlar. */
   progressVersion?: string;
   /** Rutin görevlerin en son hangi yerel takvim gününde açıldığını tutar. */
