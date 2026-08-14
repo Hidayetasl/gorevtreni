@@ -1164,37 +1164,32 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
           {/* Ana Kumanda Paneli — çocuklar için büyük ikonlu, yuvarlatılmış
               koyu lacivert panel. Dur/Kalk tek düğmede birleşik (ikili kol
               görseli), Korna/Işık/Motor Sesi ayrı aç-kapat düğmeleri. */}
-          <div className="rounded-3xl bg-[#0a1830] border-2 border-[#1c3a5e] p-3.5 sm:p-4 shadow-xl">
-            <div className="text-[10px] sm:text-xs font-black text-sky-300 uppercase tracking-widest mb-2.5 text-center">
-              🎮 Kumanda Paneli
-            </div>
-            <div className="grid grid-cols-4 gap-2 sm:gap-3">
+          <div className="rounded-2xl sm:rounded-3xl bg-[#0a1830] border-2 border-[#1c3a5e] p-2 sm:p-3 shadow-xl">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsTrainRunning(!isTrainRunning)}
-                className={`flex flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90 bg-[#102544] ring-2 ${
+                className={`flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 transition-all active:scale-90 bg-[#102544] ring-2 ${
                   isTrainRunning ? 'ring-emerald-400/80' : 'ring-rose-400/80'
                 }`}
                 title={isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}
               >
-                <img src={kontrolDurKalkImg} alt="Dur / Kalk" className="w-11 h-11 sm:w-14 sm:h-14 object-contain" draggable={false} />
-                <span className="text-[8px] sm:text-[10px] font-black text-white">{isTrainRunning ? 'DUR' : 'KALK'}</span>
+                <img src={kontrolDurKalkImg} alt="Dur / Kalk" className="w-7 h-7 sm:w-11 sm:h-11 object-contain" draggable={false} />
               </button>
 
               <button
                 type="button"
                 onClick={handleWhistleBlow}
-                className="flex flex-col items-center gap-1 rounded-2xl py-2 bg-[#102544] transition-all active:scale-90"
+                className="flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 bg-[#102544] transition-all active:scale-90"
                 title="Korna Çal"
               >
-                <img src={kontrolKornaImg} alt="Korna" className="w-11 h-11 sm:w-14 sm:h-14 object-contain" draggable={false} />
-                <span className="text-[8px] sm:text-[10px] font-black text-white">KORNA</span>
+                <img src={kontrolKornaImg} alt="Korna" className="w-7 h-7 sm:w-11 sm:h-11 object-contain" draggable={false} />
               </button>
 
               <button
                 type="button"
                 onClick={() => setLightsOn(!lightsOn)}
-                className={`flex flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90 bg-[#102544] ${
+                className={`flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 transition-all active:scale-90 bg-[#102544] ${
                   lightsOn ? 'ring-2 ring-yellow-300/90' : ''
                 }`}
                 title={lightsOn ? 'Işıkları Kapat' : 'Işıkları Aç'}
@@ -1202,16 +1197,15 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <img
                   src={kontrolIsikImg}
                   alt="Işık"
-                  className={`w-11 h-11 sm:w-14 sm:h-14 object-contain transition-opacity ${lightsOn ? 'opacity-100' : 'opacity-45'}`}
+                  className={`w-7 h-7 sm:w-11 sm:h-11 object-contain transition-opacity ${lightsOn ? 'opacity-100' : 'opacity-45'}`}
                   draggable={false}
                 />
-                <span className="text-[8px] sm:text-[10px] font-black text-white">{lightsOn ? 'AÇIK' : 'IŞIK'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setEngineSoundOn(!engineSoundOn)}
-                className={`flex flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90 bg-[#102544] ${
+                className={`flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 transition-all active:scale-90 bg-[#102544] ${
                   engineSoundOn ? 'ring-2 ring-orange-300/90' : ''
                 }`}
                 title={engineSoundOn ? 'Tren Sesini Kapat' : 'Tren Sesini Aç'}
@@ -1219,10 +1213,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <img
                   src={kontrolTrenSesiImg}
                   alt="Tren Sesi"
-                  className={`w-11 h-11 sm:w-14 sm:h-14 object-contain transition-opacity ${engineSoundOn ? 'opacity-100' : 'opacity-45'}`}
+                  className={`w-7 h-7 sm:w-11 sm:h-11 object-contain transition-opacity ${engineSoundOn ? 'opacity-100' : 'opacity-45'}`}
                   draggable={false}
                 />
-                <span className="text-[8px] sm:text-[10px] font-black text-white">{engineSoundOn ? 'AÇIK' : 'SES'}</span>
               </button>
             </div>
           </div>
