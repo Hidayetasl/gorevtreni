@@ -154,16 +154,57 @@ export function playFanfare(enabled: boolean = true) {
   }
 }
 
+// Tarayıcının ses listesi ASENKRON yüklenir (ilk çağrıda boş dönebilir). Sesler
+// hazır olur olmaz önbelleğe alınıyor ki her konuşmada doğru/kaliteli sesi
+// seçebilelim — özellikle İngilizce'de varsayılan (bazen düşük kaliteli veya
+// yanlış aksanlı) sesi değil, bilinen net sesleri tercih ediyoruz.
+let cachedVoices: SpeechSynthesisVoice[] = [];
+
+function loadVoices() {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  const list = window.speechSynthesis.getVoices();
+  if (list.length > 0) cachedVoices = list;
+}
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+// İyi bilinen, net telaffuzlu cihaz-yerel (network gerektirmeyen, dolayısıyla
+// daha hızlı ve stabil) sesler öncelikli seçiliyor; bulunamazsa dilin ilk
+// yerel sesine, o da yoksa dilin ilk sesine düşülüyor.
+const PREFERRED_VOICE_NAMES = ['Samantha', 'Google US English', 'Alex', 'Ava', 'Daniel', 'Google UK English Female'];
+
+function pickVoice(lang: string): SpeechSynthesisVoice | null {
+  if (cachedVoices.length === 0) loadVoices();
+  if (cachedVoices.length === 0) return null;
+  const langPrefix = lang.slice(0, 2).toLowerCase();
+  const pool = cachedVoices.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
+  if (pool.length === 0) return null;
+  const preferred = pool.find((v) => PREFERRED_VOICE_NAMES.some((name) => v.name.includes(name)));
+  if (preferred) return preferred;
+  const local = pool.find((v) => v.localService);
+  return local || pool[0];
+}
+
 /**
- * Web Speech API text-to-speech engine for encouraging Turkish feedback
+ * Web Speech API text-to-speech engine for encouraging Turkish feedback.
+ * `lang` varsayılan olarak Türkçe'dir; İngilizce kelime/telaffuz öğretimi gibi
+ * durumlar için 'en-US' geçilebilir (tarayıcının İngilizce sesi kullanılır).
+ * `pitch` varsayılan olarak çocuklar için hafif enerjik (1.2); İngilizce
+ * kelime öğretiminde netlik için genelde 1.0 (doğal) geçiriliyor — aşırı
+ * pitch kayması sentezlenmiş sesi anlaşılmaz/bozuk hale getirebiliyor.
  */
-export function speakText(text: string, enabled: boolean = true, rate: number = 0.95) {
+export function speakText(text: string, enabled: boolean = true, rate: number = 0.95, lang: string = 'tr-TR', pitch: number = 1.2) {
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel(); // Stop ongoing speech
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'tr-TR';
-    utterance.pitch = 1.2; // Slightly higher energetic pitch for children
+    utterance.lang = lang;
+    const voice = pickVoice(lang);
+    if (voice) utterance.voice = voice;
+    utterance.pitch = pitch;
     utterance.rate = rate; // Çağıran, gerektiğinde (ör. harf öğretimi) daha yavaş bir hız verebilir
     window.speechSynthesis.speak(utterance);
   } catch (e) {
