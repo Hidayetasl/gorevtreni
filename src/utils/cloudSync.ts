@@ -8,7 +8,7 @@ import { mergeVideosById } from './videoOrder';
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
 // Davet başka cihazda açılacağı için yerel geliştirme adresi (localhost) asla
 // paylaşılmaz. Bu uygulamanın herkesçe erişilen tek giriş noktası budur.
-const PUBLIC_APP_URL = 'https://hidayetasl.github.io/ruzgar-rutin-oyunu/';
+const PUBLIC_APP_URL = 'https://hidayetasl.github.io/gorev-treni/';
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'] as const;
 
 const firebaseConfig = {
