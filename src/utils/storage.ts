@@ -312,36 +312,21 @@ export const saveStoredWorld = (world: PlacedWorldItem[]) => saveToStorage(STORA
 export const getStoredUser = (): UserProfile => {
   const stored = loadFromStorage<UserProfile>(STORAGE_KEYS.USER, INITIAL_USER);
 
-  // V4'ün ilk gerçek başlangıcı: yalnızca görev ilerlemesi ve para sıfırlanır.
-  // Mağaza, envanter, tren dünyası, PIN, mesajlar ve videolar korunur.
+  // ÖNEMLİ: Bu bayrak da cihaz bazlıydı (aile bazlı değil) — bulut verisi
+  // yeni/temizlenmiş bir cihaza indiğinde gerçek puanı/görev sayısını
+  // sıfırlıyordu. Artık sadece bayrağı damgalıyoruz, veriye dokunmuyoruz.
   if (typeof window !== 'undefined' && window.localStorage.getItem(FIRST_DAY_RESET_VERSION) !== 'done') {
-    const firstDayUser = {
-      ...INITIAL_USER,
-      name: stored.name || INITIAL_USER.name,
-      soundEnabled: stored.soundEnabled ?? INITIAL_USER.soundEnabled,
-      speechEnabled: stored.speechEnabled ?? INITIAL_USER.speechEnabled,
-      activeTrainIcon: stored.activeTrainIcon || INITIAL_USER.activeTrainIcon,
-      syllableGameLevels: stored.syllableGameLevels ?? INITIAL_USER.syllableGameLevels,
-    };
-    saveToStorage(STORAGE_KEYS.USER, firstDayUser);
-    saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));
     window.localStorage.setItem(FIRST_DAY_RESET_VERSION, 'done');
-    return firstDayUser;
   }
 
-  // Yeni ortak başlangıç seviyesi: görevler açılır, 6 Tren Parası verilir.
-  // Bu işaret profilin içinde taşındığı için ailede sadece bir kez uygulanır.
+  // ÖNEMLİ: Bu bayrak eskiden yeni cihazlarda puan/görev sayacını sıfırlıyordu.
+  // Ancak bulut verisi cihaza indirildiğinde "eski profil" sanılıp gerçek
+  // puanlar (ör. 129) sıfırlanıyordu — ciddi bir veri kaybına yol açtı.
+  // Artık sadece işareti damgalıyoruz, puan/görev/seri asla dokunulmuyor.
   if (stored.progressVersion !== START_LEVEL_VERSION) {
-    const startLevelUser = {
-      ...stored,
-      coins: 6,
-      totalCompletedTasks: 0,
-      currentStreak: 0,
-      progressVersion: START_LEVEL_VERSION,
-    };
-    saveToStorage(STORAGE_KEYS.USER, startLevelUser);
-    saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));
-    return startLevelUser;
+    const stampedUser = { ...stored, progressVersion: START_LEVEL_VERSION };
+    saveToStorage(STORAGE_KEYS.USER, stampedUser);
+    return stampedUser;
   }
 
   return stored;
