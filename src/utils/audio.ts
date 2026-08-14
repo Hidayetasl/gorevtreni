@@ -132,22 +132,45 @@ function playEngineChuff() {
   try {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
+
+    // Gövde: yumuşak üçgen dalga "puf" — önceki sert kare dalgadan daha
+    // yuvarlak/sevimli bir tını verir. Her vuruşta hafif rastgele perde
+    // farkı, robotik/tekdüze değil canlı bir his katıyor.
+    const wobble = 0.9 + Math.random() * 0.2;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(95, now);
-    osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
-
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(210 * wobble, now);
+    osc.frequency.exponentialRampToValueAtTime(85 * wobble, now + 0.09);
     gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(0.14, now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
     osc.connect(gain);
     gain.connect(ctx.destination);
-
     osc.start(now);
-    osc.stop(now + 0.12);
+    osc.stop(now + 0.1);
+
+    // Buhar dokusu: kısa, sönümlenen filtrelenmiş gürültü — "puf!" hissini
+    // tamamlayan yumuşak nefes sesi (steam puff).
+    const bufferSize = Math.floor(ctx.sampleRate * 0.07);
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i += 1) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 850;
+    noiseFilter.Q.value = 0.6;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.05, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    noise.start(now);
   } catch (e) {
     console.debug('Engine chuff error', e);
   }
