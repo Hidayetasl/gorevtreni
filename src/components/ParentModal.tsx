@@ -4,7 +4,13 @@ import { playCoinSound, playPopSound, speakText } from '../utils/audio';
 import { extractYoutubeId, hashParentPin } from '../utils/storage';
 import { getFamilyInviteLink } from '../utils/cloudSync';
 import { sortVideosNewestFirst } from '../utils/videoOrder';
+import { ROLE_PINS } from './SimpleAccessGate';
 import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw, History, LogIn, ShoppingBag, BookOpen } from 'lucide-react';
+
+// Giriş ekranındaki aile PIN'leri (baba/anne/anneanne/dede) Ebeveyn panelini
+// açmak için de geçerlidir — tek tek ayrı bir Ebeveyn PIN'i ezberlemeye gerek
+// kalmaz, herkes zaten bildiği kendi PIN'iyle ebeveyn işlemlerine girebilir.
+const ROLE_PIN_SET = new Set<string>(Object.values(ROLE_PINS));
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -154,7 +160,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
           setIsAuthenticated(true);
           setPinMessage('');
           speakText('Ebeveyn PIN kodu belirlendi', speechEnabled);
-        } else if (newPin === '1234' || newPin === '0123' || hashParentPin(newPin) === parentConfig.pinHash) {
+        } else if (ROLE_PIN_SET.has(newPin) || hashParentPin(newPin) === parentConfig.pinHash) {
           setPinInput('');
           setIsAuthenticated(true);
           setPinMessage('');

@@ -4,12 +4,13 @@ import { createFamilyCode, familyExists, isCloudConfigured } from '../utils/clou
 
 const ACCESS_PINS = new Set(['1234', '0123']);
 
-// Aile üyeleri için kolay giriş: uzun aile kodu yerine kişiye özel, kolay
-// hatırlanan bir kod. Hangisini girerse girsin (baba123 / anne123 /
-// anneanne123) doğrudan Rüzgar'ın gerçek ailesine bağlanır — kod
-// kopyalamaya/yazmaya gerek kalmaz, ama kim girdiği ayırt edilebilir.
+// Aile üyeleri için kolay giriş: uzun aile kodu yerine kişiye özel, 4 haneli
+// sabit bir PIN. Hangisi girilirse girilsin doğrudan Rüzgar'ın gerçek
+// ailesine bağlanır — aynı PIN'ler Ebeveyn panelini açmak için de kullanılır
+// (bkz. ParentModal.tsx). Kod kopyalamaya/yazmaya gerek kalmaz.
 const QUICK_ACCESS_FAMILY_CODE = 'XJSKGCJMBPJ6';
-const QUICK_ACCESS_CODES = new Set(['BABA123', 'ANNE123', 'ANNEANNE123']);
+export const ROLE_PINS = { baba: '0123', anne: '1234', anneanne: '2345', dede: '3456' } as const;
+const QUICK_ACCESS_CODES = new Set(Object.values(ROLE_PINS));
 
 interface SimpleAccessGateProps {
   /** Bulut açıksa geçerli aile kodunu taşır; kapalıysa hiç çağrılmaz. */
@@ -130,7 +131,7 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-blue-700 text-4xl shadow-lg">🚂</div>
         <p className="font-game text-sm font-black text-sky-700">RÜZGAR'IN</p>
         <h1 className="mt-1 font-game text-3xl font-black text-slate-900">Görev Treni</h1>
-        <p className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-relaxed text-slate-600">Oyuna girmek için aile giriş kodunu yazın (kolay giriş: <span className="font-mono font-black">baba123</span> / <span className="font-mono font-black">anne123</span> / <span className="font-mono font-black">anneanne123</span>).</p>
+        <p className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-relaxed text-slate-600">Oyuna girmek için PIN'inizi yazın: baba <span className="font-mono font-black">0123</span> · anne <span className="font-mono font-black">1234</span> · anneanne <span className="font-mono font-black">2345</span> · dede <span className="font-mono font-black">3456</span>.</p>
 
         <input
           type="text"
