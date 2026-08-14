@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
-import { playTrainWhistle, playPopSound, speakText } from '../utils/audio';
-import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
+import { playTrainWhistle, playPopSound, speakText, startTrainEngineLoop, stopTrainEngineLoop } from '../utils/audio';
+import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2, Lightbulb } from 'lucide-react';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -124,6 +124,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Interactive train states for ride mode (straight railway track line)
   const [trainXPos, setTrainXPos] = useState(10);
   const [isTrainRunning, setIsTrainRunning] = useState(true);
+  // Lokomotifin ön farı — kapalı/açık; açıkken önünde sarı bir ışık halesi görünür.
+  const [lightsOn, setLightsOn] = useState(false);
   const [trainSpeed, setTrainSpeed] = useState<'normal' | 'fast' | 'slow'>('normal');
   const [trainDirection, setTrainDirection] = useState<'right' | 'left'>('right');
   const [isWhistling, setIsWhistling] = useState(false);
@@ -286,6 +288,17 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
     return () => clearInterval(interval);
   }, [isTrainRunning, trainSpeed, trainDirection, viewMode, assemblyWidthPercent, trainImagesReady]);
+
+  // Tren çalışırken sürekli "çuf-çuf" motor sesi — durunca, sekme değişince
+  // veya ses kapatılınca otomatik susturuluyor.
+  useEffect(() => {
+    if (isTrainRunning && viewMode === 'ride') {
+      startTrainEngineLoop(soundEnabled, trainSpeed);
+    } else {
+      stopTrainEngineLoop();
+    }
+    return () => stopTrainEngineLoop();
+  }, [isTrainRunning, viewMode, soundEnabled, trainSpeed]);
 
   // Tren ana rayın ucuna varınca yönünü tersine çevirir (sağdan sola, sonra
   // soldan sağa) — Yedek Hat sadece görsel/dekoratif kalır, tren ona hiç
@@ -1029,6 +1042,16 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                     className="w-full h-auto object-contain"
                     draggable={false}
                   />
+                  {/* Ön far — açıkken lokomotifin burnunda sarı bir ışık halesi belirir */}
+                  {lightsOn && (
+                    <div
+                      className="absolute right-0 bottom-[28%] w-8 h-8 sm:w-12 sm:h-12 rounded-full pointer-events-none animate-pulse"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(253,224,71,0.95) 0%, rgba(253,224,71,0.45) 40%, rgba(253,224,71,0) 75%)',
+                        transform: 'translate(45%, 0)',
+                      }}
+                    />
+                  )}
                 </div>
                 {/* Steam Smoke Puff from Chimney */}
                 <span className="absolute -top-4 right-3 text-xs sm:text-base animate-ping opacity-80">
@@ -1150,6 +1173,18 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 >
                   {isTrainRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   <span>{isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}</span>
+                </button>
+
+                <button
+                  onClick={() => setLightsOn(!lightsOn)}
+                  className={`px-3.5 py-2 rounded-2xl font-game text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                    lightsOn
+                      ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 border-yellow-200'
+                      : 'bg-[#0e2531] hover:bg-[#1a3a4d] text-slate-300 border-slate-700'
+                  }`}
+                >
+                  <Lightbulb className="w-4 h-4" />
+                  <span>{lightsOn ? 'Işıklar Açık' : 'Işıkları Aç'}</span>
                 </button>
 
                 <div className="flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">

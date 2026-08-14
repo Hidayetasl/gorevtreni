@@ -123,6 +123,57 @@ export function playTrainWhistle(enabled: boolean = true) {
   }
 }
 
+// Tren çalışırken tekrar eden "çuf-çuf" motor sesi için tek bir interval
+// referansı — aynı anda birden fazla döngü üst üste binmesin diye modül
+// seviyesinde tutuluyor.
+let engineLoopInterval: number | null = null;
+
+function playEngineChuff() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(95, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.14, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.12);
+  } catch (e) {
+    console.debug('Engine chuff error', e);
+  }
+}
+
+/**
+ * Tren hareket ederken sürekli çalan "çuf-çuf" motor sesini başlatır.
+ * `speed` tempo aralığını belirler (hızlı tren = daha sık darbe).
+ * Zaten çalan bir döngü varsa önce o durdurulur, üst üste binme olmaz.
+ */
+export function startTrainEngineLoop(enabled: boolean = true, speed: 'slow' | 'normal' | 'fast' = 'normal') {
+  stopTrainEngineLoop();
+  if (!enabled) return;
+  const intervalMs = speed === 'fast' ? 220 : speed === 'slow' ? 430 : 320;
+  playEngineChuff();
+  engineLoopInterval = window.setInterval(playEngineChuff, intervalMs);
+}
+
+/** Motor sesi döngüsünü durdurur (tren durunca veya ses kapatılınca çağrılır). */
+export function stopTrainEngineLoop() {
+  if (engineLoopInterval !== null) {
+    window.clearInterval(engineLoopInterval);
+    engineLoopInterval = null;
+  }
+}
+
 /**
  * Victory fanfare when task is approved or bonus unlocked!
  */
