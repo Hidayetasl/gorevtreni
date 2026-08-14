@@ -4,11 +4,12 @@ import { createFamilyCode, familyExists, isCloudConfigured } from '../utils/clou
 
 const ACCESS_PINS = new Set(['1234', '0123']);
 
-// Aile üyeleri için kolay giriş: uzun aile kodu yerine tek, ortak bir PIN.
-// Bu PIN'i giren herkes (baba, anne, anneanne) doğrudan Rüzgar'ın gerçek
-// ailesine bağlanır — kod kopyalamaya/yazmaya gerek kalmaz.
-const QUICK_ACCESS_PIN = '1234';
+// Aile üyeleri için kolay giriş: uzun aile kodu yerine kişiye özel, kolay
+// hatırlanan bir kod. Hangisini girerse girsin (baba123 / anne123 /
+// anneanne123) doğrudan Rüzgar'ın gerçek ailesine bağlanır — kod
+// kopyalamaya/yazmaya gerek kalmaz, ama kim girdiği ayırt edilebilir.
 const QUICK_ACCESS_FAMILY_CODE = 'XJSKGCJMBPJ6';
+const QUICK_ACCESS_CODES = new Set(['BABA123', 'ANNE123', 'ANNEANNE123']);
 
 interface SimpleAccessGateProps {
   /** Bulut açıksa geçerli aile kodunu taşır; kapalıysa hiç çağrılmaz. */
@@ -51,7 +52,7 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
   };
 
   const normalizedCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const isQuickPin = normalizedCode === QUICK_ACCESS_PIN;
+  const isQuickPin = QUICK_ACCESS_CODES.has(normalizedCode);
   const resolvedCode = isQuickPin ? QUICK_ACCESS_FAMILY_CODE : normalizedCode;
   const canSubmit = isQuickPin || normalizedCode.length >= 8;
 
@@ -129,7 +130,7 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-blue-700 text-4xl shadow-lg">🚂</div>
         <p className="font-game text-sm font-black text-sky-700">RÜZGAR'IN</p>
         <h1 className="mt-1 font-game text-3xl font-black text-slate-900">Görev Treni</h1>
-        <p className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-relaxed text-slate-600">Oyuna girmek için aile giriş kodunu yazın (kolay giriş: <span className="font-mono font-black">1234</span>).</p>
+        <p className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-relaxed text-slate-600">Oyuna girmek için aile giriş kodunu yazın (kolay giriş: <span className="font-mono font-black">baba123</span> / <span className="font-mono font-black">anne123</span> / <span className="font-mono font-black">anneanne123</span>).</p>
 
         <input
           type="text"
