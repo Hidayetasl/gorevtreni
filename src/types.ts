@@ -70,6 +70,10 @@ export interface UserProfile {
   progressVersion?: string;
   /** Rutin görevlerin en son hangi yerel takvim gününde açıldığını tutar. */
   lastTaskResetDate?: string;
+  /** Öğren sekmesinde bugün doğru cevapla kazanılan Tren Parası (günlük tavan için). */
+  learnCoinsToday?: number;
+  /** learnCoinsToday sayacının en son hangi yerel takvim gününe ait olduğunu tutar. */
+  learnCoinsResetDate?: string;
 }
 
 export interface ParentConfig {

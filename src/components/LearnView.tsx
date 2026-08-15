@@ -8,6 +8,12 @@ interface LearnViewProps {
   speechEnabled: boolean;
   /** Ebeveynin ayarladığı açık Heceleme seviyeleri (1=2 heceli, 2=3 heceli, 3=4 heceli). */
   syllableGameLevels?: number[];
+  /** Harf Treni / Heceleme / İngilizce'de her doğru cevapta çağrılır (Tren Parası ödülü App.tsx'te günlük tavanla yönetilir). */
+  onCorrectAnswer?: () => void;
+  /** Bugün Öğren sekmesinden kazanılan Tren Parası (App.tsx'te günlük tavan sıfırlamasıyla hesaplanır). */
+  learnCoinsEarnedToday?: number;
+  /** Günlük öğrenme ödülü tavanı (App.tsx: DAILY_LEARN_COIN_CAP). */
+  dailyLearnCoinCap?: number;
 }
 
 type WordEntry = { word: string; emoji: string };
@@ -251,7 +257,7 @@ function normalizeEnglish(text: string): string {
 
 type Mode = 'kesfet' | 'bul' | 'hece' | 'ingilizce';
 
-export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels }) => {
+export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels, onCorrectAnswer, learnCoinsEarnedToday = 0, dailyLearnCoinCap = 10 }) => {
   const [mode, setMode] = useState<Mode>('kesfet');
 
   // --- Keşfet modu: harfe dokun, sesini + örnek kelimeyi dinle ---
@@ -337,6 +343,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       const isMatch = said.some((text) => text === target || text.includes(target) || target.includes(text));
       if (isMatch) {
         playCoinSound(soundEnabled);
+        onCorrectAnswer?.();
         speakText('Harika söyledin! Hadi harfi bul!', speechEnabled, 0.8);
         setMicState('correct');
       } else {
@@ -370,6 +377,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     const isCorrect = entry.letter[0] === quizTarget.entry.letter[0];
     if (isCorrect) {
       playCoinSound(soundEnabled);
+      onCorrectAnswer?.();
       setQuizFeedback('correct');
       setQuizCorrectCount((count) => count + 1);
       setDiscovered((prev) => {
@@ -447,6 +455,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
 
       if (nextSelected.length === syllableRound.target.syllables.length) {
         playCoinSound(soundEnabled);
+        onCorrectAnswer?.();
         confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
         setWordCompleteCount((count) => count + 1);
 
@@ -553,6 +562,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     const isCorrect = choice.word === englishRound.target.word;
     if (isCorrect) {
       playCoinSound(soundEnabled);
+      onCorrectAnswer?.();
       setEnglishFeedback('correct');
       setEnglishCorrectCount((count) => count + 1);
       speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
@@ -582,6 +592,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       const isMatch = said.some((text) => text === target || text.includes(target) || target.includes(text));
       if (isMatch) {
         playCoinSound(soundEnabled);
+        onCorrectAnswer?.();
         speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
         setEnglishMicState('correct');
         setEnglishCorrectCount((count) => count + 1);
@@ -629,13 +640,21 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
             <span>{mode === 'kesfet' ? 'Sesleri Keşfet' : mode === 'bul' ? 'Hangi Harf?' : mode === 'hece' ? 'Heceleri Birleştir' : 'İngilizce Öğren'}</span>
           </h2>
         </div>
-        <div className="rounded-2xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-right">
-          <div className="text-[10px] font-bold text-sky-300 uppercase tracking-wide">
-            {mode === 'kesfet' ? 'Keşfedilen' : mode === 'bul' ? 'Doğru' : mode === 'hece' ? 'Tamamlanan' : 'Doğru'}
+        <div className="flex items-center gap-2">
+          <div className="rounded-2xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-right">
+            <div className="text-[10px] font-bold text-sky-300 uppercase tracking-wide">
+              {mode === 'kesfet' ? 'Keşfedilen' : mode === 'bul' ? 'Doğru' : mode === 'hece' ? 'Tamamlanan' : 'Doğru'}
+            </div>
+            <div className="font-game text-lg font-black text-white">
+              {mode === 'kesfet' ? `${discovered.size} / ${LETTER_ENTRIES.length}` : mode === 'bul' ? quizCorrectCount : mode === 'hece' ? wordCompleteCount : englishCorrectCount}
+            </div>
           </div>
-          <div className="font-game text-lg font-black text-white">
-            {mode === 'kesfet' ? `${discovered.size} / ${LETTER_ENTRIES.length}` : mode === 'bul' ? quizCorrectCount : mode === 'hece' ? wordCompleteCount : englishCorrectCount}
-          </div>
+          {mode !== 'kesfet' && (
+            <div className="rounded-2xl bg-amber-900/40 border border-amber-600/50 px-3 py-1.5 text-right" title="Öğren sekmesinden bugün kazanılan Tren Parası">
+              <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wide">Bugün 🪙</div>
+              <div className="font-game text-lg font-black text-amber-200">{Math.min(learnCoinsEarnedToday, dailyLearnCoinCap)}/{dailyLearnCoinCap}</div>
+            </div>
+          )}
         </div>
       </div>
 

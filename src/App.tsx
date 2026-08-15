@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TabType, RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from './types';
 import {
   getStoredTasks,
@@ -52,6 +52,10 @@ import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 
 const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
 const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
+// Öğren sekmesi (Harf Treni, Heceleme, İngilizce) her doğru cevapta 1 Tren
+// Parası verir; ana kazanç yolu yine günlük rutin görevler olsun diye
+// öğrenme ödülü günde bu sayıyla sınırlanır.
+const DAILY_LEARN_COIN_CAP = 10;
 
 function getBrowserDeviceLabel(): string {
   if (typeof navigator === 'undefined') return '';
@@ -201,6 +205,23 @@ export default function App() {
       ));
     }
   }, [tasks, user.lastTaskResetDate]);
+
+  // Öğren sekmesinde doğru cevap verildiğinde çağrılır: günlük tavana kadar
+  // +1 Tren Parası verir. Tavana ulaşıldıysa oyun eğlenceli kalsın diye
+  // (kutlama/ses zaten LearnView içinde çalıyor) sessizce hiçbir şey yapmaz.
+  const handleLearnCorrectAnswer = useCallback(() => {
+    const todayKey = getLocalDateKey();
+    setUser((prev) => {
+      const earnedToday = prev.learnCoinsResetDate === todayKey ? (prev.learnCoinsToday ?? 0) : 0;
+      if (earnedToday >= DAILY_LEARN_COIN_CAP) return prev;
+      return {
+        ...prev,
+        coins: prev.coins + 1,
+        learnCoinsToday: earnedToday + 1,
+        learnCoinsResetDate: todayKey,
+      };
+    });
+  }, []);
 
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog });
 
@@ -741,6 +762,9 @@ export default function App() {
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
               syllableGameLevels={user.syllableGameLevels}
+              onCorrectAnswer={handleLearnCorrectAnswer}
+              learnCoinsEarnedToday={user.learnCoinsResetDate === getLocalDateKey() ? (user.learnCoinsToday ?? 0) : 0}
+              dailyLearnCoinCap={DAILY_LEARN_COIN_CAP}
             />
           )}
         </main>
