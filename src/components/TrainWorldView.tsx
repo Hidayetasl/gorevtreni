@@ -96,11 +96,21 @@ const SCENE_IMG_SIZE: Record<string, string> = {
   'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
-  // Okul, hastane ve park önceden varsayılan (daha küçük) boyuttaydı ve
-  // manzarada fark edilmiyordu — evlerden de büyük, belirgin binalar oldular.
+  // Okul, hastane, park ve aşağıdaki diğer bina türleri önceden tanımsızdı ve
+  // varsayılan (küçük) boyutta kalıp manzarada fark edilmiyordu — hepsi artık
+  // aynı "belirgin bina" boyutunda, evlerden de büyük.
   'scenery-school': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-hospital': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-park': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-market': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-cinema': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-train-repair': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-firestation-building': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-windmill': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-bakery': 'w-24 h-24 sm:w-32 sm:h-32',
+  // Fıskiye ve uçak bina değil, daha küçük dekor öğeleri — ev boyutunda kalsın.
+  'scenery-fountain': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-airplane': 'w-20 h-20 sm:w-28 sm:h-28',
 };
 const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
 
@@ -135,8 +145,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Lokomotifin ön farı — kapalı/açık; açıkken önünde sarı bir ışık halesi görünür.
   const [lightsOn, setLightsOn] = useState(false);
   // Motor (çuf-çuf) sesi için ayrı bir aç/kapat — genel ses ayarından bağımsız
-  // olarak sadece bu sesi susturabilmek için.
-  const [engineSoundOn, setEngineSoundOn] = useState(true);
+  // olarak sadece bu sesi susturabilmek için. Oyun her açıldığında otomatik
+  // çalmasın diye varsayılan kapalı; çocuk isterse kumanda panelinden açar.
+  const [engineSoundOn, setEngineSoundOn] = useState(false);
   const [trainSpeed, setTrainSpeed] = useState<'normal' | 'fast' | 'slow'>('normal');
   const [trainDirection, setTrainDirection] = useState<'right' | 'left'>('right');
   const [isWhistling, setIsWhistling] = useState(false);
