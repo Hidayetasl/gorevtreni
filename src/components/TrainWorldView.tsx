@@ -876,6 +876,38 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               ☁️
             </div>
 
+            {/* Güneş: gündüz temalarında (gece hariç) gökyüzünde her zaman net
+                görünsün diye ayrı, hafif parlayan bir öğe olarak eklendi. */}
+            {envTheme !== 'night' && (
+              <div className="absolute top-3 right-4 sm:top-4 sm:right-6 z-10 text-3xl sm:text-5xl opacity-90 animate-pulse pointer-events-none drop-shadow-[0_0_12px_rgba(253,224,71,0.6)]">
+                ☀️
+              </div>
+            )}
+
+            {/* En arkadaki tepelerde, kasaba ızgarasının dışında duran, ücretsiz
+                dekoratif rüzgar gülleri — uzaklık hissi için küçük ve soluk. */}
+            <img
+              src={SCENERY_IMAGES['scenery-windmill']}
+              alt=""
+              className="absolute top-[3%] left-[6%] z-[1] w-8 h-8 sm:w-14 sm:h-14 opacity-60 animate-spin-slow pointer-events-none select-none"
+              draggable={false}
+            />
+            <img
+              src={SCENERY_IMAGES['scenery-windmill']}
+              alt=""
+              className="absolute top-[5%] right-[28%] z-[1] w-6 h-6 sm:w-10 sm:h-10 opacity-50 animate-spin-slow pointer-events-none select-none"
+              draggable={false}
+            />
+
+            {/* Nehirde yüzen ördekler — kasaba ızgarasının dışında, ücretsiz
+                varsayılan dekor. Nehrin göründüğü yaklaşık noktalara yerleştirildi. */}
+            <div className="absolute top-[32%] left-[46%] z-[7] text-xl sm:text-3xl opacity-90 pointer-events-none select-none animate-[bounce_3s_ease-in-out_infinite]">
+              🦆
+            </div>
+            <div className="absolute top-[54%] left-[40%] z-[7] text-lg sm:text-2xl opacity-90 pointer-events-none select-none animate-[bounce_3.6s_ease-in-out_infinite]">
+              🦆
+            </div>
+
             {/* Floating Smoke Puff Bubbles generated from whistle */}
             {smokePuffs.map((puff) => (
               <div
