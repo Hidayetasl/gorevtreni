@@ -96,16 +96,15 @@ const SCENE_IMG_SIZE: Record<string, string> = {
   'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
-  // Ana/kurumsal binalar (okul, hastane, itfaiye istasyonu, park, tamirhane,
-  // değirmen) belirgin büyük kalsın.
+  // Sadece 3 ana kurumsal bina (okul, hastane, itfaiye istasyonu) belirgin
+  // büyük kalsın; diğer tüm binalar (park, tamirhane, değirmen, market, fırın,
+  // sinema) ev boyutunda kalsın.
   'scenery-school': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-hospital': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-park': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-train-repair': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-firestation-building': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-windmill': 'w-24 h-24 sm:w-32 sm:h-32',
-  // Küçük esnaf/dükkan tipi binalar (market, fırın, sinema) ev boyutunda kalsın,
-  // ana binalar kadar büyük olmasın.
+  'scenery-park': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-train-repair': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-windmill': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-market': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-bakery': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-cinema': 'w-20 h-20 sm:w-28 sm:h-28',
