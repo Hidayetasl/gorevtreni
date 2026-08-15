@@ -10,10 +10,12 @@ interface LearnViewProps {
   syllableGameLevels?: number[];
   /** Harf Treni / Heceleme / İngilizce'de her doğru cevapta çağrılır (Tren Parası ödülü App.tsx'te günlük tavanla yönetilir). */
   onCorrectAnswer?: () => void;
-  /** Bugün Öğren sekmesinden kazanılan Tren Parası (App.tsx'te günlük tavan sıfırlamasıyla hesaplanır). */
+  /** Bugün Öğren sekmesinden kazanılan Tren Parası. */
   learnCoinsEarnedToday?: number;
-  /** Günlük öğrenme ödülü tavanı (App.tsx: DAILY_LEARN_COIN_CAP). */
-  dailyLearnCoinCap?: number;
+  /** Sonraki Tren Parasına kaç doğru cevap kaldığını gösteren sayaç (0..learnAnswersPerCoin-1). */
+  learnAnswersTowardNextCoin?: number;
+  /** Kaç doğru cevapta 1 Tren Parası verildiği (App.tsx: LEARN_ANSWERS_PER_COIN). */
+  learnAnswersPerCoin?: number;
 }
 
 type WordEntry = { word: string; emoji: string };
@@ -257,7 +259,7 @@ function normalizeEnglish(text: string): string {
 
 type Mode = 'kesfet' | 'bul' | 'hece' | 'ingilizce';
 
-export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels, onCorrectAnswer, learnCoinsEarnedToday = 0, dailyLearnCoinCap = 10 }) => {
+export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels, onCorrectAnswer, learnCoinsEarnedToday = 0, learnAnswersTowardNextCoin = 0, learnAnswersPerCoin = 10 }) => {
   const [mode, setMode] = useState<Mode>('kesfet');
 
   // --- Keşfet modu: harfe dokun, sesini + örnek kelimeyi dinle ---
@@ -650,9 +652,9 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
             </div>
           </div>
           {mode !== 'kesfet' && (
-            <div className="rounded-2xl bg-amber-900/40 border border-amber-600/50 px-3 py-1.5 text-right" title="Öğren sekmesinden bugün kazanılan Tren Parası">
-              <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wide">Bugün 🪙</div>
-              <div className="font-game text-lg font-black text-amber-200">{Math.min(learnCoinsEarnedToday, dailyLearnCoinCap)}/{dailyLearnCoinCap}</div>
+            <div className="rounded-2xl bg-amber-900/40 border border-amber-600/50 px-3 py-1.5 text-right" title={`Her ${learnAnswersPerCoin} doğru cevapta 1 Tren Parası`}>
+              <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wide">Bugün 🪙 {learnCoinsEarnedToday}</div>
+              <div className="font-game text-sm font-black text-amber-200">{learnAnswersTowardNextCoin}/{learnAnswersPerCoin}</div>
             </div>
           )}
         </div>

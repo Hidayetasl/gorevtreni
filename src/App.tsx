@@ -52,10 +52,10 @@ import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 
 const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
 const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
-// Öğren sekmesi (Harf Treni, Heceleme, İngilizce) her doğru cevapta 1 Tren
-// Parası verir; ana kazanç yolu yine günlük rutin görevler olsun diye
-// öğrenme ödülü günde bu sayıyla sınırlanır.
-const DAILY_LEARN_COIN_CAP = 10;
+// Öğren sekmesi (Harf Treni, Heceleme, İngilizce): ana kazanç yolu yine
+// günlük rutin görevler olsun diye öğrenmede puan hemen değil, birikimli
+// verilir — her 10 doğru cevapta 1 Tren Parası.
+const LEARN_ANSWERS_PER_COIN = 10;
 
 function getBrowserDeviceLabel(): string {
   if (typeof navigator === 'undefined') return '';
@@ -206,18 +206,21 @@ export default function App() {
     }
   }, [tasks, user.lastTaskResetDate]);
 
-  // Öğren sekmesinde doğru cevap verildiğinde çağrılır: günlük tavana kadar
-  // +1 Tren Parası verir. Tavana ulaşıldıysa oyun eğlenceli kalsın diye
-  // (kutlama/ses zaten LearnView içinde çalıyor) sessizce hiçbir şey yapmaz.
+  // Öğren sekmesinde doğru cevap verildiğinde çağrılır: doğru cevap sayacını
+  // artırır, her 10 doğru cevapta 1 Tren Parası verir (kutlama/ses zaten
+  // LearnView içinde çalıyor, burada sadece ödül hesabı yapılır).
   const handleLearnCorrectAnswer = useCallback(() => {
     const todayKey = getLocalDateKey();
     setUser((prev) => {
-      const earnedToday = prev.learnCoinsResetDate === todayKey ? (prev.learnCoinsToday ?? 0) : 0;
-      if (earnedToday >= DAILY_LEARN_COIN_CAP) return prev;
+      const isToday = prev.learnCoinsResetDate === todayKey;
+      const answersToday = (isToday ? prev.learnAnswersToday ?? 0 : 0) + 1;
+      const coinsToday = isToday ? prev.learnCoinsToday ?? 0 : 0;
+      const earnsCoin = answersToday % LEARN_ANSWERS_PER_COIN === 0;
       return {
         ...prev,
-        coins: prev.coins + 1,
-        learnCoinsToday: earnedToday + 1,
+        coins: prev.coins + (earnsCoin ? 1 : 0),
+        learnAnswersToday: answersToday,
+        learnCoinsToday: coinsToday + (earnsCoin ? 1 : 0),
         learnCoinsResetDate: todayKey,
       };
     });
@@ -764,7 +767,8 @@ export default function App() {
               syllableGameLevels={user.syllableGameLevels}
               onCorrectAnswer={handleLearnCorrectAnswer}
               learnCoinsEarnedToday={user.learnCoinsResetDate === getLocalDateKey() ? (user.learnCoinsToday ?? 0) : 0}
-              dailyLearnCoinCap={DAILY_LEARN_COIN_CAP}
+              learnAnswersTowardNextCoin={(user.learnCoinsResetDate === getLocalDateKey() ? (user.learnAnswersToday ?? 0) : 0) % LEARN_ANSWERS_PER_COIN}
+              learnAnswersPerCoin={LEARN_ANSWERS_PER_COIN}
             />
           )}
         </main>
