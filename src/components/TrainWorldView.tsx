@@ -89,14 +89,18 @@ const SCENE_IMG_SIZE: Record<string, string> = {
   // Lunapark dönme dolabı + sinema birleşik yapısı, diğer binalardan belirgin
   // şekilde daha yüksek bir görsel olduğu için kendi kutusunda daha uzun.
   'scenery-ferris': 'w-16 h-24 sm:w-24 sm:h-36',
-  // Ev modelleri ve okul, diğer binalara göre hafifçe daha büyük görünsün.
+  // Ev modelleri, diğer binalara göre hafifçe daha büyük görünsün.
   'scenery-house': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-2': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-3': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-school': 'w-20 h-20 sm:w-28 sm:h-28',
+  // Okul, hastane ve park önceden varsayılan (daha küçük) boyuttaydı ve
+  // manzarada fark edilmiyordu — evlerden de büyük, belirgin binalar oldular.
+  'scenery-school': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-hospital': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-park': 'w-24 h-24 sm:w-32 sm:h-32',
 };
 const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
 
