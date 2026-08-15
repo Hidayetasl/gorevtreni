@@ -96,18 +96,19 @@ const SCENE_IMG_SIZE: Record<string, string> = {
   'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
-  // Okul, hastane, park ve aşağıdaki diğer bina türleri önceden tanımsızdı ve
-  // varsayılan (küçük) boyutta kalıp manzarada fark edilmiyordu — hepsi artık
-  // aynı "belirgin bina" boyutunda, evlerden de büyük.
+  // Ana/kurumsal binalar (okul, hastane, itfaiye istasyonu, park, tamirhane,
+  // değirmen) belirgin büyük kalsın.
   'scenery-school': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-hospital': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-park': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-market': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-cinema': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-train-repair': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-firestation-building': 'w-24 h-24 sm:w-32 sm:h-32',
   'scenery-windmill': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-bakery': 'w-24 h-24 sm:w-32 sm:h-32',
+  // Küçük esnaf/dükkan tipi binalar (market, fırın, sinema) ev boyutunda kalsın,
+  // ana binalar kadar büyük olmasın.
+  'scenery-market': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-bakery': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-cinema': 'w-20 h-20 sm:w-28 sm:h-28',
   // Fıskiye ve uçak bina değil, daha küçük dekor öğeleri — ev boyutunda kalsın.
   'scenery-fountain': 'w-20 h-20 sm:w-28 sm:h-28',
   'scenery-airplane': 'w-20 h-20 sm:w-28 sm:h-28',
