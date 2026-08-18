@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
-    base: process.env.GITHUB_PAGES === 'true' ? '/gorev-treni/' : '/',
+    base: process.env.GITHUB_PAGES === 'true' ? '/gorevtreni/' : '/',
     plugins: [
       react(),
       tailwindcss(),
