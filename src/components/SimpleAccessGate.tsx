@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
-import { createFamilyCode, familyExists, isCloudConfigured } from '../utils/cloudSync';
+import { CANONICAL_FAMILY_CODE, createFamilyCode, familyExists, isCloudConfigured, saveFamilyCode } from '../utils/cloudSync';
 
 const ACCESS_PINS = new Set(['1234', '0123']);
 
@@ -8,7 +8,7 @@ const ACCESS_PINS = new Set(['1234', '0123']);
 // kolay hatırlanan bir kod. Bunu giren herkes (baba/anne/anneanne/dede fark
 // etmeksizin) doğrudan Rüzgar'ın gerçek ailesine bağlanır. Ebeveyn panelini
 // açmak için kullanılan PIN'ler ayrı ve değişmedi (bkz. ParentModal.tsx).
-const QUICK_ACCESS_FAMILY_CODE = 'XJSKGCJMBPJ6';
+const QUICK_ACCESS_FAMILY_CODE = CANONICAL_FAMILY_CODE;
 const QUICK_ACCESS_CODES = new Set(['RUZGAR123']);
 
 interface SimpleAccessGateProps {
@@ -67,6 +67,11 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
         setErrorMessage('Bu aile koduyla kayıt bulunamadı. Kodu kontrol edin.');
         return;
       }
+      // ÖNEMLİ: Aile kodu burada kalıcı olarak kaydedilmezse (yalnızca React
+      // state'e geçerse), sayfa yenilendiğinde veya bazı senkronizasyon
+      // yollarında hiç yazılmadan cihaz eski/boş bir koda takılı kalabiliyordu.
+      // Bu, "adres değişti ama eski veriler çıkıyor" sorununun bir parçasıydı.
+      saveFamilyCode(resolvedCode);
       localStorage.setItem('ruzgar_game_access_v1', 'open');
       onUnlock(resolvedCode);
     } catch {

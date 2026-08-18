@@ -51,8 +51,23 @@ async function getServices() {
   return services;
 }
 
+// Rüzgar'ın ailesinin TEK gerçek/doğru aile kodu. RUZGAR123 girişi de bu koda
+// bağlanır. Bu sabit, cihazlarda kalmış eski/yanlış (ör. test sırasında
+// oluşmuş) aile kodlarını fark edip otomatik düzeltmek için kullanılır.
+export const CANONICAL_FAMILY_CODE = 'XJSKGCJMBPJ6';
+
 export function getFamilyCode() {
-  return localStorage.getItem(FAMILY_CODE_KEY) || '';
+  const stored = localStorage.getItem(FAMILY_CODE_KEY) || '';
+  // Cihazda doğru aileden FARKLI eski bir kod kayıtlıysa (ör. geliştirme
+  // sırasında yanlışlıkla oluşmuş boş bir aile), otomatik olarak temizle ki
+  // uygulama doğru aileye (CANONICAL_FAMILY_CODE) yeniden bağlansın. Bu,
+  // "adres değişti ama hala eski/az puan görünüyor" sorununun kök nedeniydi.
+  if (stored && stored !== CANONICAL_FAMILY_CODE) {
+    localStorage.removeItem(FAMILY_CODE_KEY);
+    localStorage.removeItem('ruzgar_game_access_v1');
+    return '';
+  }
+  return stored;
 }
 
 /** WhatsApp ile gönderilebilen davet bağlantısından aile kodunu okur. */
