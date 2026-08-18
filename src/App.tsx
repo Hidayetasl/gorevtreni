@@ -261,20 +261,31 @@ export default function App() {
     },
   });
 
-  const isFirstFamilyDataEffectRef = useRef(true);
   useEffect(() => {
     latestFamilyDataRef.current = currentFamilyData();
-    if (isFirstFamilyDataEffectRef.current) {
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog]);
+
+  // hasLocalPendingWriteRef SADECE "körü körüne üzerine yazılan" alanları
+  // (puan, görevler, mağaza, dünya, bonuslar, ebeveyn ayarı) izler. Sesli
+  // notlar/videolar/etkinlik günlüğü kasıtlı olarak DIŞARIDA bırakıldı —
+  // onlar zaten kimliğe göre güvenle birleştiriliyor (bkz. subscribeToFamily),
+  // hiçbir zaman kaybolmuyorlar. "Uygulama açıldı" günlük kaydı gibi zararsız
+  // bir değişiklik bu bayrağı tetiklerse, cihaz gereksiz yere buluttaki BAŞKA
+  // bir cihazdan gelen daha güncel puanı reddedip kendi eski verisini üzerine
+  // yazabilir — bu da yeni bir veri kaybı türü olurdu.
+  const isFirstConflictSensitiveEffectRef = useRef(true);
+  useEffect(() => {
+    if (isFirstConflictSensitiveEffectRef.current) {
       // İlk render'da (mount) bu efekt zaten çalışır; bu, gerçek bir yerel
       // değişiklik değildir — bayrağı burada işaretlemiyoruz, yoksa ilk bulut
       // senkronu hiç uygulanamaz.
-      isFirstFamilyDataEffectRef.current = false;
+      isFirstConflictSensitiveEffectRef.current = false;
     } else if (!remoteUpdateRef.current) {
       // Bu değişiklik buluttan gelmedi (kullanıcının kendi eylemi) — buluta
       // henüz yazılmamış bir değişiklik var demektir.
       hasLocalPendingWriteRef.current = true;
     }
-  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog]);
+  }, [user, parentConfig, tasks, shop, world, bonuses]);
 
   useEffect(() => {
     if (!cloudEnabled || !isCloudConfigured || !familyCode) return;
