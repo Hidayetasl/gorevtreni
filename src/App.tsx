@@ -162,6 +162,14 @@ export default function App() {
   const remoteUpdateRef = useRef(false);
   const syncReadyRef = useRef(false);
   const pendingSyncRef = useRef(false);
+  // ÖNEMLİ: Sayfa yeni açıldığında (ör. satın alma) ilk bulut senkronu daha
+  // gelmeden bir değişiklik yapılırsa, biraz sonra gelen "ilk" bulut verisi
+  // (henüz bu değişikliği içermeyen eski veri) bu değişikliği SESSİZCE
+  // eziyordu — puan düşmüş görünmüyor, satın alınan parça envanterde
+  // çıkmıyordu. Bu bayrak, kaydedilmemiş yerel bir değişiklik varken gelen
+  // bulut verisinin üzerine yazmasını engeller; bunun yerine yerel veri
+  // buluta yazılır.
+  const hasLocalPendingWriteRef = useRef(false);
   const latestFamilyDataRef = useRef<import('./utils/cloudSync').FamilyData | null>(null);
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
@@ -253,8 +261,19 @@ export default function App() {
     },
   });
 
+  const isFirstFamilyDataEffectRef = useRef(true);
   useEffect(() => {
     latestFamilyDataRef.current = currentFamilyData();
+    if (isFirstFamilyDataEffectRef.current) {
+      // İlk render'da (mount) bu efekt zaten çalışır; bu, gerçek bir yerel
+      // değişiklik değildir — bayrağı burada işaretlemiyoruz, yoksa ilk bulut
+      // senkronu hiç uygulanamaz.
+      isFirstFamilyDataEffectRef.current = false;
+    } else if (!remoteUpdateRef.current) {
+      // Bu değişiklik buluttan gelmedi (kullanıcının kendi eylemi) — buluta
+      // henüz yazılmamış bir değişiklik var demektir.
+      hasLocalPendingWriteRef.current = true;
+    }
   }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog]);
 
   useEffect(() => {
@@ -269,6 +288,23 @@ export default function App() {
         unsubscribe = await subscribeToFamily(familyCode, (remote, metadata) => {
           if (metadata.fromCache) {
             setCloudStatus(navigator.onLine ? 'Bulut doğrulanıyor…' : 'Çevrimdışı: kayıtlı oyun açık');
+            return;
+          }
+          if (hasLocalPendingWriteRef.current) {
+            // Bu cihazda buluta henüz yazılmamış taze bir değişiklik var (ör.
+            // az önce yapılan bir satın alma). Buluttan gelen bu veri o
+            // değişiklikten ÖNCEKİ eski hali olabilir — üzerine yazarsak
+            // satın alma "sessizce" kaybolur. Bunun yerine yerel değişikliği
+            // hemen buluta yazıyoruz (debounce efektine güvenmiyoruz, çünkü
+            // ref değişikliği tek başına o efekti tetiklemez).
+            syncReadyRef.current = true;
+            setCloudStatus('Yerel değişiklik buluta yazılıyor…');
+            uploadFamilyData(familyCode, latestFamilyDataRef.current ?? currentFamilyData())
+              .then(() => {
+                hasLocalPendingWriteRef.current = false;
+                setCloudStatus('Eşitlendi ✓');
+              })
+              .catch(() => setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'));
             return;
           }
           remoteUpdateRef.current = true;
@@ -338,7 +374,7 @@ export default function App() {
     }
     const timer = window.setTimeout(() => {
       uploadFamilyData(familyCode, currentFamilyData())
-        .then(() => { pendingSyncRef.current = false; setCloudStatus('Eşitlendi ✓'); })
+        .then(() => { pendingSyncRef.current = false; hasLocalPendingWriteRef.current = false; setCloudStatus('Eşitlendi ✓'); })
         .catch(() => { pendingSyncRef.current = true; setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'); });
     }, 900);
     return () => window.clearTimeout(timer);
