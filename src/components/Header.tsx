@@ -19,6 +19,7 @@ interface HeaderProps {
   cloudStatus?: string;
   onManualSync?: () => void;
   isSyncing?: boolean;
+  deviceRoleLabel?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   cloudStatus,
   onManualSync,
   isSyncing = false,
+  deviceRoleLabel,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -167,22 +169,31 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {onManualSync && cloudStatus && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`mb-2 flex items-center gap-1.5 text-[10px] sm:text-xs font-bold rounded-lg px-2.5 py-1.5 w-fit border ${
-              cloudStatus.startsWith('Eşitleme hatası')
-                ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
-                : cloudStatus.startsWith('Çevrimdışı')
-                  ? 'bg-amber-950/50 border-amber-500/60 text-amber-100'
-                  : 'bg-sky-950/60 border-sky-600/60 text-sky-200'
-            }`}
-          >
-            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>Bulut: {cloudStatus}</span>
+        {(onManualSync && cloudStatus) || deviceRoleLabel ? (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {onManualSync && cloudStatus && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`flex items-center gap-1.5 text-[10px] sm:text-xs font-bold rounded-lg px-2.5 py-1.5 w-fit border ${
+                  cloudStatus.startsWith('Eşitleme hatası')
+                    ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                    : cloudStatus.startsWith('Çevrimdışı')
+                      ? 'bg-amber-950/50 border-amber-500/60 text-amber-100'
+                      : 'bg-sky-950/60 border-sky-600/60 text-sky-200'
+                }`}
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>Bulut: {cloudStatus}</span>
+              </div>
+            )}
+            {deviceRoleLabel && (
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold rounded-lg px-2.5 py-1.5 w-fit border bg-slate-800/60 border-slate-600/60 text-slate-200">
+                <span>{deviceRoleLabel}</span>
+              </div>
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Top Horizontal Pill Navigation Bar */}
         <nav className="grid grid-cols-5 gap-1.5 sm:gap-3 pt-1">

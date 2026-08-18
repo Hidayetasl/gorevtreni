@@ -94,6 +94,14 @@ export interface BonusCard {
   claimed: boolean;
 }
 
+/**
+ * Bu FİZİKSEL cihazın (telefon/tablet) rolü — bulutta değil, sadece bu
+ * cihazın localStorage'ında tutulur. "Rüzgar cihazı" oyunun oynandığı,
+ * görevlerin işaretlendiği telefondur; "izleyici" sadece takip eden/onaylayan
+ * aile üyelerinin (baba/anne/anneanne/dede) cihazıdır.
+ */
+export type DeviceRole = 'player' | 'viewer';
+
 export interface ActivityLogEntry {
   id: string;
   type: 'app_open' | 'task_complete' | 'purchase';

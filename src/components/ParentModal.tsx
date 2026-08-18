@@ -42,6 +42,9 @@ interface ParentModalProps {
   onJoinFamily: (code: string) => Promise<void>;
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
+  deviceRoleLabel?: string;
+  lastSyncedByLabel?: string;
+  onChangeDeviceRole?: () => void;
 }
 
 export const ParentModal: React.FC<ParentModalProps> = ({
@@ -74,6 +77,9 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onJoinFamily,
   activityLog = [],
   voiceMessages = [],
+  deviceRoleLabel,
+  lastSyncedByLabel,
+  onChangeDeviceRole,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -1067,6 +1073,25 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   )}
                   {syncMessage && <p role="status" className="text-[11px] font-bold text-sky-800">{syncMessage}</p>}
                 </div>
+
+                {(deviceRoleLabel || onChangeDeviceRole) && (
+                  <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <h3 className="font-game text-sm text-slate-900">📱 Bu Cihazın Rolü</h3>
+                    {deviceRoleLabel && <p className="text-xs font-semibold text-slate-700">{deviceRoleLabel}</p>}
+                    {lastSyncedByLabel && (
+                      <p className="text-[11px] leading-relaxed text-slate-500">Buluta son yazan: {lastSyncedByLabel}</p>
+                    )}
+                    {onChangeDeviceRole && (
+                      <button
+                        type="button"
+                        onClick={onChangeDeviceRole}
+                        className="w-full min-h-10 rounded-xl bg-slate-700 text-white font-game text-xs font-bold"
+                      >
+                        Cihaz Rolünü Değiştir
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div className="pt-3 border-t border-gray-200">
                   <button

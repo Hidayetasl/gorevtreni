@@ -31,6 +31,8 @@ export type FamilyData = {
   voiceMessages: VoiceMessage[];
   videos: StoryVideo[];
   activityLog?: ActivityLogEntry[];
+  /** En son hangi cihaz/rol veriyi buluta yazdı — Ebeveyn panelinde gösterilir. */
+  lastSyncedBy?: { roleLabel: string; device: string; timestamp: string };
 };
 
 export const isCloudConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]));

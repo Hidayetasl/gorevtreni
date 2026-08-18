@@ -1,4 +1,4 @@
-import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from '../types';
+import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry, DeviceRole } from '../types';
 import taskBrushTeethImg from '../assets/images/ruzgar-disfircalama.jpg';
 import taskTidyToysImg from '../assets/images/ruzgar-oyuncak.jpg';
 import taskEatMealImg from '../assets/images/ruzgar-yemek.jpg';
@@ -21,6 +21,32 @@ const STORAGE_KEYS = {
 
 const FIRST_DAY_RESET_VERSION = 'ruzgar_first_day_reset_v1';
 export const START_LEVEL_VERSION = 'start-with-6-coins-v1';
+
+const DEVICE_ROLE_KEY = 'ruzgar_device_role_v1';
+const DEVICE_OWNER_KEY = 'ruzgar_device_owner_v1';
+
+/**
+ * Bu cihazın rolü hiçbir zaman buluta gitmez ve aileler arasında paylaşılmaz
+ * — sadece "bu telefon/tablet ne işe yarıyor" bilgisini tutar. Rol seçilmemişse
+ * (ilk açılış) role: null döner ve giriş ekranından sonra rol sorulur.
+ */
+export function getDeviceRole(): { role: DeviceRole | null; owner?: string } {
+  const role = localStorage.getItem(DEVICE_ROLE_KEY);
+  const owner = localStorage.getItem(DEVICE_OWNER_KEY) || undefined;
+  if (role === 'player' || role === 'viewer') return { role, owner };
+  return { role: null };
+}
+
+export function saveDeviceRole(role: DeviceRole, owner?: string) {
+  localStorage.setItem(DEVICE_ROLE_KEY, role);
+  if (owner) localStorage.setItem(DEVICE_OWNER_KEY, owner);
+  else localStorage.removeItem(DEVICE_OWNER_KEY);
+}
+
+export function clearDeviceRole() {
+  localStorage.removeItem(DEVICE_ROLE_KEY);
+  localStorage.removeItem(DEVICE_OWNER_KEY);
+}
 
 export const INITIAL_USER: UserProfile = {
   name: 'Rüzgar',
@@ -261,14 +287,24 @@ export function hashParentPin(pin: string): string {
   return `v4-${(hash >>> 0).toString(36)}`;
 }
 
+// Görev fotoğrafları derleme sırasında oluşan bir yol içerir (ör.
+// /gorevtreni/assets/...). Site adresi değiştiğinde (gorev-treni ->
+// gorevtreni) localStorage'da veya buluttaki eski kayıtlarda bu yol eskide
+// kalıp resim kırık çıkabiliyor. Bu fonksiyon, kaynağı ne olursa olsun
+// (yerel veya bulut) görev listesindeki resimleri HER ZAMAN bu derlemenin
+// güncel/doğru yoluyla değiştirir.
+export const fixTaskImages = (tasks: RoutineTask[]): RoutineTask[] => {
+  return tasks.map((task) => {
+    const template = INITIAL_TASKS.find((initial) => initial.id === task.id);
+    return template?.imageUrl ? { ...task, imageUrl: template.imageUrl } : task;
+  });
+};
+
 export const getStoredTasks = (): RoutineTask[] => {
   const stored = loadFromStorage<RoutineTask[]>(STORAGE_KEYS.TASKS, INITIAL_TASKS);
   // Önceki V4 kayıtlarındaki görev durumu/puanı korunur; sadece bu sürümün
   // Rüzgar görselleri yerleşir.
-  return stored.map((task) => {
-    const template = INITIAL_TASKS.find((initial) => initial.id === task.id);
-    return template?.imageUrl ? { ...task, imageUrl: template.imageUrl } : task;
-  });
+  return fixTaskImages(stored);
 };
 export const saveStoredTasks = (tasks: RoutineTask[]) => saveToStorage(STORAGE_KEYS.TASKS, tasks);
 

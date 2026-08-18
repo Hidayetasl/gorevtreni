@@ -8,6 +8,10 @@ import { TabType, RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentCon
 import {
   getStoredTasks,
   saveStoredTasks,
+  fixTaskImages,
+  getDeviceRole,
+  saveDeviceRole,
+  clearDeviceRole,
   getStoredShop,
   saveStoredShop,
   mergeShopItemsWithCatalog,
@@ -47,8 +51,10 @@ import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { SimpleAccessGate } from './components/SimpleAccessGate';
+import { DeviceRoleGate } from './components/DeviceRoleGate';
 import { createFamilyCode, familyExists, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
+import { DeviceRole } from './types';
 
 const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
 const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
@@ -76,6 +82,12 @@ function getBrowserDeviceLabel(): string {
   else if (/Windows/.test(ua)) device = 'Windows';
   else if (/Linux/.test(ua)) device = 'Linux';
   return device ? `${browser} · ${device}` : browser;
+}
+
+function getDeviceRoleLabel(role: DeviceRole | null, owner?: string): string {
+  if (role === 'player') return '🚂 Rüzgar\'ın cihazı';
+  if (role === 'viewer') return owner ? `👀 İzleyici (${owner})` : '👀 İzleyici';
+  return '';
 }
 
 function getLocalDateKey(value: Date | string = new Date()) {
@@ -138,6 +150,12 @@ export default function App() {
   const [videos, setVideos] = useState<StoryVideo[]>(() => getStoredVideos());
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>(() => getStoredActivityLog());
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
+  // Bu FİZİKSEL cihazın rolü: "player" = Rüzgar bu telefonda oynuyor,
+  // "viewer" = sadece takip eden/onaylayan bir aile üyesinin cihazı.
+  // Buluta gitmez, sadece bu cihazda kalıcıdır.
+  const [deviceRole, setDeviceRole] = useState(() => getDeviceRole());
+  // Buluttan gelen "en son hangi cihaz/rol yazdı" bilgisi — Ebeveyn panelinde gösterilir.
+  const [lastSyncedBy, setLastSyncedBy] = useState<{ roleLabel: string; device: string; timestamp: string } | undefined>();
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [networkEpoch, setNetworkEpoch] = useState(0);
@@ -226,7 +244,14 @@ export default function App() {
     });
   }, []);
 
-  const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({ user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog });
+  const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({
+    user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog,
+    lastSyncedBy: {
+      roleLabel: getDeviceRoleLabel(deviceRole.role, deviceRole.owner) || 'Bilinmeyen cihaz',
+      device: getBrowserDeviceLabel(),
+      timestamp: new Date().toISOString(),
+    },
+  });
 
   useEffect(() => {
     latestFamilyDataRef.current = currentFamilyData();
@@ -256,8 +281,12 @@ export default function App() {
           const shopCatalogChanged = syncedShop.length !== remote.shop.length;
 
           setUser(syncedUser); setParentConfig(remote.parentConfig);
-          setTasks(remote.tasks);
+          // Buluttaki görev fotoğrafı yolu eski adresten (ör. gorev-treni)
+          // kalmış olabilir; her zaman bu derlemenin güncel yoluyla değiştir,
+          // yoksa resimler açılışta kısa görünüp bulut verisiyle bozuluyordu.
+          setTasks(fixTaskImages(remote.tasks));
           setShop(syncedShop); setWorld(remote.world); setBonuses(remote.bonuses);
+          if (remote.lastSyncedBy) setLastSyncedBy(remote.lastSyncedBy);
           const remoteMessages = remote.voiceMessages || [];
           const localMessages = voiceMessagesRef.current;
           const combinedMessages = [...remoteMessages];
@@ -322,11 +351,12 @@ export default function App() {
   useEffect(() => {
     const id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const sessionStart = Date.now();
+    const roleLabel = getDeviceRoleLabel(deviceRole.role, deviceRole.owner);
     const entry: ActivityLogEntry = {
       id,
       type: 'app_open',
       label: 'Uygulama açıldı',
-      detail: getBrowserDeviceLabel(),
+      detail: roleLabel ? `${getBrowserDeviceLabel()} · ${roleLabel}` : getBrowserDeviceLabel(),
       timestamp: new Date().toISOString(),
     };
     setActivityLog((prev) => [entry, ...prev].slice(0, 300));
@@ -405,8 +435,9 @@ export default function App() {
         ...INITIAL_USER,
         ...remote.user,
       });
-      setParentConfig(remote.parentConfig); setTasks(remote.tasks); setShop(mergeShopItemsWithCatalog(remote.shop));
+      setParentConfig(remote.parentConfig); setTasks(fixTaskImages(remote.tasks)); setShop(mergeShopItemsWithCatalog(remote.shop));
       setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
+      if (remote.lastSyncedBy) setLastSyncedBy(remote.lastSyncedBy);
       window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
@@ -678,6 +709,20 @@ export default function App() {
     );
   }
 
+  // Aile kodu doğrulandıktan sonra, bu fiziksel cihazın rolü henüz
+  // seçilmemişse sorulur: Rüzgar bu telefonda mı oynuyor, yoksa bu cihaz
+  // sadece takip eden/onaylayan biri mi?
+  if (!deviceRole.role) {
+    return (
+      <DeviceRoleGate
+        onSelect={(role, owner) => {
+          saveDeviceRole(role, owner);
+          setDeviceRole({ role, owner });
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0e2531] via-[#112f3e] to-[#2f7533] text-slate-100 relative selection:bg-sky-200">
       {/* Background Animated Sky & Clouds */}
@@ -712,6 +757,7 @@ export default function App() {
           cloudStatus={cloudStatus}
           onManualSync={handleManualSync}
           isSyncing={isManualSyncing}
+          deviceRoleLabel={getDeviceRoleLabel(deviceRole.role, deviceRole.owner)}
         />
 
         {/* Main Content Body */}
@@ -812,6 +858,9 @@ export default function App() {
           onJoinFamily={handleJoinFamily}
           activityLog={activityLog}
           voiceMessages={voiceMessages}
+          deviceRoleLabel={getDeviceRoleLabel(deviceRole.role, deviceRole.owner)}
+          lastSyncedByLabel={lastSyncedBy ? `${lastSyncedBy.roleLabel} · ${lastSyncedBy.device}` : undefined}
+          onChangeDeviceRole={() => { clearDeviceRole(); setDeviceRole({ role: null }); }}
         />
 
         {/* Voice Messages Modal */}
