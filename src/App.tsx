@@ -237,6 +237,7 @@ export default function App() {
   // LearnView içinde çalıyor, burada sadece ödül hesabı yapılır).
   const handleLearnCorrectAnswer = useCallback(() => {
     const todayKey = getLocalDateKey();
+    hasLocalPendingWriteRef.current = true;
     setUser((prev) => {
       const isToday = prev.learnCoinsResetDate === todayKey;
       const answersToday = (isToday ? prev.learnAnswersToday ?? 0 : 0) + 1;
@@ -265,27 +266,16 @@ export default function App() {
     latestFamilyDataRef.current = currentFamilyData();
   }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog]);
 
-  // hasLocalPendingWriteRef SADECE "körü körüne üzerine yazılan" alanları
-  // (puan, görevler, mağaza, dünya, bonuslar, ebeveyn ayarı) izler. Sesli
-  // notlar/videolar/etkinlik günlüğü kasıtlı olarak DIŞARIDA bırakıldı —
-  // onlar zaten kimliğe göre güvenle birleştiriliyor (bkz. subscribeToFamily),
-  // hiçbir zaman kaybolmuyorlar. "Uygulama açıldı" günlük kaydı gibi zararsız
-  // bir değişiklik bu bayrağı tetiklerse, cihaz gereksiz yere buluttaki BAŞKA
-  // bir cihazdan gelen daha güncel puanı reddedip kendi eski verisini üzerine
-  // yazabilir — bu da yeni bir veri kaybı türü olurdu.
-  const isFirstConflictSensitiveEffectRef = useRef(true);
-  useEffect(() => {
-    if (isFirstConflictSensitiveEffectRef.current) {
-      // İlk render'da (mount) bu efekt zaten çalışır; bu, gerçek bir yerel
-      // değişiklik değildir — bayrağı burada işaretlemiyoruz, yoksa ilk bulut
-      // senkronu hiç uygulanamaz.
-      isFirstConflictSensitiveEffectRef.current = false;
-    } else if (!remoteUpdateRef.current) {
-      // Bu değişiklik buluttan gelmedi (kullanıcının kendi eylemi) — buluta
-      // henüz yazılmamış bir değişiklik var demektir.
-      hasLocalPendingWriteRef.current = true;
-    }
-  }, [user, parentConfig, tasks, shop, world, bonuses]);
+  // markLocalPendingWrite(): SADECE gerçek kullanıcı eylemlerinde (satın alma,
+  // görev tamamlama, dünyaya yerleştirme, bonus vb.) doğrudan çağrılır — genel
+  // bir state-izleme efekti KULLANMIYORUZ, çünkü "yeni gün" damgalama gibi
+  // otomatik/arka plan değişiklikler de aynı state alanlarını (user, tasks)
+  // değiştirebiliyor ve bunlar gerçek bir çakışma değil. Genel efekt bunu
+  // ayırt edemediği için buluttaki güncel veriyi gereksiz yere reddedip eski
+  // yerel veriyi üzerine yazabiliyordu.
+  const markLocalPendingWrite = () => {
+    hasLocalPendingWriteRef.current = true;
+  };
 
   useEffect(() => {
     if (!cloudEnabled || !isCloudConfigured || !familyCode) return;
@@ -534,6 +524,7 @@ export default function App() {
 
   // Task Completion / Approval Logic
   const handleMarkTaskDone = (taskId: string) => {
+    markLocalPendingWrite();
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: 'pending_approval', completedAt: new Date().toISOString() } : t))
     );
@@ -545,6 +536,7 @@ export default function App() {
     const now = new Date().toISOString();
     const todayKey = getLocalDateKey(now);
 
+    markLocalPendingWrite();
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: 'completed', approvedAt: now } : t))
     );
@@ -566,6 +558,7 @@ export default function App() {
     const now = new Date().toISOString();
     const todayKey = getLocalDateKey(now);
 
+    markLocalPendingWrite();
     setTasks((prev) =>
       prev.map((t) => (t.status === 'pending_approval' ? { ...t, status: 'completed', approvedAt: now } : t))
     );
@@ -580,11 +573,13 @@ export default function App() {
   };
 
   const handleRejectTask = (taskId: string) => {
+    markLocalPendingWrite();
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'todo' } : t)));
   };
 
   const handleReactivateTask = (taskId: string) => {
     const todayKey = getLocalDateKey();
+    markLocalPendingWrite();
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId && isRoutineTask(t) ? reopenRoutineTask(t) : t))
     );
@@ -593,6 +588,7 @@ export default function App() {
 
   const handleReactivateAllRoutineTasks = () => {
     const todayKey = getLocalDateKey();
+    markLocalPendingWrite();
     setTasks((prev) => prev.map((t) => (isRoutineTask(t) && t.status === 'completed' ? reopenRoutineTask(t) : t)));
     setUser((prev) => ({ ...prev, lastTaskResetDate: todayKey }));
   };
@@ -603,22 +599,26 @@ export default function App() {
       id: `task-${Date.now()}`,
       status: 'todo',
     };
+    markLocalPendingWrite();
     setTasks((prev) => [newTask, ...prev]);
   };
 
   const handleDeleteTask = (taskId: string) => {
+    markLocalPendingWrite();
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
 
   // Shop & Inventory Handlers
   const handleBuyItem = (itemId: string, price: number) => {
     const item = shop.find((s) => s.id === itemId);
+    markLocalPendingWrite();
     setUser((prev) => ({ ...prev, coins: Math.max(0, prev.coins - price) }));
     setShop((prev) => prev.map((item) => (item.id === itemId ? { ...item, unlocked: true } : item)));
     logActivity('purchase', item?.name || itemId, `-${price} Tren Parası`);
   };
 
   const handleSetActiveTrain = (icon: string) => {
+    markLocalPendingWrite();
     setUser((prev) => ({ ...prev, activeTrainIcon: icon }));
   };
 
@@ -628,10 +628,12 @@ export default function App() {
       ...itemData,
       id: `world-${Date.now()}`,
     };
+    markLocalPendingWrite();
     setWorld((prev) => [...prev, newItem]);
   };
 
   const handleRemoveItem = (placedId: string) => {
+    markLocalPendingWrite();
     setWorld((prev) => prev.filter((item) => item.id !== placedId));
   };
 
@@ -643,10 +645,12 @@ export default function App() {
       createdAt: new Date().toISOString(),
       claimed: false,
     };
+    markLocalPendingWrite();
     setBonuses((prev) => [newBonus, ...prev]);
   };
 
   const handleClaimBonus = (bonusId: string, bonusCoins: number) => {
+    markLocalPendingWrite();
     setBonuses((prev) => prev.map((b) => (b.id === bonusId ? { ...b, claimed: true } : b)));
     setUser((prev) => ({ ...prev, coins: prev.coins + bonusCoins }));
   };
@@ -889,8 +893,8 @@ export default function App() {
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
           onSendBonus={handleSendBonus}
-          onUpdateParentConfig={setParentConfig}
-          onUpdateUserProfile={setUser}
+          onUpdateParentConfig={(config) => { markLocalPendingWrite(); setParentConfig(config); }}
+          onUpdateUserProfile={(profile) => { markLocalPendingWrite(); setUser(profile); }}
           onResetData={handleResetData}
           soundEnabled={user.soundEnabled}
           speechEnabled={user.speechEnabled}
