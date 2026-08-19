@@ -187,7 +187,12 @@ function mergeActivityLog(remote: ActivityLogEntry[] = [], local: ActivityLogEnt
   const entries = new Map<string, ActivityLogEntry>();
   for (const entry of remote) entries.set(entry.id, entry);
   for (const entry of local) entries.set(entry.id, entry);
-  return [...entries.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 300);
+  // 300 -> 60: Etkinlik geçmişi belgenin en büyük alanıydı (gerçek cihazda tek
+  // başına ~48KB) ve HER senkronizasyonda (otomatik/manuel) değişmese bile
+  // tamamen yeniden gönderiliyordu. 60 kayıt, ebeveyn panelindeki "son
+  // etkinlikler" ihtiyacı için fazlasıyla yeterli ve belge boyutunu ciddi
+  // ölçüde küçültüp senkronizasyonu hafifletiyor.
+  return [...entries.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 60);
 }
 
 function removeUndefinedFields(value: unknown): unknown {
@@ -209,29 +214,48 @@ function removeUndefinedFields(value: unknown): unknown {
   return value;
 }
 
-export async function uploadFamilyData(code: string, data: FamilyData) {
+// ÖNEMLİ: Daha önce her çağrıda TÜM aile belgesi (görevler, mağaza, dünya,
+// bonuslar, sesli notlar, videolar, 300 kayıtlık etkinlik geçmişi — tek
+// cihazda ölçülen gerçek boyut ~75KB) baştan yazılıyordu; tek bir görev
+// tamamlansa bile değişmeyen alanlar da yeniden gönderiliyordu. Artık
+// `data` yalnızca DEĞİŞEN alanları içerir (bkz. App.tsx'teki diff mantığı)
+// ve `setDoc(..., { merge: true })` ile SADECE o alanlar buluta yazılır;
+// belgenin geri kalanına dokunulmaz. Sesli not/video/etkinlik geçmişi gibi
+// iki cihazdan da gelebilecek alanlar için hâlâ önce okunup birleştiriliyor,
+// ama SADECE bu alanlardan biri gönderiliyorsa (çoğu zaman gönderilmez).
+export async function uploadFamilyData(code: string, data: Partial<FamilyData>) {
   const normalized = saveFamilyCode(code);
   await getServices();
-  // Önce buluttaki sesli notları alıp yeni yerel notlarla birleştiriyoruz.
-  // Bu, anne ve babanın aynı anda yolladığı notların kaybolmasını engeller.
-  const existing = await getDoc(familyRef(normalized));
-  const remoteMessages = existing.exists()
-    ? ((existing.data().voiceMessages || []) as VoiceMessage[])
-    : [];
-  const remoteVideos = existing.exists()
-    ? ((existing.data().videos || []) as StoryVideo[])
-    : [];
-  const remoteActivityLog = existing.exists()
-    ? ((existing.data().activityLog || []) as ActivityLogEntry[])
-    : [];
-  const voiceMessages = await moveAudioToStorage(
-    normalized,
-    mergeVoiceMessages(remoteMessages, data.voiceMessages),
-  );
-  const videos = mergeVideos(remoteVideos, data.videos);
-  const activityLog = mergeActivityLog(remoteActivityLog, data.activityLog);
-  const payload = removeUndefinedFields({ ...data, voiceMessages, videos, activityLog, updatedAt: Date.now(), schemaVersion: 1 });
-  await setDoc(familyRef(normalized), payload, { merge: false });
+  const ref = familyRef(normalized);
+  const payload: Record<string, unknown> = { updatedAt: Date.now(), schemaVersion: 1 };
+
+  const needsCollabRead = data.voiceMessages !== undefined || data.videos !== undefined || data.activityLog !== undefined;
+  if (needsCollabRead) {
+    // Önce buluttaki sesli notları/videoları/etkinlikleri alıp yeni yerel
+    // olanlarla birleştiriyoruz. Bu, anne ve babanın aynı anda yolladığı
+    // notların/kayıtların kaybolmasını engeller.
+    const existing = await getDoc(ref);
+    if (data.voiceMessages !== undefined) {
+      const remoteMessages = existing.exists() ? ((existing.data().voiceMessages || []) as VoiceMessage[]) : [];
+      payload.voiceMessages = await moveAudioToStorage(normalized, mergeVoiceMessages(remoteMessages, data.voiceMessages));
+    }
+    if (data.videos !== undefined) {
+      const remoteVideos = existing.exists() ? ((existing.data().videos || []) as StoryVideo[]) : [];
+      payload.videos = mergeVideos(remoteVideos, data.videos);
+    }
+    if (data.activityLog !== undefined) {
+      const remoteActivityLog = existing.exists() ? ((existing.data().activityLog || []) as ActivityLogEntry[]) : [];
+      payload.activityLog = mergeActivityLog(remoteActivityLog, data.activityLog);
+    }
+  }
+
+  const directFields = ['user', 'parentConfig', 'tasks', 'shop', 'world', 'bonuses', 'lastSyncedBy'] as const;
+  for (const key of directFields) {
+    if (data[key] !== undefined) payload[key] = data[key];
+  }
+
+  const cleaned = removeUndefinedFields(payload);
+  await setDoc(ref, cleaned as Record<string, unknown>, { merge: true });
 }
 
 export async function familyExists(code: string) {

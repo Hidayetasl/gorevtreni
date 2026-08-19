@@ -171,6 +171,12 @@ export default function App() {
   // buluta yazılır.
   const hasLocalPendingWriteRef = useRef(false);
   const latestFamilyDataRef = useRef<import('./utils/cloudSync').FamilyData | null>(null);
+  // ÖNEMLİ: Rutin otomatik eşitleme buluta HER ALANI değil, SADECE son
+  // buluta yazılan/buluttan alınan halinden FARKLI olan alanları gönderir
+  // (bkz. aşağıdaki debounce efekti). Bu ref, "buluttaki güncel hal bu"
+  // diye bildiğimiz referansları tutar; state değişmeden bu referanslar da
+  // değişmez (bu kod tabanında state hep immutable güncellenir).
+  const lastUploadedFieldsRef = useRef<Partial<import('./utils/cloudSync').FamilyData>>({});
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
   const activityLogRef = useRef(activityLog);
@@ -284,7 +290,11 @@ export default function App() {
     setCloudStatus('Aile verisine bağlanıyor…');
     (async () => {
       try {
-        if (!(await familyExists(familyCode))) await uploadFamilyData(familyCode, currentFamilyData());
+        if (!(await familyExists(familyCode))) {
+          const initialData = currentFamilyData();
+          await uploadFamilyData(familyCode, initialData);
+          lastUploadedFieldsRef.current = initialData;
+        }
         if (cancelled) return;
         unsubscribe = await subscribeToFamily(familyCode, (remote, metadata) => {
           if (metadata.fromCache) {
@@ -303,6 +313,7 @@ export default function App() {
             uploadFamilyData(familyCode, latestFamilyDataRef.current ?? currentFamilyData())
               .then(() => {
                 hasLocalPendingWriteRef.current = false;
+                lastUploadedFieldsRef.current = latestFamilyDataRef.current ?? currentFamilyData();
                 setCloudStatus('Eşitlendi ✓');
               })
               .catch(() => setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'));
@@ -317,11 +328,12 @@ export default function App() {
           const syncedShop = mergeShopItemsWithCatalog(remote.shop);
           const shopCatalogChanged = syncedShop.length !== remote.shop.length;
 
-          setUser(syncedUser); setParentConfig(remote.parentConfig);
           // Buluttaki görev fotoğrafı yolu eski adresten (ör. gorev-treni)
           // kalmış olabilir; her zaman bu derlemenin güncel yoluyla değiştir,
           // yoksa resimler açılışta kısa görünüp bulut verisiyle bozuluyordu.
-          setTasks(fixTaskImages(remote.tasks));
+          const syncedTasks = fixTaskImages(remote.tasks);
+          setUser(syncedUser); setParentConfig(remote.parentConfig);
+          setTasks(syncedTasks);
           setShop(syncedShop); setWorld(remote.world); setBonuses(remote.bonuses);
           if (remote.lastSyncedBy) setLastSyncedBy(remote.lastSyncedBy);
           const remoteMessages = remote.voiceMessages || [];
@@ -346,6 +358,20 @@ export default function App() {
             if (!combinedActivityLog.some((remoteEntry) => remoteEntry.id === entry.id)) combinedActivityLog.push(entry);
           }
           setActivityLog(combinedActivityLog);
+          // Yerel state artık buluttakiyle aynı — bir sonraki otomatik
+          // eşitlemenin bu alanları gereksiz yere tekrar göndermemesi için
+          // "son buluta yazılan" referanslarını da güncelliyoruz.
+          lastUploadedFieldsRef.current = {
+            user: syncedUser,
+            parentConfig: remote.parentConfig,
+            tasks: syncedTasks,
+            shop: syncedShop,
+            world: remote.world,
+            bonuses: remote.bonuses,
+            voiceMessages: combinedMessages,
+            videos: syncedVideos,
+            activityLog: combinedActivityLog,
+          };
           setCloudStatus('Eşitlendi ✓');
           pendingSyncRef.current = false;
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
@@ -374,8 +400,28 @@ export default function App() {
       return;
     }
     const timer = window.setTimeout(() => {
-      uploadFamilyData(familyCode, currentFamilyData())
-        .then(() => { pendingSyncRef.current = false; hasLocalPendingWriteRef.current = false; setCloudStatus('Eşitlendi ✓'); })
+      // Sadece son buluta yazılan halinden GERÇEKTEN farklı olan alanları
+      // gönder — ör. bir görev tamamlandığında sadece "tasks" (ve dolaylı
+      // "user" puanı) değişir; mağaza, dünya, 60 kayıtlık etkinlik geçmişi
+      // vb. değişmediyse hiç gönderilmez. Böylece her küçük değişiklikte
+      // tüm aile belgesi yeniden yazılmaz.
+      const current = currentFamilyData();
+      const last = lastUploadedFieldsRef.current;
+      const diff: Partial<import('./utils/cloudSync').FamilyData> = {};
+      (Object.keys(current) as (keyof import('./utils/cloudSync').FamilyData)[]).forEach((key) => {
+        if (last[key] !== current[key]) (diff as Record<string, unknown>)[key] = current[key];
+      });
+      if (Object.keys(diff).length === 0) {
+        pendingSyncRef.current = false;
+        hasLocalPendingWriteRef.current = false;
+        setCloudStatus('Eşitlendi ✓');
+        return;
+      }
+      uploadFamilyData(familyCode, diff)
+        .then(() => {
+          lastUploadedFieldsRef.current = { ...lastUploadedFieldsRef.current, ...diff };
+          pendingSyncRef.current = false; hasLocalPendingWriteRef.current = false; setCloudStatus('Eşitlendi ✓');
+        })
         .catch(() => { pendingSyncRef.current = true; setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'); });
     }, 900);
     return () => window.clearTimeout(timer);
@@ -396,7 +442,7 @@ export default function App() {
       detail: roleLabel ? `${getBrowserDeviceLabel()} · ${roleLabel}` : getBrowserDeviceLabel(),
       timestamp: new Date().toISOString(),
     };
-    setActivityLog((prev) => [entry, ...prev].slice(0, 300));
+    setActivityLog((prev) => [entry, ...prev].slice(0, 60));
 
     const updateDuration = () => {
       const durationMs = Date.now() - sessionStart;
@@ -468,13 +514,27 @@ export default function App() {
         await uploadFamilyData(familyCode, { ...remote, shop: mergeShopItemsWithCatalog(remote.shop), videos: combinedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog });
       }
       remoteUpdateRef.current = true;
-      setUser({
-        ...INITIAL_USER,
-        ...remote.user,
-      });
-      setParentConfig(remote.parentConfig); setTasks(fixTaskImages(remote.tasks)); setShop(mergeShopItemsWithCatalog(remote.shop));
+      const syncedUser: UserProfile = { ...INITIAL_USER, ...remote.user };
+      const syncedTasks = fixTaskImages(remote.tasks);
+      const syncedShop = mergeShopItemsWithCatalog(remote.shop);
+      setUser(syncedUser);
+      setParentConfig(remote.parentConfig); setTasks(syncedTasks); setShop(syncedShop);
       setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
       if (remote.lastSyncedBy) setLastSyncedBy(remote.lastSyncedBy);
+      // Manuel eşitleme sonrası yerel state buluttakiyle birebir aynı —
+      // otomatik eşitlemenin bir sonraki turda bunları gereksiz yere tekrar
+      // göndermemesi için referansları güncelliyoruz.
+      lastUploadedFieldsRef.current = {
+        user: syncedUser,
+        parentConfig: remote.parentConfig,
+        tasks: syncedTasks,
+        shop: syncedShop,
+        world: remote.world,
+        bonuses: remote.bonuses,
+        voiceMessages: combinedMessages,
+        videos: combinedVideos,
+        activityLog: combinedActivityLog,
+      };
       window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
@@ -491,7 +551,9 @@ export default function App() {
     setFamilyCode(code);
     setCloudStatus('Aile oluşturuluyor…');
     try {
-      await uploadFamilyData(code, currentFamilyData());
+      const initialData = currentFamilyData();
+      await uploadFamilyData(code, initialData);
+      lastUploadedFieldsRef.current = initialData;
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
     } catch (error) { setCloudStatus(error instanceof Error ? `Eşitleme hatası: ${error.message}` : 'Eşitleme başlatılamadı.'); }
@@ -519,7 +581,7 @@ export default function App() {
       detail,
       timestamp: new Date().toISOString(),
     };
-    setActivityLog((prev) => [entry, ...prev].slice(0, 300));
+    setActivityLog((prev) => [entry, ...prev].slice(0, 60));
   };
 
   // Task Completion / Approval Logic
