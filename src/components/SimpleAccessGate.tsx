@@ -61,7 +61,16 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
     setStatus('checking');
     setErrorMessage('');
     try {
-      const exists = await familyExists(resolvedCode);
+      // ÖNEMLİ: familyExists() içindeki bulut isteğinin hiç zaman aşımı
+      // yoktu. Yavaş/soğuk bir bağlantıda (ör. ilk girişte, telefon henüz
+      // bulutla hiç konuşmamışken) istek çok uzun sürebiliyor ve ekran
+      // "Kontrol ediliyor…" yazısında SONSUZA KADAR takılı kalabiliyordu.
+      // 15 saniyede bir zaman aşımına düşürüp kullanıcıya tekrar deneme
+      // şansı veriyoruz.
+      const timeout = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error('timeout')), 15000);
+      });
+      const exists = await Promise.race([familyExists(resolvedCode), timeout]);
       if (!exists) {
         setStatus('error');
         setErrorMessage('Bu aile koduyla kayıt bulunamadı. Kodu kontrol edin.');
@@ -74,9 +83,16 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
       saveFamilyCode(resolvedCode);
       localStorage.setItem('ruzgar_game_access_v1', 'open');
       onUnlock(resolvedCode);
-    } catch {
+    } catch (err) {
       setStatus('error');
-      setErrorMessage('Bağlantı hatası. İnternetinizi kontrol edip tekrar deneyin.');
+      // "İnternetinizi kontrol edin" ifadesi yanıltıcıydı: internet varken de
+      // bağlantı sadece yavaş olduğunda aynı hata çıkıyordu. Artık zaman
+      // aşımı durumunu ayrı, doğru bir mesajla belirtiyoruz.
+      if (err instanceof Error && err.message === 'timeout') {
+        setErrorMessage('Bağlantı çok uzun sürdü. Lütfen tekrar deneyin.');
+      } else {
+        setErrorMessage('Bağlantı hatası. İnternetinizi kontrol edip tekrar deneyin.');
+      }
     }
   };
 
