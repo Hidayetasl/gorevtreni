@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playPopSound, speakText, startTrainEngineLoop, stopTrainEngineLoop } from '../utils/audio';
-import { Plus, Trash2, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2, Maximize2, Minimize2, X, Map as MapIcon } from 'lucide-react';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -51,69 +51,81 @@ const WORLD_WIDE_PERCENT = Math.round((GRID_COLS / 8) * 100);
 
 // Her eşya türünün ana sahnede kaç büyük çizileceği (konum artık sabit değil,
 // sadece görsel boyut sabit kalıyor).
+// (bkz. SCENE_IMG_SIZE'daki mobil boyut notu — aynı sığdırma mantığı burada
+// da geçerli: gerçek görseli olmayan eşyalar için emoji yedeği.)
 const SCENE_ITEM_SIZE: Record<string, string> = {
-  'scenery-tree': 'text-4xl sm:text-6xl',
-  'scenery-flower': 'text-3xl sm:text-5xl',
-  'scenery-cow': 'text-4xl sm:text-6xl',
-  'scenery-house': 'text-2xl sm:text-4xl',
-  'scenery-traffic-light': 'text-2xl sm:text-4xl',
-  'scenery-park': 'text-3xl sm:text-5xl',
-  'scenery-windmill': 'text-3xl sm:text-5xl',
-  'scenery-market': 'text-2xl sm:text-4xl',
-  'scenery-school': 'text-2xl sm:text-4xl',
-  'scenery-hospital': 'text-2xl sm:text-4xl',
-  'scenery-train-repair': 'text-3xl sm:text-5xl',
-  'scenery-ferris': 'text-5xl sm:text-7xl',
-  'scenery-bakery': 'text-3xl sm:text-5xl',
-  'scenery-fountain': 'text-3xl sm:text-5xl',
-  'scenery-house-2': 'text-2xl sm:text-4xl',
-  'scenery-house-3': 'text-2xl sm:text-4xl',
-  'scenery-house-4': 'text-2xl sm:text-4xl',
-  'scenery-house-5': 'text-2xl sm:text-4xl',
-  'scenery-house-6': 'text-2xl sm:text-4xl',
-  'scenery-cinema': 'text-2xl sm:text-4xl',
-  'scenery-airplane': 'text-3xl sm:text-5xl',
-  'scenery-ambulance': 'text-3xl sm:text-5xl',
-  'scenery-firestation': 'text-3xl sm:text-5xl',
-  'scenery-firestation-building': 'text-2xl sm:text-4xl',
-  'scenery-squirrel-courier': 'text-2xl sm:text-4xl',
+  'scenery-tree': 'text-xl sm:text-6xl',
+  'scenery-flower': 'text-lg sm:text-5xl',
+  'scenery-cow': 'text-xl sm:text-6xl',
+  'scenery-house': 'text-base sm:text-4xl',
+  'scenery-traffic-light': 'text-base sm:text-4xl',
+  'scenery-park': 'text-lg sm:text-5xl',
+  'scenery-windmill': 'text-lg sm:text-5xl',
+  'scenery-market': 'text-base sm:text-4xl',
+  'scenery-school': 'text-base sm:text-4xl',
+  'scenery-hospital': 'text-base sm:text-4xl',
+  'scenery-train-repair': 'text-lg sm:text-5xl',
+  'scenery-ferris': 'text-2xl sm:text-7xl',
+  'scenery-bakery': 'text-lg sm:text-5xl',
+  'scenery-fountain': 'text-lg sm:text-5xl',
+  'scenery-house-2': 'text-base sm:text-4xl',
+  'scenery-house-3': 'text-base sm:text-4xl',
+  'scenery-house-4': 'text-base sm:text-4xl',
+  'scenery-house-5': 'text-base sm:text-4xl',
+  'scenery-house-6': 'text-base sm:text-4xl',
+  'scenery-cinema': 'text-base sm:text-4xl',
+  'scenery-airplane': 'text-lg sm:text-5xl',
+  'scenery-ambulance': 'text-lg sm:text-5xl',
+  'scenery-firestation': 'text-lg sm:text-5xl',
+  'scenery-firestation-building': 'text-base sm:text-4xl',
+  'scenery-squirrel-courier': 'text-base sm:text-4xl',
 };
 
 // Gerçek görseli olan eşyaların (SCENERY_IMAGES) ana sahnedeki piksel boyutu.
 // Binalar biraz daha büyük ve net görünsün; araçlar (ambulans/itfaiye) ise
 // binaların yaklaşık yarısı büyüklüğünde kalsın ki manzarayı kaplamasınlar.
+//
+// ÖNEMLİ (mobil üst üste binme düzeltmesi): Sahne 14 sütunluk bir ızgaraya
+// göre konumlanıyor (WORLD_WIDE_PERCENT ile %175 genişlikte, yana kaydırmalı).
+// Masaüstünde kutu genişliği max-w-5xl (1024px) olduğu için sütun başına
+// ~135px düşüyor — sm: boyutları (64-144px) rahatça sığıyor. Ama telefonda
+// kutu genişliği ~350-390px'e düşünce sütun başına sadece ~45-50px kalıyor;
+// eski taban (sm: öncesi) boyutlar (64-96px) bundan büyük olduğu için
+// komşu eşyalar görsel olarak üst üste biniyordu. Taban boyutlar artık
+// mobil sütun genişliğine sığacak şekilde küçültüldü; sm: (≥640px, geniş
+// ekran) boyutları hiç değişmedi.
 const SCENE_IMG_SIZE: Record<string, string> = {
-  'scenery-ambulance': 'w-12 h-12 sm:w-20 sm:h-20',
-  'scenery-firestation': 'w-12 h-12 sm:w-20 sm:h-20',
-  'scenery-squirrel-courier': 'w-10 h-10 sm:w-16 sm:h-16',
+  'scenery-ambulance': 'w-8 h-8 sm:w-20 sm:h-20',
+  'scenery-firestation': 'w-8 h-8 sm:w-20 sm:h-20',
+  'scenery-squirrel-courier': 'w-7 h-7 sm:w-16 sm:h-16',
   // Lunapark dönme dolabı + sinema birleşik yapısı, diğer binalardan belirgin
   // şekilde daha yüksek bir görsel olduğu için kendi kutusunda daha uzun.
-  'scenery-ferris': 'w-16 h-24 sm:w-24 sm:h-36',
+  'scenery-ferris': 'w-9 h-14 sm:w-24 sm:h-36',
   // Ev modelleri, diğer binalara göre hafifçe daha büyük görünsün.
-  'scenery-house': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-2': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-3': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-house-2': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-house-3': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-house-4': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-house-5': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-house-6': 'w-11 h-11 sm:w-28 sm:h-28',
   // Sadece 3 ana kurumsal bina (okul, hastane, itfaiye istasyonu) belirgin
   // büyük kalsın.
-  'scenery-school': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-hospital': 'w-24 h-24 sm:w-32 sm:h-32',
-  'scenery-firestation-building': 'w-24 h-24 sm:w-32 sm:h-32',
+  'scenery-school': 'w-12 h-12 sm:w-32 sm:h-32',
+  'scenery-hospital': 'w-12 h-12 sm:w-32 sm:h-32',
+  'scenery-firestation-building': 'w-12 h-12 sm:w-32 sm:h-32',
   // Diğer tüm binalar (park, tamirhane, değirmen, market, fırın, sinema) ev
   // boyutundan da %20 küçük — evlerin gölgesinde kalıp ana binaları öne çıkarsın.
-  'scenery-park': 'w-16 h-16 sm:w-[90px] sm:h-[90px]',
-  'scenery-train-repair': 'w-16 h-16 sm:w-[90px] sm:h-[90px]',
-  'scenery-windmill': 'w-16 h-16 sm:w-[90px] sm:h-[90px]',
-  'scenery-market': 'w-16 h-16 sm:w-[90px] sm:h-[90px]',
-  'scenery-bakery': 'w-16 h-16 sm:w-[90px] sm:h-[90px]',
-  'scenery-cinema': 'w-16 h-16 sm:w-[90px] sm:h-[90px]',
+  'scenery-park': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
+  'scenery-train-repair': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
+  'scenery-windmill': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
+  'scenery-market': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
+  'scenery-bakery': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
+  'scenery-cinema': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
   // Fıskiye ve uçak bina değil, daha küçük dekor öğeleri — ev boyutunda kalsın.
-  'scenery-fountain': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-airplane': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-fountain': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-airplane': 'w-11 h-11 sm:w-28 sm:h-28',
 };
-const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
+const DEFAULT_SCENE_IMG_SIZE = 'w-10 h-10 sm:w-24 sm:h-24';
 
 // Izgara hücresini (0..7, 0..6) ana sahnenin güvenli görüntü alanına (bulut ve
 // ray şeridi hariç) eşleyen yardımcı fonksiyon.
@@ -139,7 +151,60 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('ride');
   const [envTheme, setEnvTheme] = useState<EnvironmentTheme>('farm');
-  
+
+  // Tam ekran: kanvası (aşağıdaki canvasBoxRef) tam ekran yapıyoruz. Tam
+  // ekrandayken kanvasın altındaki kalıcı kontrol panelleri (kanvasın
+  // KARDEŞİ oldukları için) artık görünmez olur — bu yüzden tam ekranda
+  // ekrana dokununca açılıp kapanan, sol taraftan gelen kompakt bir kontrol
+  // menüsü gösteriyoruz.
+  //
+  // ÖNEMLİ: Bu tam ekran durumu CSS tabanlıdır (position:fixed, tüm ekranı
+  // kaplar) — native Element.requestFullscreen() API'sine BAĞIMLI DEĞİLDİR.
+  // Sebep: ailenin kullandığı iPhone'larda (mobil Safari) bu API arbitrary
+  // elemanlar için güvenilir çalışmıyor/desteklenmiyor; sadece bu API'ye
+  // güvenseydik "tam ekran" düğmesi telefonda sessizce hiçbir şey yapmazdı.
+  // CSS tabanlı yaklaşım her tarayıcıda çalışır; destekleyen tarayıcılarda
+  // (ör. masaüstü) native API'yi de EK OLARAK deneriz (OS seviyeli gerçek
+  // tam ekran + tarayıcı arayüzünü gizleme için), başarısız olursa sessizce
+  // yok sayılır.
+  const canvasBoxRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFsControls, setShowFsControls] = useState(false);
+
+  useEffect(() => {
+    // Kullanıcı native tam ekrandan Esc tuşu / OS geri tuşu ile çıkarsa
+    // bizim CSS tabanlı durumumuzu da senkronize et.
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+        setShowFsControls(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    // Tam ekrandayken arka sayfanın kaymasını engelle.
+    if (isFullscreen) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = previousOverflow; };
+    }
+  }, [isFullscreen]);
+
+  const handleToggleFullscreen = () => {
+    if (isFullscreen) {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      setIsFullscreen(false);
+      setShowFsControls(false);
+    } else {
+      setIsFullscreen(true);
+      setShowFsControls(true);
+      canvasBoxRef.current?.requestFullscreen?.().catch(() => {});
+    }
+  };
+
   // Interactive train states for ride mode (straight railway track line)
   const [trainXPos, setTrainXPos] = useState(10);
   const [isTrainRunning, setIsTrainRunning] = useState(true);
@@ -708,7 +773,133 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {viewMode === 'ride' && (
         <div className="space-y-4">
           {/* Main Graphic Canvas Box */}
-          <div className="relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl group select-none">
+          <div
+            ref={canvasBoxRef}
+            onClick={() => { if (isFullscreen) setShowFsControls((prev) => !prev); }}
+            className={`overflow-hidden border-slate-700 shadow-2xl group select-none ${
+              isFullscreen
+                ? 'fixed inset-0 z-[100] w-screen h-screen border-0 rounded-none bg-black'
+                : 'relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl border-4'
+            }`}
+          >
+            {/* Tam Ekran Aç/Kapat Düğmesi — her zaman görünür, sağ üstte. */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleToggleFullscreen(); }}
+              className="absolute top-3 right-3 z-50 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950/70 text-white border border-white/20 shadow-lg backdrop-blur-sm active:scale-90 transition-transform"
+              title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran Yap'}
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+
+            {/* Tam ekranda: ekrana dokununca açılıp kapanan, sol taraftan gelen
+                kompakt kontrol menüsü. Normal görünümde kanvasın altındaki kalıcı
+                paneller zaten var, bu menüye gerek yok. */}
+            {isFullscreen && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`absolute inset-y-0 left-0 z-50 w-48 sm:w-56 bg-slate-950/90 backdrop-blur-md border-r border-white/10 shadow-2xl p-3 flex flex-col gap-2.5 overflow-y-auto transition-transform duration-200 ${
+                  showFsControls ? 'translate-x-0' : '-translate-x-full'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-black text-sky-300 uppercase tracking-wider">Kontroller</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowFsControls(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white active:scale-90"
+                    title="Menüyü Kapat"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsTrainRunning(!isTrainRunning)}
+                    className={`flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] ring-2 text-white text-[10px] font-bold active:scale-90 ${
+                      isTrainRunning ? 'ring-emerald-400/80' : 'ring-rose-400/80'
+                    }`}
+                  >
+                    <img src={kontrolDurKalkImg} alt="Dur / Kalk" className="w-7 h-7 object-contain" draggable={false} />
+                    {isTrainRunning ? 'Durdur' : 'Başlat'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleWhistleBlow}
+                    className="flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] text-white text-[10px] font-bold active:scale-90"
+                  >
+                    <img src={kontrolKornaImg} alt="Korna" className="w-7 h-7 object-contain" draggable={false} />
+                    Korna
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLightsOn(!lightsOn)}
+                    className={`flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] text-white text-[10px] font-bold active:scale-90 ${
+                      lightsOn ? 'ring-2 ring-yellow-300/90' : ''
+                    }`}
+                  >
+                    <img src={kontrolIsikImg} alt="Işık" className={`w-7 h-7 object-contain transition-opacity ${lightsOn ? 'opacity-100' : 'opacity-45'}`} draggable={false} />
+                    Işık
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEngineSoundOn(!engineSoundOn)}
+                    className={`flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] text-white text-[10px] font-bold active:scale-90 ${
+                      engineSoundOn ? 'ring-2 ring-orange-300/90' : ''
+                    }`}
+                  >
+                    <img src={kontrolTrenSesiImg} alt="Tren Sesi" className={`w-7 h-7 object-contain transition-opacity ${engineSoundOn ? 'opacity-100' : 'opacity-45'}`} draggable={false} />
+                    Motor
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setTrainSpeed('slow')}
+                    className={`flex-1 px-1.5 py-1.5 rounded-xl text-[10px] font-bold ${trainSpeed === 'slow' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
+                  >
+                    🐢
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTrainSpeed('normal')}
+                    className={`flex-1 px-1.5 py-1.5 rounded-xl text-[10px] font-bold ${trainSpeed === 'normal' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
+                  >
+                    🚂
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTrainSpeed('fast')}
+                    className={`flex-1 px-1.5 py-1.5 rounded-xl text-[10px] font-bold ${trainSpeed === 'fast' ? 'bg-amber-500 text-amber-950' : 'text-slate-400'}`}
+                  >
+                    🚀
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setTrainDirection(trainDirection === 'right' ? 'left' : 'right')}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl bg-[#0e2531] border border-slate-700 text-white text-[11px] font-bold"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
+                  Yön Değiştir
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { document.exitFullscreen?.().catch(() => {}); setViewMode('builder'); }}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-600/90 text-white text-[11px] font-bold active:scale-95"
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                  Harita Çizimi'ne Git
+                </button>
+
+                <p className="mt-auto text-[9px] text-slate-400 leading-snug">Ekrana dokunarak bu menüyü açıp kapatabilirsin.</p>
+              </div>
+            )}
             {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
