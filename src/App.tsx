@@ -38,6 +38,9 @@ import {
   INITIAL_VOICE_MESSAGES,
   INITIAL_VIDEOS,
   START_LEVEL_VERSION,
+  markPendingCloudWrite,
+  clearPendingCloudWrite,
+  hasPendingCloudWrite,
 } from './utils/storage';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -169,7 +172,11 @@ export default function App() {
   // çıkmıyordu. Bu bayrak, kaydedilmemiş yerel bir değişiklik varken gelen
   // bulut verisinin üzerine yazmasını engeller; bunun yerine yerel veri
   // buluta yazılır.
-  const hasLocalPendingWriteRef = useRef(false);
+  // Sayfa yeniden açıldığında, önceki oturumdan buluta ULAŞMAMIŞ olabilecek
+  // bir değişiklik varsa (bkz. markPendingCloudWrite yorumu) bunu baştan
+  // biliyor olmalıyız — yoksa ilk bulut anlık görüntüsü bu değişikliği
+  // sessizce silebilir.
+  const hasLocalPendingWriteRef = useRef(hasPendingCloudWrite());
   const latestFamilyDataRef = useRef<import('./utils/cloudSync').FamilyData | null>(null);
   // ÖNEMLİ: Rutin otomatik eşitleme buluta HER ALANI değil, SADECE son
   // buluta yazılan/buluttan alınan halinden FARKLI olan alanları gönderir
@@ -244,6 +251,7 @@ export default function App() {
   const handleLearnCorrectAnswer = useCallback(() => {
     const todayKey = getLocalDateKey();
     hasLocalPendingWriteRef.current = true;
+    markPendingCloudWrite();
     setUser((prev) => {
       const isToday = prev.learnCoinsResetDate === todayKey;
       const answersToday = (isToday ? prev.learnAnswersToday ?? 0 : 0) + 1;
@@ -281,6 +289,7 @@ export default function App() {
   // yerel veriyi üzerine yazabiliyordu.
   const markLocalPendingWrite = () => {
     hasLocalPendingWriteRef.current = true;
+    markPendingCloudWrite();
   };
 
   useEffect(() => {
@@ -313,6 +322,7 @@ export default function App() {
             uploadFamilyData(familyCode, latestFamilyDataRef.current ?? currentFamilyData())
               .then(() => {
                 hasLocalPendingWriteRef.current = false;
+                clearPendingCloudWrite();
                 lastUploadedFieldsRef.current = latestFamilyDataRef.current ?? currentFamilyData();
                 setCloudStatus('Eşitlendi ✓');
               })
@@ -414,13 +424,14 @@ export default function App() {
       if (Object.keys(diff).length === 0) {
         pendingSyncRef.current = false;
         hasLocalPendingWriteRef.current = false;
+        clearPendingCloudWrite();
         setCloudStatus('Eşitlendi ✓');
         return;
       }
       uploadFamilyData(familyCode, diff)
         .then(() => {
           lastUploadedFieldsRef.current = { ...lastUploadedFieldsRef.current, ...diff };
-          pendingSyncRef.current = false; hasLocalPendingWriteRef.current = false; setCloudStatus('Eşitlendi ✓');
+          pendingSyncRef.current = false; hasLocalPendingWriteRef.current = false; clearPendingCloudWrite(); setCloudStatus('Eşitlendi ✓');
         })
         .catch(() => { pendingSyncRef.current = true; setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'); });
     }, 900);
@@ -487,9 +498,18 @@ export default function App() {
     setIsManualSyncing(true);
     setCloudStatus('Şimdi eşitleniyor…');
     try {
-      if (pendingSyncRef.current && latestFamilyDataRef.current) {
+      // ÖNEMLİ: Sadece "çevrimdışıydık" (pendingSyncRef) durumunu değil,
+      // "az önce bir değişiklik yapıldı ama 900ms'lik otomatik yazma henüz
+      // tetiklenmedi" (hasLocalPendingWriteRef) durumunu da kontrol ediyoruz.
+      // Aksi halde: kullanıcı bir işlem yapıp HEMEN "Şimdi eşitle"ye
+      // basarsa, bu kod önce eski buluttaki veriyi çekip yerel state'in
+      // üzerine yazıyordu — az önce yapılan değişiklik hiç buluta gitmeden
+      // sessizce kayboluyordu.
+      if ((pendingSyncRef.current || hasLocalPendingWriteRef.current) && latestFamilyDataRef.current) {
         await uploadFamilyData(familyCode, latestFamilyDataRef.current);
         pendingSyncRef.current = false;
+        hasLocalPendingWriteRef.current = false;
+        clearPendingCloudWrite();
       }
       const remote = await getFamilyData(familyCode);
       if (!remote) throw new Error('Bu aile kaydı bulunamadı.');

@@ -25,6 +25,37 @@ export const START_LEVEL_VERSION = 'start-with-6-coins-v1';
 const DEVICE_ROLE_KEY = 'ruzgar_device_role_v1';
 const DEVICE_OWNER_KEY = 'ruzgar_device_owner_v1';
 
+// ÖNEMLİ: Bulut yazması 900ms geciktirilerek yapılır (gereksiz sık yazımı
+// önlemek için). Kullanıcı bir işlem yapıp bu süre dolmadan sayfayı
+// yenilerse (ör. satın alıp hemen yenileme yapılırsa) değişiklik HİÇ
+// buluta gitmeden sayfa kapanır; yeniden açılışta buluttaki eski veri
+// üzerine yazıp değişikliği "kaybettirir". Bu bayrak, "yerel değişiklik
+// buluta henüz ulaşmadı" bilgisini kalıcı olarak (sayfa yenilense bile)
+// saklar; App.tsx açılışta bunu okuyup, ilk bulut verisini körü körüne
+// kabul etmek yerine önce yerel veriyi buluta yazar.
+const PENDING_CLOUD_WRITE_KEY = 'ruzgar_pending_cloud_write_v1';
+export function markPendingCloudWrite() {
+  try {
+    localStorage.setItem(PENDING_CLOUD_WRITE_KEY, '1');
+  } catch {
+    // localStorage erişilemiyorsa sessizce geç.
+  }
+}
+export function clearPendingCloudWrite() {
+  try {
+    localStorage.removeItem(PENDING_CLOUD_WRITE_KEY);
+  } catch {
+    // localStorage erişilemiyorsa sessizce geç.
+  }
+}
+export function hasPendingCloudWrite(): boolean {
+  try {
+    return localStorage.getItem(PENDING_CLOUD_WRITE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Bu cihazın rolü hiçbir zaman buluta gitmez ve aileler arasında paylaşılmaz
  * — sadece "bu telefon/tablet ne işe yarıyor" bilgisini tutar. Rol seçilmemişse
