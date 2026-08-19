@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, setDoc } from 'firebase/firestore';
+import { doc, getDoc, initializeFirestore, onSnapshot, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeVideosById } from './videoOrder';
@@ -37,12 +37,31 @@ export type FamilyData = {
 
 export const isCloudConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]));
 
+// ÖNEMLİ: Önceden "çoklu sekme kalıcı önbellek" (persistentLocalCache +
+// persistentMultipleTabManager) kullanılıyordu. Bu özellik, her sekme/oturum
+// için tarayıcının localStorage'ına küçük "istemci" kayıtları yazıyor ve
+// bunlar hiç temizlenmiyordu — zamanla (özellikle telefonda uygulama kapatılıp
+// açılınca, sekme gerçekten kapanmadığı için) binlerce kayıt birikip
+// localStorage'ın kotasını dolduruyordu. Sonuç: "FIRESTORE INTERNAL
+// ASSERTION... quota has been exceeded" hatası ve senkronizasyonun tamamen
+// durması (gerçek bir aile telefonunda doğrulandı). Kalıcı/çoklu-sekme
+// önbelleği tamamen kaldırıp basit bellek-içi önbelleğe (varsayılan) geçtik:
+// uygulama zaten her açılışta buluttan taze veri çekiyor, kalıcı önbelleğe
+// ihtiyaç yok — bu hata sınıfını kökten ortadan kaldırıyor.
+function clearStaleFirestoreLocalStorage() {
+  try {
+    const staleKeys = Object.keys(localStorage).filter((key) => key.startsWith('firestore_'));
+    for (const key of staleKeys) localStorage.removeItem(key);
+  } catch {
+    // localStorage erişilemiyorsa (ör. gizli mod kısıtlaması) sessizce geç.
+  }
+}
+
 let services: ReturnType<typeof createServices> | null = null;
 function createServices() {
+  clearStaleFirestoreLocalStorage();
   const app = getApps()[0] ?? initializeApp(firebaseConfig);
-  const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  });
+  const db = initializeFirestore(app, {});
   return { auth: getAuth(app), db, storage: getStorage(app) };
 }
 
