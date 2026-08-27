@@ -1,21 +1,13 @@
 import React, { useCallback, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
-import { BookOpen, Volume2, Sparkles, RotateCcw, Mic, PartyPopper } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, Volume2, Sparkles, RotateCcw, Mic, PartyPopper } from 'lucide-react';
 
 interface LearnViewProps {
   soundEnabled: boolean;
   speechEnabled: boolean;
   /** Ebeveynin ayarladığı açık Heceleme seviyeleri (1=2 heceli, 2=3 heceli, 3=4 heceli). */
   syllableGameLevels?: number[];
-  /** Harf Treni / Heceleme / İngilizce'de her doğru cevapta çağrılır (Tren Parası ödülü App.tsx'te günlük tavanla yönetilir). */
-  onCorrectAnswer?: () => void;
-  /** Bugün Öğren sekmesinden kazanılan Tren Parası. */
-  learnCoinsEarnedToday?: number;
-  /** Sonraki Tren Parasına kaç doğru cevap kaldığını gösteren sayaç (0..learnAnswersPerCoin-1). */
-  learnAnswersTowardNextCoin?: number;
-  /** Kaç doğru cevapta 1 Tren Parası verildiği (App.tsx: LEARN_ANSWERS_PER_COIN). */
-  learnAnswersPerCoin?: number;
 }
 
 type WordEntry = { word: string; emoji: string };
@@ -152,115 +144,45 @@ function buildSyllableRound(level: number, excludeWord?: string): { target: Syll
   return { target, pool: tiles };
 }
 
-// --- İngilizce öğrenme verisi (işitsel öğrenme: resim + İngilizce kelime sesi) ---
-// Somut, günlük kelimeler kategori kategori. Her kategori tek başına bir emoji
-// setiyle temsil edilebilecek şekilde seçildi (renkler = renkli daireler,
-// sayılar = rakam emojileri, vb.) — gerçek fotoğraf gerektirmiyor.
-type EnglishCategoryId = 'colors' | 'numbers' | 'animals' | 'family' | 'toys' | 'food' | 'phrases';
-type EnglishWord = { word: string; tr: string; emoji: string; category: EnglishCategoryId };
+type Mode = 'kesfet' | 'bul' | 'hece';
 
-const ENGLISH_CATEGORIES: { id: EnglishCategoryId; label: string; icon: string }[] = [
-  { id: 'colors', label: 'Renkler', icon: '🎨' },
-  { id: 'numbers', label: 'Sayılar', icon: '🔢' },
-  { id: 'animals', label: 'Hayvanlar', icon: '🐾' },
-  { id: 'family', label: 'Aile', icon: '👪' },
-  { id: 'toys', label: 'Oyuncaklar', icon: '🧸' },
-  { id: 'food', label: 'Yiyecekler', icon: '🍎' },
-  { id: 'phrases', label: 'Kalıplar', icon: '💬' },
+const LEARNING_WAGONS: Array<{ id: Mode; label: string; detail: string; icon: string }> = [
+  { id: 'kesfet', label: 'Sesi Keşfet', detail: 'Harfleri dinle', icon: '🔤' },
+  { id: 'bul', label: 'Hangi Harf?', detail: 'Resmi ve sesi bul', icon: '🧠' },
+  { id: 'hece', label: 'Heceleri Birleştir', detail: 'Kelimeyi tamamla', icon: '🎈' },
 ];
 
-const ENGLISH_WORDS: EnglishWord[] = [
-  // Renkler
-  { word: 'Red', tr: 'Kırmızı', emoji: '🔴', category: 'colors' },
-  { word: 'Blue', tr: 'Mavi', emoji: '🔵', category: 'colors' },
-  { word: 'Green', tr: 'Yeşil', emoji: '🟢', category: 'colors' },
-  { word: 'Yellow', tr: 'Sarı', emoji: '🟡', category: 'colors' },
-  { word: 'Orange', tr: 'Turuncu', emoji: '🟠', category: 'colors' },
-  { word: 'Purple', tr: 'Mor', emoji: '🟣', category: 'colors' },
-  { word: 'Black', tr: 'Siyah', emoji: '⚫', category: 'colors' },
-  { word: 'White', tr: 'Beyaz', emoji: '⚪', category: 'colors' },
-  { word: 'Brown', tr: 'Kahverengi', emoji: '🟤', category: 'colors' },
-  // Sayılar
-  { word: 'One', tr: 'Bir', emoji: '1️⃣', category: 'numbers' },
-  { word: 'Two', tr: 'İki', emoji: '2️⃣', category: 'numbers' },
-  { word: 'Three', tr: 'Üç', emoji: '3️⃣', category: 'numbers' },
-  { word: 'Four', tr: 'Dört', emoji: '4️⃣', category: 'numbers' },
-  { word: 'Five', tr: 'Beş', emoji: '5️⃣', category: 'numbers' },
-  { word: 'Six', tr: 'Altı', emoji: '6️⃣', category: 'numbers' },
-  { word: 'Seven', tr: 'Yedi', emoji: '7️⃣', category: 'numbers' },
-  { word: 'Eight', tr: 'Sekiz', emoji: '8️⃣', category: 'numbers' },
-  { word: 'Nine', tr: 'Dokuz', emoji: '9️⃣', category: 'numbers' },
-  { word: 'Ten', tr: 'On', emoji: '🔟', category: 'numbers' },
-  // Hayvanlar
-  { word: 'Dog', tr: 'Köpek', emoji: '🐶', category: 'animals' },
-  { word: 'Cat', tr: 'Kedi', emoji: '🐱', category: 'animals' },
-  { word: 'Fish', tr: 'Balık', emoji: '🐟', category: 'animals' },
-  { word: 'Bird', tr: 'Kuş', emoji: '🐦', category: 'animals' },
-  { word: 'Rabbit', tr: 'Tavşan', emoji: '🐰', category: 'animals' },
-  { word: 'Duck', tr: 'Ördek', emoji: '🦆', category: 'animals' },
-  { word: 'Horse', tr: 'At', emoji: '🐴', category: 'animals' },
-  { word: 'Lion', tr: 'Aslan', emoji: '🦁', category: 'animals' },
-  { word: 'Bear', tr: 'Ayı', emoji: '🐻', category: 'animals' },
-  { word: 'Frog', tr: 'Kurbağa', emoji: '🐸', category: 'animals' },
-  // Aile
-  { word: 'Mom', tr: 'Anne', emoji: '👩', category: 'family' },
-  { word: 'Dad', tr: 'Baba', emoji: '👨', category: 'family' },
-  { word: 'Baby', tr: 'Bebek', emoji: '👶', category: 'family' },
-  { word: 'Sister', tr: 'Kız kardeş', emoji: '👧', category: 'family' },
-  { word: 'Brother', tr: 'Erkek kardeş', emoji: '👦', category: 'family' },
-  { word: 'Grandma', tr: 'Anneanne / Babaanne', emoji: '👵', category: 'family' },
-  { word: 'Grandpa', tr: 'Dede', emoji: '👴', category: 'family' },
-  // Oyuncaklar
-  { word: 'Ball', tr: 'Top', emoji: '⚽', category: 'toys' },
-  { word: 'Teddy Bear', tr: 'Oyuncak Ayı', emoji: '🧸', category: 'toys' },
-  { word: 'Car', tr: 'Araba', emoji: '🚗', category: 'toys' },
-  { word: 'Balloon', tr: 'Balon', emoji: '🎈', category: 'toys' },
-  { word: 'Kite', tr: 'Uçurtma', emoji: '🪁', category: 'toys' },
-  { word: 'Puzzle', tr: 'Yapboz', emoji: '🧩', category: 'toys' },
-  { word: 'Blocks', tr: 'Bloklar', emoji: '🧱', category: 'toys' },
-  // Yiyecekler
-  { word: 'Apple', tr: 'Elma', emoji: '🍎', category: 'food' },
-  { word: 'Banana', tr: 'Muz', emoji: '🍌', category: 'food' },
-  { word: 'Milk', tr: 'Süt', emoji: '🥛', category: 'food' },
-  { word: 'Bread', tr: 'Ekmek', emoji: '🍞', category: 'food' },
-  { word: 'Egg', tr: 'Yumurta', emoji: '🥚', category: 'food' },
-  { word: 'Cake', tr: 'Pasta', emoji: '🎂', category: 'food' },
-  { word: 'Cheese', tr: 'Peynir', emoji: '🧀', category: 'food' },
-  { word: 'Cookie', tr: 'Kurabiye', emoji: '🍪', category: 'food' },
-  // Kısa kalıplar
-  { word: 'Hello', tr: 'Merhaba', emoji: '👋', category: 'phrases' },
-  { word: 'Thank you', tr: 'Teşekkür ederim', emoji: '🙏', category: 'phrases' },
-  { word: 'My name is Rüzgar', tr: 'Benim adım Rüzgar', emoji: '🙋', category: 'phrases' },
-];
+const DAILY_LEARNING_GOAL = 3;
 
-type EnglishGameType = 'find' | 'repeat';
-
-function buildEnglishFindRound(category: EnglishCategoryId, excludeWord?: string): { target: EnglishWord; choices: EnglishWord[] } {
-  const pool = ENGLISH_WORDS.filter((w) => w.category === category);
-  const candidates = excludeWord ? pool.filter((w) => w.word !== excludeWord) : pool;
-  const source = candidates.length > 0 ? candidates : pool;
-  const target = source[Math.floor(Math.random() * source.length)];
-  const distractors = shuffle(pool.filter((w) => w.word !== target.word)).slice(0, 3);
-  const choices = shuffle([target, ...distractors]);
-  return { target, choices };
+function getLocalLearnDateKey() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function pickRandomEnglishWord(category: EnglishCategoryId, excludeWord?: string): EnglishWord {
-  const pool = ENGLISH_WORDS.filter((w) => w.category === category);
-  const candidates = excludeWord ? pool.filter((w) => w.word !== excludeWord) : pool;
-  const source = candidates.length > 0 ? candidates : pool;
-  return source[Math.floor(Math.random() * source.length)];
+function readDailyLearningCount() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ruzgar_daily_learning_v1') || 'null') as { dateKey?: string; count?: number } | null;
+    return saved?.dateKey === getLocalLearnDateKey() ? Math.min(DAILY_LEARNING_GOAL, Math.max(0, Number(saved.count) || 0)) : 0;
+  } catch {
+    return 0;
+  }
 }
 
-// İngilizce kelime karşılaştırması için sadeleştirme (Türkçe locale'e gerek yok).
-function normalizeEnglish(text: string): string {
-  return text.toLowerCase().trim().replace(/[.,!?]/g, '');
-}
-
-type Mode = 'kesfet' | 'bul' | 'hece' | 'ingilizce';
-
-export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels, onCorrectAnswer, learnCoinsEarnedToday = 0, learnAnswersTowardNextCoin = 0, learnAnswersPerCoin = 10 }) => {
+export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels }) => {
   const [mode, setMode] = useState<Mode>('kesfet');
+  const [dailyLearnCount, setDailyLearnCount] = useState(readDailyLearningCount);
+
+  const registerLearningAction = useCallback(() => {
+    setDailyLearnCount((current) => {
+      const next = Math.min(DAILY_LEARNING_GOAL, current + 1);
+      try {
+        localStorage.setItem('ruzgar_daily_learning_v1', JSON.stringify({ dateKey: getLocalLearnDateKey(), count: next }));
+      } catch {
+        // Yerel depolama kapalıysa öğrenme akışı yine de devam eder.
+      }
+      return next;
+    });
+  }, []);
 
   // --- Keşfet modu: harfe dokun, sesini + örnek kelimeyi dinle ---
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
@@ -281,6 +203,8 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     wordTimeoutRef.current = window.setTimeout(() => {
       speakText(primary.word, speechEnabled, 0.72);
     }, 900);
+    const wasNewLetter = !discovered.has(entry.letter);
+    if (wasNewLetter) registerLearningAction();
     setDiscovered((prev) => {
       const next = new Set(prev);
       next.add(entry.letter);
@@ -345,7 +269,6 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       const isMatch = said.some((text) => text === target || text.includes(target) || target.includes(text));
       if (isMatch) {
         playCoinSound(soundEnabled);
-        onCorrectAnswer?.();
         speakText('Harika söyledin! Hadi harfi bul!', speechEnabled, 0.8);
         setMicState('correct');
       } else {
@@ -379,14 +302,15 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     const isCorrect = entry.letter[0] === quizTarget.entry.letter[0];
     if (isCorrect) {
       playCoinSound(soundEnabled);
-      onCorrectAnswer?.();
       setQuizFeedback('correct');
       setQuizCorrectCount((count) => count + 1);
-      setDiscovered((prev) => {
-        const next = new Set(prev);
-        next.add(quizTarget.entry.letter);
-        return next;
-      });
+        const wasNewQuizLetter = !discovered.has(quizTarget.entry.letter);
+        if (wasNewQuizLetter) registerLearningAction();
+        setDiscovered((prev) => {
+          const next = new Set(prev);
+          next.add(quizTarget.entry.letter);
+          return next;
+        });
       speakText(`Doğru! ${quizTarget.word.word}, ${quizTarget.entry.letter[0]} ile başlar.`, speechEnabled, 0.75);
       if (quizAdvanceTimeoutRef.current) window.clearTimeout(quizAdvanceTimeoutRef.current);
       quizAdvanceTimeoutRef.current = window.setTimeout(nextQuizTarget, 1800);
@@ -457,9 +381,9 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
 
       if (nextSelected.length === syllableRound.target.syllables.length) {
         playCoinSound(soundEnabled);
-        onCorrectAnswer?.();
         confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
         setWordCompleteCount((count) => count + 1);
+        registerLearningAction();
 
         const currentLevelIndex = allowedLevels.indexOf(activeHeceLevel);
         const nextAllowedLevel = currentLevelIndex >= 0 && currentLevelIndex < allowedLevels.length - 1
@@ -493,137 +417,15 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     playPopSound(soundEnabled);
     if (quizAdvanceTimeoutRef.current) window.clearTimeout(quizAdvanceTimeoutRef.current);
     if (syllableAdvanceTimeoutRef.current) window.clearTimeout(syllableAdvanceTimeoutRef.current);
-    if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
     stopListening();
-    stopEnglishListening();
     setMicState('idle');
-    setEnglishMicState('idle');
     if (nextMode === 'bul') nextQuizTarget();
     if (nextMode === 'hece') nextSyllableRound(activeHeceLevel);
-    if (nextMode === 'ingilizce') {
-      if (englishGameType === 'find') nextEnglishFindRound(englishCategory);
-      else nextEnglishRepeatWord(englishCategory);
-    }
     setMode(nextMode);
-  };
-
-  // --- İngilizce modu: kategori seç, ardından "Dinle & Bul" (dinle → doğru
-  // resmi seç) veya "Tekrar Et" (mikrofonla kelimeyi tekrar söyle) oyunu.
-  // Türkçe 'bul' modundan tamamen ayrı state/ref kullanıyor ki iki mikrofon
-  // akışı birbirine karışmasın. ---
-  const [englishCategory, setEnglishCategory] = useState<EnglishCategoryId>('animals');
-  const [englishGameType, setEnglishGameType] = useState<EnglishGameType>('find');
-  const [englishRound, setEnglishRound] = useState(() => buildEnglishFindRound('animals'));
-  const [englishFeedback, setEnglishFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
-  const [englishCorrectCount, setEnglishCorrectCount] = useState(0);
-  const [englishRepeatWord, setEnglishRepeatWord] = useState<EnglishWord>(() => pickRandomEnglishWord('animals'));
-  const [englishMicState, setEnglishMicState] = useState<'idle' | 'listening' | 'correct' | 'no-match' | 'denied' | 'error'>('idle');
-  const englishRecognitionRef = useRef<any>(null);
-  const englishAdvanceTimeoutRef = useRef<number | null>(null);
-
-  const stopEnglishListening = useCallback(() => {
-    try { englishRecognitionRef.current?.abort(); } catch { /* yoksay */ }
-    englishRecognitionRef.current = null;
-  }, []);
-
-  const nextEnglishFindRound = useCallback((category: EnglishCategoryId) => {
-    stopEnglishListening();
-    setEnglishRound((current) => buildEnglishFindRound(category, current.target.category === category ? current.target.word : undefined));
-    setEnglishFeedback('idle');
-  }, [stopEnglishListening]);
-
-  const nextEnglishRepeatWord = useCallback((category: EnglishCategoryId) => {
-    stopEnglishListening();
-    setEnglishMicState('idle');
-    setEnglishRepeatWord((current) => pickRandomEnglishWord(category, current.category === category ? current.word : undefined));
-  }, [stopEnglishListening]);
-
-  const handleEnglishCategoryChange = (category: EnglishCategoryId) => {
-    playPopSound(soundEnabled);
-    setEnglishCategory(category);
-    if (englishGameType === 'find') nextEnglishFindRound(category);
-    else nextEnglishRepeatWord(category);
-  };
-
-  const handleEnglishGameTypeChange = (gameType: EnglishGameType) => {
-    playPopSound(soundEnabled);
-    setEnglishGameType(gameType);
-    if (gameType === 'find') nextEnglishFindRound(englishCategory);
-    else nextEnglishRepeatWord(englishCategory);
-  };
-
-  const handleEnglishSpeakTarget = () => {
-    const word = englishGameType === 'find' ? englishRound.target.word : englishRepeatWord.word;
-    // Doğal perde (pitch 1.0) + yavaş hız: yüksek pitch sentezlenmiş İngilizce
-    // sesi bozup anlaşılmaz yapıyordu, netlik için düzeltildi.
-    speakText(word, speechEnabled, 0.7, 'en-US', 1.0);
-  };
-
-  const handleEnglishChoiceTap = (choice: EnglishWord) => {
-    if (englishFeedback === 'correct') return;
-    const isCorrect = choice.word === englishRound.target.word;
-    if (isCorrect) {
-      playCoinSound(soundEnabled);
-      onCorrectAnswer?.();
-      setEnglishFeedback('correct');
-      setEnglishCorrectCount((count) => count + 1);
-      speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
-      if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-      englishAdvanceTimeoutRef.current = window.setTimeout(() => nextEnglishFindRound(englishCategory), 1600);
-    } else {
-      playPopSound(soundEnabled);
-      setEnglishFeedback('wrong');
-      window.setTimeout(() => setEnglishFeedback((current) => (current === 'wrong' ? 'idle' : current)), 500);
-    }
-  };
-
-  const handleEnglishMicRepeat = () => {
-    if (!micSupported || englishMicState === 'listening') return;
-    const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognitionCtor();
-    englishRecognitionRef.current = recognition;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 3;
-    setEnglishMicState('listening');
-
-    recognition.onresult = (event: any) => {
-      const target = normalizeEnglish(englishRepeatWord.word);
-      const results = event.results?.[0];
-      const said: string[] = results ? Array.from(results).map((r: any) => normalizeEnglish(r.transcript)) : [];
-      const isMatch = said.some((text) => text === target || text.includes(target) || target.includes(text));
-      if (isMatch) {
-        playCoinSound(soundEnabled);
-        onCorrectAnswer?.();
-        speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
-        setEnglishMicState('correct');
-        setEnglishCorrectCount((count) => count + 1);
-        if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-        englishAdvanceTimeoutRef.current = window.setTimeout(() => nextEnglishRepeatWord(englishCategory), 1800);
-      } else {
-        playPopSound(soundEnabled);
-        setEnglishMicState('no-match');
-      }
-    };
-    recognition.onerror = (event: any) => {
-      const denied = event?.error === 'not-allowed' || event?.error === 'service-not-allowed';
-      setEnglishMicState(denied ? 'denied' : 'no-match');
-    };
-    recognition.onend = () => {
-      englishRecognitionRef.current = null;
-      setEnglishMicState((current) => (current === 'listening' ? 'idle' : current));
-    };
-
-    try {
-      recognition.start();
-    } catch {
-      setEnglishMicState('error');
-    }
   };
 
   // Bileşen kapanırken açık kalmış bir mikrofon dinlemesi olmasın.
   React.useEffect(() => () => stopListening(), [stopListening]);
-  React.useEffect(() => () => stopEnglishListening(), [stopEnglishListening]);
 
   // Aynı harfin farklı resimleriyle birkaç kez denendiği halde bulunamazsa
   // (harf havuzu tükendiyse bile) çocuğun tamamen takılıp kalmaması için son
@@ -635,33 +437,60 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       <div className="flex items-center justify-between gap-2 px-1">
         <div>
           <div className="text-[11px] font-black text-sky-400 uppercase tracking-widest">
-            {mode === 'ingilizce' ? 'İNGİLİZCE TRENİ' : 'HARF TRENİ'}
+            HARF TRENİ
           </div>
           <h2 className="font-game text-2xl sm:text-3xl font-black text-white flex items-center gap-2">
             <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 text-sky-300" />
-            <span>{mode === 'kesfet' ? 'Sesleri Keşfet' : mode === 'bul' ? 'Hangi Harf?' : mode === 'hece' ? 'Heceleri Birleştir' : 'İngilizce Öğren'}</span>
+            <span>{mode === 'kesfet' ? 'Sesleri Keşfet' : mode === 'bul' ? 'Hangi Harf?' : 'Heceleri Birleştir'}</span>
           </h2>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="rounded-2xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-right">
-            <div className="text-[10px] font-bold text-sky-300 uppercase tracking-wide">
-              {mode === 'kesfet' ? 'Keşfedilen' : mode === 'bul' ? 'Doğru' : mode === 'hece' ? 'Tamamlanan' : 'Doğru'}
-            </div>
-            <div className="font-game text-lg font-black text-white">
-              {mode === 'kesfet' ? `${discovered.size} / ${LETTER_ENTRIES.length}` : mode === 'bul' ? quizCorrectCount : mode === 'hece' ? wordCompleteCount : englishCorrectCount}
-            </div>
+        <div className="rounded-2xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-right">
+          <div className="text-[10px] font-bold text-sky-300 uppercase tracking-wide">
+            {mode === 'kesfet' ? 'Keşfedilen' : mode === 'bul' ? 'Doğru' : 'Tamamlanan'}
           </div>
-          {mode !== 'kesfet' && (
-            <div className="rounded-2xl bg-amber-900/40 border border-amber-600/50 px-3 py-1.5 text-right" title={`Her ${learnAnswersPerCoin} doğru cevapta 1 Tren Parası`}>
-              <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wide">Bugün 🪙 {learnCoinsEarnedToday}</div>
-              <div className="font-game text-sm font-black text-amber-200">{learnAnswersTowardNextCoin}/{learnAnswersPerCoin}</div>
-            </div>
-          )}
+          <div className="font-game text-lg font-black text-white">
+            {mode === 'kesfet' ? `${discovered.size} / ${LETTER_ENTRIES.length}` : mode === 'bul' ? quizCorrectCount : wordCompleteCount}
+          </div>
         </div>
       </div>
 
+      <section className="rounded-2xl border-2 border-violet-400/60 bg-gradient-to-r from-violet-950/70 via-sky-950/70 to-emerald-950/70 p-3 shadow-lg" aria-labelledby="learning-roadmap-title">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-200">ÖĞRENME YOLCULUĞUM</div>
+            <h3 id="learning-roadmap-title" className="font-game text-base sm:text-lg font-black text-white">Bugün {DAILY_LEARNING_GOAL} küçük keşif yap</h3>
+          </div>
+          <div className="text-right">
+            <div className="font-game text-lg font-black text-amber-300">{dailyLearnCount}/{DAILY_LEARNING_GOAL}</div>
+            <div className="text-[10px] font-bold text-slate-300">bugünkü hedef</div>
+          </div>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800/80" aria-label={`Bugünkü öğrenme hedefi ${dailyLearnCount}/${DAILY_LEARNING_GOAL}`}>
+          <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-emerald-400" style={{ width: `${Math.min(100, (dailyLearnCount / DAILY_LEARNING_GOAL) * 100)}%` }} />
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-2">
+          {LEARNING_WAGONS.map((wagon, index) => {
+            const isActive = mode === wagon.id;
+            const isDone = wagon.id === 'kesfet' ? discovered.size > 0 : wagon.id === 'bul' ? quizCorrectCount > 0 : wordCompleteCount > 0;
+            return (
+              <button
+                key={wagon.id}
+                type="button"
+                onClick={() => handleModeChange(wagon.id)}
+                className={`min-h-[76px] rounded-xl border-2 px-1.5 py-2 text-center ${isActive ? 'border-amber-300 bg-amber-400/20 text-white' : 'border-slate-700/80 bg-slate-950/30 text-slate-300'}`}
+                aria-current={isActive ? 'step' : undefined}
+              >
+                <div className="flex items-center justify-center gap-1 text-xl"><span aria-hidden="true">{wagon.icon}</span>{isDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" aria-label="Tamamlandı" />}</div>
+                <div className="mt-1 font-game text-[10px] sm:text-xs font-black leading-tight">{index + 1}. {wagon.label}</div>
+                <div className="mt-0.5 text-[9px] font-semibold leading-tight text-slate-400">{wagon.detail}</div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Mod Seçici */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
           onClick={() => handleModeChange('kesfet')}
@@ -694,17 +523,6 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
           }`}
         >
           🎈 Heceler
-        </button>
-        <button
-          type="button"
-          onClick={() => handleModeChange('ingilizce')}
-          className={`py-2.5 rounded-2xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-            mode === 'ingilizce'
-              ? 'bg-rose-500 border-rose-300 text-white shadow-md'
-              : 'bg-[#173340] border-sky-800/60 text-slate-300'
-          }`}
-        >
-          🌍 İngilizce
         </button>
       </div>
 
@@ -924,176 +742,6 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
           >
             <RotateCcw className="w-3.5 h-3.5" /> Başka kelime
           </button>
-        </>
-      )}
-
-      {mode === 'ingilizce' && (
-        <>
-          <div className="rounded-2xl bg-rose-950/40 border border-rose-800/50 px-4 py-3 flex items-center gap-2.5">
-            <Volume2 className="w-5 h-5 text-rose-300 flex-shrink-0" />
-            <p className="text-xs sm:text-sm font-semibold text-rose-100 leading-relaxed">
-              Sesi dinle, resmi öğren! "Dinle & Bul" ile doğru resmi seç, "Tekrar Et" ile kelimeyi kendin söyle.
-            </p>
-          </div>
-
-          {/* Kategori seçici */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {ENGLISH_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleEnglishCategoryChange(cat.id)}
-                className={`flex-shrink-0 flex items-center gap-1 rounded-xl border-2 px-3 py-1.5 font-game text-[11px] sm:text-xs font-black transition-all active:scale-95 ${
-                  englishCategory === cat.id
-                    ? 'bg-rose-500 border-rose-300 text-white'
-                    : 'bg-[#173340] border-sky-800/60 text-slate-300'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Oyun tipi seçici */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleEnglishGameTypeChange('find')}
-              className={`py-2 rounded-xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-                englishGameType === 'find'
-                  ? 'bg-amber-500 border-amber-300 text-white shadow-md'
-                  : 'bg-[#173340] border-sky-800/60 text-slate-300'
-              }`}
-            >
-              👂 Dinle &amp; Bul
-            </button>
-            <button
-              type="button"
-              onClick={() => handleEnglishGameTypeChange('repeat')}
-              className={`py-2 rounded-xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-                englishGameType === 'repeat'
-                  ? 'bg-amber-500 border-amber-300 text-white shadow-md'
-                  : 'bg-[#173340] border-sky-800/60 text-slate-300'
-              }`}
-            >
-              🗣️ Tekrar Et
-            </button>
-          </div>
-
-          {englishGameType === 'find' && (
-            <>
-              <div
-                className={`rounded-3xl border-2 py-6 flex flex-col items-center justify-center gap-2 transition-colors duration-300 ${
-                  englishFeedback === 'correct'
-                    ? 'border-emerald-300 bg-emerald-500/20'
-                    : englishFeedback === 'wrong'
-                    ? 'border-rose-400 bg-rose-500/10 animate-shake'
-                    : 'border-sky-800/60 bg-[#0f2a35]'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={handleEnglishSpeakTarget}
-                  className="flex items-center gap-1.5 rounded-xl border bg-rose-900/50 border-rose-700/60 px-4 py-1.5 text-[11px] font-bold text-rose-200 active:scale-95"
-                >
-                  <Volume2 className="w-3.5 h-3.5" /> Dinle
-                </button>
-                {englishFeedback === 'correct' && (
-                  <span className="font-game text-lg font-black text-emerald-200">
-                    {englishRound.target.emoji} {englishRound.target.word} ({englishRound.target.tr})
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                {englishRound.choices.map((choice) => (
-                  <button
-                    key={choice.word}
-                    type="button"
-                    onClick={() => handleEnglishChoiceTap(choice)}
-                    disabled={englishFeedback === 'correct'}
-                    className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-sky-700/60 bg-[#173340] py-5 shadow-md transition-all active:scale-90 hover:bg-[#1f4253] disabled:opacity-40"
-                  >
-                    <span className="text-4xl sm:text-5xl">{choice.emoji}</span>
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-                  nextEnglishFindRound(englishCategory);
-                }}
-                className="flex items-center gap-1 rounded-xl bg-rose-900/60 border border-rose-700/60 px-3 py-1.5 text-[11px] font-bold text-rose-200"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Başka kelime
-              </button>
-            </>
-          )}
-
-          {englishGameType === 'repeat' && (
-            <div className="rounded-3xl border-2 border-sky-800/60 bg-[#0f2a35] py-8 flex flex-col items-center justify-center gap-2.5">
-              <span className="text-6xl sm:text-7xl">{englishRepeatWord.emoji}</span>
-              <span className="font-game text-xl sm:text-2xl font-black text-white">{englishRepeatWord.word}</span>
-              <span className="text-xs font-semibold text-slate-400">{englishRepeatWord.tr}</span>
-
-              <button
-                type="button"
-                onClick={handleEnglishSpeakTarget}
-                className="flex items-center gap-1.5 rounded-xl border bg-rose-900/50 border-rose-700/60 px-4 py-1.5 text-[11px] font-bold text-rose-200 active:scale-95"
-              >
-                <Volume2 className="w-3.5 h-3.5" /> Dinle
-              </button>
-
-              {micSupported ? (
-                <button
-                  type="button"
-                  onClick={handleEnglishMicRepeat}
-                  disabled={englishMicState === 'listening'}
-                  className={`flex items-center gap-1.5 rounded-xl border px-4 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
-                    englishMicState === 'listening'
-                      ? 'bg-rose-600/80 border-rose-400 text-white animate-pulse'
-                      : englishMicState === 'correct'
-                      ? 'bg-emerald-600 border-emerald-300 text-white'
-                      : 'bg-emerald-900/50 border-emerald-700/60 text-emerald-200'
-                  }`}
-                >
-                  <Mic className="w-3.5 h-3.5" />
-                  {englishMicState === 'listening' ? 'Dinliyorum…' : 'Tekrar Et'}
-                </button>
-              ) : (
-                <span className="text-[10px] font-semibold text-slate-400">
-                  Bu cihazda ses tanıma yok — yine de yüksek sesle söyle!
-                </span>
-              )}
-
-              {englishMicState === 'correct' && (
-                <span className="text-xs font-bold text-emerald-300">Great job! 🎉</span>
-              )}
-              {englishMicState === 'no-match' && (
-                <span className="text-xs font-bold text-amber-300">Seni tam duyamadım, tekrar dener misin?</span>
-              )}
-              {englishMicState === 'denied' && (
-                <span className="text-xs font-bold text-rose-300">Mikrofon izni gerekiyor</span>
-              )}
-              {englishMicState === 'error' && (
-                <span className="text-xs font-bold text-rose-300">Bir sorun oldu, tekrar dener misin?</span>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-                  nextEnglishRepeatWord(englishCategory);
-                }}
-                className="mt-1 flex items-center gap-1 rounded-xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-[11px] font-bold text-sky-200"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Başka kelime
-              </button>
-            </div>
-          )}
         </>
       )}
     </div>

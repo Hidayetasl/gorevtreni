@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+// Tasarım: Pastel Tren Rotası — zaman filtreleri bilet tonlarıyla ayrışır; seçili durak canlıdır.
 import { RoutineTask, TimeOfDay } from '../types';
 import { TaskCard } from './TaskCard';
-import { Sun, Sunset, Moon, Sparkles, Trophy } from 'lucide-react';
+import { Sun, Sunset, Moon, Sparkles, Trophy, Mic, BookOpen } from 'lucide-react';
 
 interface TasksViewProps {
   tasks: RoutineTask[];
@@ -10,7 +11,6 @@ interface TasksViewProps {
   speechEnabled: boolean;
   onOpenVoiceModal?: (initialTab?: 'inbox' | 'record') => void;
   onOpenJournal?: (initialTab?: 'inbox' | 'record') => void;
-  unreadVoiceCount?: number;
 }
 
 export const TasksView: React.FC<TasksViewProps> = ({
@@ -20,7 +20,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
   speechEnabled,
   onOpenVoiceModal,
   onOpenJournal,
-  unreadVoiceCount = 0,
 }) => {
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | 'all' | 'extra'>('all');
 
@@ -38,69 +37,66 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
 
   return (
-    <div className="space-y-3 pb-24">
+    <div className="tasks-view space-y-2 pb-24">
       {/* View Header */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div>
-          <div className="text-[11px] font-black text-sky-400 uppercase tracking-widest">
+      <div className="tasks-view-header flex items-center justify-between gap-2 px-1">
+        <div className="tasks-view-kicker">
+          <div className="text-[10px] font-black text-blue-600 uppercase tracking-[0.14em]">
             RUTİN GÖREVLERİM
           </div>
-          <h2 className="font-game text-2xl sm:text-3xl font-black text-white">
-            Görev Treni
-          </h2>
         </div>
 
-        {/* Routine progress stats & Voice Message button */}
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {/* Secondary actions only; the Header already owns the message inbox. */}
+        <div className="tasks-quick-actions flex flex-wrap items-center justify-end gap-1.5">
           {onOpenVoiceModal && (
-            <>
-              <button
-                onClick={() => onOpenVoiceModal('inbox')}
-                className={`border-2 text-white px-3 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 text-xs font-bold font-game transition-all active:scale-95 relative ${
-                  unreadVoiceCount > 0
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 border-amber-200 animate-pulse'
-                    : 'bg-gradient-to-r from-rose-600 to-pink-600 border-rose-300'
-                }`}
-              >
-                <span>📥 Gelenler</span>
-                {unreadVoiceCount > 0 && <span className="bg-white text-rose-600 text-[10px] font-black px-1.5 py-0.2 rounded-full">{unreadVoiceCount}</span>}
-              </button>
-              <button
-                onClick={() => onOpenVoiceModal('record')}
-                className="bg-gradient-to-r from-sky-500 to-blue-600 hover:brightness-110 border-2 border-sky-300 text-white px-3 py-2 rounded-2xl shadow-lg flex items-center gap-1 text-xs font-bold font-game transition-all active:scale-95"
-              >
-                <span>🎙️ Gönder</span>
-              </button>
-              {onOpenJournal && <button onClick={() => onOpenJournal('inbox')} className="bg-gradient-to-r from-violet-600 to-purple-700 border-2 border-violet-300 text-white px-3 py-2 rounded-2xl shadow-lg text-xs font-bold font-game transition-all active:scale-95">📔 Günlüğüm</button>}
-            </>
+            <button
+              onClick={() => onOpenVoiceModal('record')}
+              className="tasks-action-button bg-blue-600 text-white px-3 py-2 rounded-2xl shadow-lg flex items-center gap-1 text-sm font-bold font-game transition-all active:scale-95"
+              aria-label="Sesli mesaj gönder"
+              title="Sesli mesaj gönder"
+            >
+              <Mic className="h-4 w-4" aria-hidden="true" />
+              <span className="tasks-action-label">Gönder</span>
+            </button>
+          )}
+          {onOpenJournal && (
+            <button
+              onClick={() => onOpenJournal('inbox')}
+              className="tasks-action-button bg-blue-600 text-white px-3 py-2 rounded-2xl shadow-lg text-sm font-bold font-game transition-all active:scale-95"
+              aria-label="Günlüğümü aç"
+              title="Günlüğümü aç"
+            >
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+              <span className="tasks-action-label">Günlük</span>
+            </button>
           )}
 
-          <div className="bg-[#091720] border-2 border-emerald-500/80 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-2">
-            <span className="text-emerald-400 font-bold text-xs sm:text-sm font-game">
+          <div className="tasks-progress-pill bg-[#091720] border-2 border-emerald-500/80 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-2">
+            <span className="text-white font-bold text-xs sm:text-sm font-game">
               Tamamlanan: {completedCount}/{tasks.length}
             </span>
-            <Trophy className="w-4 h-4 text-emerald-400" />
+            <Trophy className="w-4 h-4 text-white" />
           </div>
         </div>
       </div>
 
       {/* Parent Assigned Extra Tasks Banner */}
       {todoExtraCount > 0 && (
-        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white p-3.5 rounded-2xl shadow-lg border border-purple-400 flex items-center justify-between gap-3 animate-pulse">
+        <div className="bg-gradient-to-r from-green-700 via-green-600 to-green-700 text-white p-3 rounded-2xl shadow-lg border border-green-300/70 flex items-center justify-between gap-3 animate-pulse">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">✨</span>
             <div>
-              <div className="font-game text-xs sm:text-sm font-extrabold text-purple-100">
+              <div className="font-game text-xs sm:text-sm font-extrabold text-white">
                 EBEVEYNİNDEN YENİ EK GÖREV!
               </div>
-              <div className="text-[11px] sm:text-xs text-purple-200 font-bold">
-                Ebeveynin senin için <span className="text-yellow-300 font-game">{todoExtraCount}</span> adet özel ek görev tanımladı. Yapıp ekstra para kazanabilirsin!
+              <div className="text-[11px] sm:text-xs text-green-50 font-bold">
+                Ebeveynin senin için <span className="text-orange-200 font-game">{todoExtraCount}</span> adet özel ek görev tanımladı. Yapıp ekstra para kazanabilirsin!
               </div>
             </div>
           </div>
           <button
             onClick={() => setSelectedTime('extra')}
-            className="bg-yellow-400 text-purple-950 px-3 py-1.5 rounded-xl font-game text-xs font-black shadow-md border border-yellow-300 hover:bg-yellow-300 flex-shrink-0"
+            className="bg-orange-500 text-white px-3 py-1.5 rounded-xl font-game text-xs font-black shadow-md border border-orange-200 hover:bg-orange-400 flex-shrink-0"
           >
             Görevleri Gör ✨
           </button>
@@ -108,26 +104,30 @@ export const TasksView: React.FC<TasksViewProps> = ({
       )}
 
       {/* Time Filter Bar */}
-      <div className="max-w-full flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="tasks-filter-bar max-w-full flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         <button
           onClick={() => setSelectedTime('all')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
+          aria-pressed={selectedTime === 'all'}
+          data-filter="all"
+          className={`tasks-filter-button flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
             selectedTime === 'all'
               ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
               : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-yellow-300" />
+          <Sparkles className="w-4 h-4 text-orange-300" />
           <span>Tüm Görevler ({tasks.length})</span>
         </button>
 
         {extraTasks.length > 0 && (
           <button
             onClick={() => setSelectedTime('extra')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
+            aria-pressed={selectedTime === 'extra'}
+            data-filter="extra"
+            className={`tasks-filter-button flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
               selectedTime === 'extra'
-                ? 'bg-purple-600 text-white border-purple-400 shadow-md ring-2 ring-purple-300'
-                : 'bg-purple-950/80 text-purple-200 border-purple-600/60 hover:bg-purple-900'
+                ? 'bg-green-600 text-white border-green-300 shadow-md'
+                : 'bg-green-950/80 text-green-100 border-green-600/60 hover:bg-green-900'
             }`}
           >
             <span>✨ Ek Görevler ({extraTasks.length})</span>
@@ -136,19 +136,23 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
         <button
           onClick={() => setSelectedTime('morning')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
+          aria-pressed={selectedTime === 'morning'}
+          data-filter="morning"
+          className={`tasks-filter-button flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
             selectedTime === 'morning'
               ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
               : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
           }`}
         >
-          <Sun className="w-4 h-4 text-amber-400" />
+          <Sun className="w-4 h-4 text-orange-300" />
           <span>🌅 Sabah</span>
         </button>
 
         <button
           onClick={() => setSelectedTime('afternoon')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
+          aria-pressed={selectedTime === 'afternoon'}
+          data-filter="afternoon"
+          className={`tasks-filter-button flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
             selectedTime === 'afternoon'
               ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
               : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
@@ -160,19 +164,21 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
         <button
           onClick={() => setSelectedTime('evening')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
+          aria-pressed={selectedTime === 'evening'}
+          data-filter="evening"
+          className={`tasks-filter-button flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
             selectedTime === 'evening'
               ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
               : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
           }`}
         >
-          <Moon className="w-4 h-4 text-indigo-300" />
+          <Moon className="w-4 h-4 text-blue-200" />
           <span>🌙 Akşam</span>
         </button>
       </div>
 
       {/* Task Status Summary Bar (Compact & Small) */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-3 py-0.5">
+      <div className="tasks-status-summary grid grid-cols-3 gap-1.5 sm:gap-3 py-0.5">
         <div className="bg-[#091720]/90 border border-sky-500/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-xs">
           <span className="text-[11px] sm:text-xs font-bold text-sky-300 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
@@ -232,9 +238,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
       {/* All Tasks Completed Banner */}
       {completedCount > 0 && completedCount === tasks.length && (
-        <div className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 border-4 border-amber-500 rounded-3xl p-6 text-center text-amber-950 shadow-xl space-y-2 animate-bounce">
-          <Trophy className="w-12 h-12 mx-auto text-amber-700 animate-spin" />
-          <h2 className="font-game text-2xl font-extrabold">
+        <div className="bg-gradient-to-r from-orange-400 via-orange-300 to-green-400 border-2 border-orange-500 rounded-2xl p-4 text-center text-green-950 shadow-xl space-y-1.5 animate-bounce">
+          <Trophy className="w-10 h-10 mx-auto text-green-800 animate-spin" />
+          <h2 className="font-game text-xl font-extrabold">
             TEBRİKLER RÜZGAR! 🏆
           </h2>
           <p className="text-sm font-bold">

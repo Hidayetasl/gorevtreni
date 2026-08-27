@@ -1,24 +1,22 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { doc, getDoc, initializeFirestore, onSnapshot, setDoc } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { arrayUnion, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import type { ActivityLogEntry, BonusCard, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
+import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeVideosById } from './videoOrder';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
-// Davet başka cihazda açılacağı için yerel geliştirme adresi (localhost) asla
-// paylaşılmaz. Bu uygulamanın herkesçe erişilen tek giriş noktası budur.
-const PUBLIC_APP_URL = 'https://hidayetasl.github.io/gorevtreni/';
+const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || (
+  typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : ''
+);
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'] as const;
 
 const firebaseConfig = {
-  // Firebase web configuration is public client metadata. Access is protected by
-  // the Firestore/Storage rules and the random family code, never by this API key.
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyACur9bQng3tiiQ-ieoOKadcDJhuqaPncg',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'ruzgar-rutin-oyunu-2026.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'ruzgar-rutin-oyunu-2026',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'ruzgar-rutin-oyunu-2026.firebasestorage.app',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:590256889024:web:d8b6aa531c7f1d078d6125',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
 
 export type FamilyData = {
@@ -31,64 +29,106 @@ export type FamilyData = {
   voiceMessages: VoiceMessage[];
   videos: StoryVideo[];
   activityLog?: ActivityLogEntry[];
-  /** En son hangi cihaz/rol veriyi buluta yazdı — Ebeveyn panelinde gösterilir. */
-  lastSyncedBy?: { roleLabel: string; device: string; timestamp: string };
+  coinLedger?: CoinLedgerEntry[];
+  ownerUid?: string;
+  memberUids?: string[];
+  inviteEnabled?: boolean;
+  /** `undefined` korunur, `null` ise kullanıcı tarafından temizlenir. */
+  activeChildDevice?: ActiveChildDevice | null;
 };
 
-export const isCloudConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]));
+const adultAccountConfig: Array<{ name: AdultName; email: string; uid: string }> = [
+  {
+    name: 'Baba',
+    email: (import.meta.env.VITE_FIREBASE_BABA_EMAIL || '').trim().toLowerCase(),
+    uid: (import.meta.env.VITE_FIREBASE_BABA_UID || '').trim(),
+  },
+  {
+    name: 'Anne',
+    email: (import.meta.env.VITE_FIREBASE_ANNE_EMAIL || '').trim().toLowerCase(),
+    uid: (import.meta.env.VITE_FIREBASE_ANNE_UID || '').trim(),
+  },
+  {
+    name: 'Anneanne',
+    email: (import.meta.env.VITE_FIREBASE_ANNEANNE_EMAIL || '').trim().toLowerCase(),
+    uid: (import.meta.env.VITE_FIREBASE_ANNEANNE_UID || '').trim(),
+  },
+];
 
-// ÖNEMLİ: Önceden "çoklu sekme kalıcı önbellek" (persistentLocalCache +
-// persistentMultipleTabManager) kullanılıyordu. Bu özellik, her sekme/oturum
-// için tarayıcının localStorage'ına küçük "istemci" kayıtları yazıyor ve
-// bunlar hiç temizlenmiyordu — zamanla (özellikle telefonda uygulama kapatılıp
-// açılınca, sekme gerçekten kapanmadığı için) binlerce kayıt birikip
-// localStorage'ın kotasını dolduruyordu. Sonuç: "FIRESTORE INTERNAL
-// ASSERTION... quota has been exceeded" hatası ve senkronizasyonun tamamen
-// durması (gerçek bir aile telefonunda doğrulandı). Kalıcı/çoklu-sekme
-// önbelleği tamamen kaldırıp basit bellek-içi önbelleğe (varsayılan) geçtik:
-// uygulama zaten her açılışta buluttan taze veri çekiyor, kalıcı önbelleğe
-// ihtiyaç yok — bu hata sınıfını kökten ortadan kaldırıyor.
-function clearStaleFirestoreLocalStorage() {
-  try {
-    const staleKeys = Object.keys(localStorage).filter((key) => key.startsWith('firestore_'));
-    for (const key of staleKeys) localStorage.removeItem(key);
-  } catch {
-    // localStorage erişilemiyorsa (ör. gizli mod kısıtlaması) sessizce geç.
+export const isCloudConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]?.trim()));
+
+function firebaseAuth() {
+  if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
+  services ??= createServices();
+  return services.auth;
+}
+
+/** Auth hesabını sabit UID/e-posta eşleştirmesiyle doğrular. */
+export function getAdultName(user: User | null): AdultName | null {
+  if (!user) return null;
+  const hasExplicitMapping = adultAccountConfig.some((account) => account.uid || account.email);
+  const configuredMatch = adultAccountConfig.find((account) => (
+    (account.uid && account.uid === user.uid)
+    || (account.email && account.email === (user.email || '').trim().toLowerCase())
+  ));
+  if (configuredMatch) return configuredMatch.name;
+  if (hasExplicitMapping) return null;
+
+  // İlk kurulumda UID env değerleri henüz eklenmemişse Firebase Console'daki
+  // displayName alanları geçici/uyumlu bir fallback olarak kullanılabilir.
+  const displayName = user.displayName?.trim();
+  return displayName === 'Baba' || displayName === 'Anne' || displayName === 'Anneanne'
+    ? displayName
+    : null;
+}
+
+export function subscribeToAuth(
+  onUser: (user: User | null) => void,
+  onError?: (error: Error) => void,
+) {
+  const auth = firebaseAuth();
+  return onAuthStateChanged(auth, onUser, onError);
+}
+
+export async function signInAdult(email: string, password: string) {
+  const auth = firebaseAuth();
+  const credentials = await signInWithEmailAndPassword(auth, email.trim(), password);
+  const adultName = getAdultName(credentials.user);
+  if (!adultName) {
+    await signOut(auth);
+    throw new Error('Bu Firebase hesabı izinli yetişkin hesaplarından biri değil.');
   }
+  return credentials.user;
+}
+
+export async function signOutAdult() {
+  await signOut(firebaseAuth());
+}
+
+export async function ensureAnonymousAuth() {
+  const auth = firebaseAuth();
+  if (!auth.currentUser) await signInAnonymously(auth);
+  return auth.currentUser;
 }
 
 let services: ReturnType<typeof createServices> | null = null;
 function createServices() {
-  clearStaleFirestoreLocalStorage();
   const app = getApps()[0] ?? initializeApp(firebaseConfig);
-  const db = initializeFirestore(app, {});
+  const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
   return { auth: getAuth(app), db, storage: getStorage(app) };
 }
 
 async function getServices() {
   if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
   services ??= createServices();
-  if (!services.auth.currentUser) await signInAnonymously(services.auth);
+  await ensureAnonymousAuth();
   return services;
 }
 
-// Rüzgar'ın ailesinin TEK gerçek/doğru aile kodu. RUZGAR123 girişi de bu koda
-// bağlanır. Bu sabit, cihazlarda kalmış eski/yanlış (ör. test sırasında
-// oluşmuş) aile kodlarını fark edip otomatik düzeltmek için kullanılır.
-export const CANONICAL_FAMILY_CODE = 'XJSKGCJMBPJ6';
-
 export function getFamilyCode() {
-  const stored = localStorage.getItem(FAMILY_CODE_KEY) || '';
-  // Cihazda doğru aileden FARKLI eski bir kod kayıtlıysa (ör. geliştirme
-  // sırasında yanlışlıkla oluşmuş boş bir aile), otomatik olarak temizle ki
-  // uygulama doğru aileye (CANONICAL_FAMILY_CODE) yeniden bağlansın. Bu,
-  // "adres değişti ama hala eski/az puan görünüyor" sorununun kök nedeniydi.
-  if (stored && stored !== CANONICAL_FAMILY_CODE) {
-    localStorage.removeItem(FAMILY_CODE_KEY);
-    localStorage.removeItem('ruzgar_game_access_v1');
-    return '';
-  }
-  return stored;
+  return localStorage.getItem(FAMILY_CODE_KEY) || '';
 }
 
 /** WhatsApp ile gönderilebilen davet bağlantısından aile kodunu okur. */
@@ -102,6 +142,7 @@ export function getInviteFamilyCode() {
 export function getFamilyInviteLink(code: string) {
   const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!normalized) return '';
+  if (!PUBLIC_APP_URL) return '';
   const url = new URL(PUBLIC_APP_URL);
   url.searchParams.set('aile', normalized);
   return url.toString();
@@ -124,6 +165,10 @@ export function saveFamilyCode(code: string) {
 
 function familyRef(code: string) {
   return doc(services!.db, 'families', code);
+}
+
+function familyInviteRef(code: string) {
+  return doc(services!.db, 'familyInvites', code);
 }
 
 async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
@@ -181,18 +226,33 @@ function mergeVideos(remote: StoryVideo[], local: StoryVideo[]) {
   return mergeVideosById(remote, local);
 }
 
+export function mergeById<T extends { id: string; updatedAt?: string; deletedAt?: string }>(remote: T[] = [], local: T[] = [], includeDeleted = false) {
+  const entries = new Map<string, T>();
+  const timestamp = (value?: string) => {
+    const parsed = Date.parse(value || '');
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  for (const entry of remote) entries.set(entry.id, entry);
+  for (const entry of local) {
+    const existing = entries.get(entry.id);
+    if (!existing || timestamp(entry.updatedAt) >= timestamp(existing.updatedAt)) entries.set(entry.id, entry);
+  }
+  return [...entries.values()].filter((entry) => includeDeleted || !entry.deletedAt);
+}
+
+function mergeCoinLedger(remote: CoinLedgerEntry[] = [], local: CoinLedgerEntry[] = []) {
+  const entries = new Map<string, CoinLedgerEntry>();
+  for (const entry of [...remote, ...local]) entries.set(entry.id, entry);
+  return [...entries.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
 // Etkinlik geçmişi (uygulama açılışı, görev onayı, satın alma) kimliğe göre
 // birleştirilir; hiçbir cihaz diğerinin kaydını manuel/otomatik eşitlemede silemez.
 function mergeActivityLog(remote: ActivityLogEntry[] = [], local: ActivityLogEntry[] = []) {
   const entries = new Map<string, ActivityLogEntry>();
   for (const entry of remote) entries.set(entry.id, entry);
   for (const entry of local) entries.set(entry.id, entry);
-  // 300 -> 60: Etkinlik geçmişi belgenin en büyük alanıydı (gerçek cihazda tek
-  // başına ~48KB) ve HER senkronizasyonda (otomatik/manuel) değişmese bile
-  // tamamen yeniden gönderiliyordu. 60 kayıt, ebeveyn panelindeki "son
-  // etkinlikler" ihtiyacı için fazlasıyla yeterli ve belge boyutunu ciddi
-  // ölçüde küçültüp senkronizasyonu hafifletiyor.
-  return [...entries.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 60);
+  return [...entries.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 300);
 }
 
 function removeUndefinedFields(value: unknown): unknown {
@@ -214,53 +274,81 @@ function removeUndefinedFields(value: unknown): unknown {
   return value;
 }
 
-// ÖNEMLİ: Daha önce her çağrıda TÜM aile belgesi (görevler, mağaza, dünya,
-// bonuslar, sesli notlar, videolar, 300 kayıtlık etkinlik geçmişi — tek
-// cihazda ölçülen gerçek boyut ~75KB) baştan yazılıyordu; tek bir görev
-// tamamlansa bile değişmeyen alanlar da yeniden gönderiliyordu. Artık
-// `data` yalnızca DEĞİŞEN alanları içerir (bkz. App.tsx'teki diff mantığı)
-// ve `setDoc(..., { merge: true })` ile SADECE o alanlar buluta yazılır;
-// belgenin geri kalanına dokunulmaz. Sesli not/video/etkinlik geçmişi gibi
-// iki cihazdan da gelebilecek alanlar için hâlâ önce okunup birleştiriliyor,
-// ama SADECE bu alanlardan biri gönderiliyorsa (çoğu zaman gönderilmez).
-export async function uploadFamilyData(code: string, data: Partial<FamilyData>) {
+export async function uploadFamilyData(code: string, data: FamilyData) {
   const normalized = saveFamilyCode(code);
-  await getServices();
-  const ref = familyRef(normalized);
-  const payload: Record<string, unknown> = { updatedAt: Date.now(), schemaVersion: 1 };
+  const services = await getServices();
+  const uid = services.auth.currentUser?.uid;
+  if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
 
-  const needsCollabRead = data.voiceMessages !== undefined || data.videos !== undefined || data.activityLog !== undefined;
-  if (needsCollabRead) {
-    // Önce buluttaki sesli notları/videoları/etkinlikleri alıp yeni yerel
-    // olanlarla birleştiriyoruz. Bu, anne ve babanın aynı anda yolladığı
-    // notların/kayıtların kaybolmasını engeller.
-    const existing = await getDoc(ref);
-    if (data.voiceMessages !== undefined) {
-      const remoteMessages = existing.exists() ? ((existing.data().voiceMessages || []) as VoiceMessage[]) : [];
-      payload.voiceMessages = await moveAudioToStorage(normalized, mergeVoiceMessages(remoteMessages, data.voiceMessages));
-    }
-    if (data.videos !== undefined) {
-      const remoteVideos = existing.exists() ? ((existing.data().videos || []) as StoryVideo[]) : [];
-      payload.videos = mergeVideos(remoteVideos, data.videos);
-    }
-    if (data.activityLog !== undefined) {
-      const remoteActivityLog = existing.exists() ? ((existing.data().activityLog || []) as ActivityLogEntry[]) : [];
-      payload.activityLog = mergeActivityLog(remoteActivityLog, data.activityLog);
-    }
-  }
+  // Sesleri transaction dışında Storage'a taşırız; Firestore transaction yalnızca
+  // küçük metadata ve aile belgesi üzerinde çalışır.
+  const localMessages = await moveAudioToStorage(normalized, data.voiceMessages);
+  let ownerUid = uid;
+  let createdAt = Date.now();
 
-  const directFields = ['user', 'parentConfig', 'tasks', 'shop', 'world', 'bonuses', 'lastSyncedBy'] as const;
-  for (const key of directFields) {
-    if (data[key] !== undefined) payload[key] = data[key];
-  }
+  await runTransaction(services.db, async (transaction) => {
+    const reference = familyRef(normalized);
+    const snapshot = await transaction.get(reference);
+    const remoteData = snapshot.exists() ? snapshot.data() as Partial<FamilyData> & { createdAt?: number } : {};
+    ownerUid = remoteData.ownerUid || uid;
+    createdAt = remoteData.createdAt || createdAt;
+    const memberUids = [...new Set([...(Array.isArray(remoteData.memberUids) ? remoteData.memberUids : []), uid])];
+    const { pinHash: _localPinHash, ...sharedParentConfig } = data.parentConfig;
+    const payload = removeUndefinedFields({
+      ...data,
+      parentConfig: sharedParentConfig,
+      tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks),
+      shop: mergeById((remoteData.shop || []) as ShopItem[], data.shop),
+      bonuses: mergeById((remoteData.bonuses || []) as BonusCard[], data.bonuses),
+      world: mergeById((remoteData.world || []) as PlacedWorldItem[], data.world, true),
+      voiceMessages: mergeVoiceMessages((remoteData.voiceMessages || []) as VoiceMessage[], localMessages),
+      videos: mergeVideos((remoteData.videos || []) as StoryVideo[], data.videos),
+      activityLog: mergeActivityLog((remoteData.activityLog || []) as ActivityLogEntry[], data.activityLog),
+      coinLedger: mergeCoinLedger((remoteData.coinLedger || []) as CoinLedgerEntry[], data.coinLedger),
+      // Eski/ilgili bir upload aktif cihaz alanı taşımıyorsa uzak değeri koru;
+      // checkbox temizleme işlemi ise açıkça `null` gönderir.
+      activeChildDevice: data.activeChildDevice === undefined
+        ? (remoteData.activeChildDevice || null)
+        : data.activeChildDevice,
+      ownerUid,
+      memberUids,
+      inviteEnabled: true,
+      updatedAt: Date.now(),
+      schemaVersion: 3,
+    });
+    transaction.set(reference, payload, { merge: false });
+  });
 
-  const cleaned = removeUndefinedFields(payload);
-  await setDoc(ref, cleaned as Record<string, unknown>, { merge: true });
+  await setDoc(familyInviteRef(normalized), removeUndefinedFields({
+    familyCode: normalized,
+    ownerUid,
+    inviteEnabled: true,
+    createdAt,
+    updatedAt: Date.now(),
+  }), { merge: true });
+}
+
+export async function acceptFamilyInvite(code: string) {
+  const normalized = saveFamilyCode(code);
+  const services = await getServices();
+  const uid = services.auth.currentUser?.uid;
+  if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
+  const invite = await getDoc(familyInviteRef(normalized));
+  if (!invite.exists() || invite.data().inviteEnabled !== true) throw new Error('Davet bağlantısı geçersiz veya kapatılmış.');
+  const familySnapshot = await getDoc(familyRef(normalized));
+  if (!familySnapshot.exists()) throw new Error('Bu aile kaydı bulunamadı.');
+  const existingMembers = familySnapshot.data().memberUids;
+  // Zaten üye olan cihazlarda tekrar yazma yapma; Firestore kuralı yalnızca
+  // yeni bir UID eklendiğinde bu güncellemeye izin verir.
+  if (Array.isArray(existingMembers) && existingMembers.includes(uid)) return true;
+  await updateDoc(familyRef(normalized), { memberUids: arrayUnion(uid), updatedAt: Date.now() });
+  return true;
 }
 
 export async function familyExists(code: string) {
+  const normalized = saveFamilyCode(code);
   await getServices();
-  return (await getDoc(familyRef(code))).exists();
+  return (await getDoc(familyInviteRef(normalized))).exists();
 }
 
 export async function getFamilyData(code: string) {

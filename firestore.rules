@@ -1,10 +1,69 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Her cihaz arka planda anonim Firebase oturumu açar. Aile belgesi adı
-    // rastgele davet kodudur; kod bilinmeden veriye erişilemez.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function familyPath(familyCode) {
+      return /databases/$(database)/documents/families/$(familyCode);
+    }
+
+    function isFamilyMember(familyCode) {
+      return signedIn()
+        && (resource.data.get('ownerUid', '') == request.auth.uid
+          || resource.data.get('memberUids', []).hasAny([request.auth.uid]));
+    }
+
+    function isFamilyOwner() {
+      return signedIn() && resource.data.get('ownerUid', '') == request.auth.uid;
+    }
+
+    // Davet belgesi yalnızca kodun aktif olup olmadığını taşır; aile verisini taşımaz.
+    match /familyInvites/{familyCode} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.familyCode == familyCode;
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.familyCode == resource.data.familyCode;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
     match /families/{familyCode} {
-      allow read, write: if request.auth != null;
+      // İlk cihaz aileyi oluşturur; ownerUid ve kendi UID'si memberUids içine yazılmalıdır.
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUids.hasAny([request.auth.uid]);
+
+      // Yeni aile oluşturma öncesindeki getDoc(false) çağrısı reddedilmez; mevcut veri ise üyeye aittir.
+      allow get: if signedIn()
+        && (!exists(familyPath(familyCode)) || isFamilyMember(familyCode));
+      allow list: if false;
+
+      // Daveti kabul eden yeni üye sadece memberUids + updatedAt alanını ekleyebilir.
+      allow update: if signedIn() && (
+        isFamilyOwner()
+        || (
+          resource.data.get('inviteEnabled', false) == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'updatedAt'])
+          && request.resource.data.memberUids.hasAll(resource.data.memberUids)
+          && request.resource.data.memberUids.hasAny([request.auth.uid])
+          && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+        )
+        || (
+          isFamilyMember(familyCode)
+          && request.resource.data.get('ownerUid', '') == resource.data.get('ownerUid', '')
+          && request.resource.data.get('memberUids', []) == resource.data.get('memberUids', [])
+          && request.resource.data.get('inviteEnabled', false) == resource.data.get('inviteEnabled', false)
+        )
+      );
+
+      allow delete: if isFamilyOwner();
     }
   }
 }

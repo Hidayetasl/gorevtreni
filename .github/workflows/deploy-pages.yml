@@ -27,6 +27,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:progress
+      - run: npm run lint
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
@@ -35,6 +37,13 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_BABA_UID: ${{ secrets.VITE_FIREBASE_BABA_UID }}
+          VITE_FIREBASE_BABA_EMAIL: ${{ secrets.VITE_FIREBASE_BABA_EMAIL }}
+          VITE_FIREBASE_ANNE_UID: ${{ secrets.VITE_FIREBASE_ANNE_UID }}
+          VITE_FIREBASE_ANNE_EMAIL: ${{ secrets.VITE_FIREBASE_ANNE_EMAIL }}
+          VITE_FIREBASE_ANNEANNE_UID: ${{ secrets.VITE_FIREBASE_ANNEANNE_UID }}
+          VITE_FIREBASE_ANNEANNE_EMAIL: ${{ secrets.VITE_FIREBASE_ANNEANNE_EMAIL }}
+          VITE_PUBLIC_APP_URL: ${{ vars.VITE_PUBLIC_APP_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

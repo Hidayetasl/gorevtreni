@@ -3,15 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TabType, RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from './types';
+// Tasarım: Pastel Tren Rotası — krem zemin, sıcak kahve metin ve sakin gökyüzü mavisi istasyon alanları.
+import React, { useState, useEffect, useRef } from 'react';
+import { ActiveChildDevice, AdultName, TabType, RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry, CoinLedgerEntry } from './types';
 import {
   getStoredTasks,
   saveStoredTasks,
-  fixTaskImages,
-  getDeviceRole,
-  saveDeviceRole,
-  clearDeviceRole,
   getStoredShop,
   saveStoredShop,
   mergeShopItemsWithCatalog,
@@ -29,18 +26,18 @@ import {
   saveStoredVideos,
   getStoredActivityLog,
   saveStoredActivityLog,
+  getStoredCoinLedger,
+  saveStoredCoinLedger,
   INITIAL_TASKS,
   INITIAL_SHOP,
   INITIAL_WORLD,
   INITIAL_USER,
   INITIAL_PARENT,
   INITIAL_BONUSES,
+  getOrCreateDeviceId,
   INITIAL_VOICE_MESSAGES,
   INITIAL_VIDEOS,
   START_LEVEL_VERSION,
-  markPendingCloudWrite,
-  clearPendingCloudWrite,
-  hasPendingCloudWrite,
 } from './utils/storage';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -54,17 +51,13 @@ import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { SimpleAccessGate } from './components/SimpleAccessGate';
-import { DeviceRoleGate } from './components/DeviceRoleGate';
-import { createFamilyCode, familyExists, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, saveFamilyCode, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { acceptFamilyInvite, createFamilyCode, familyExists, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
-import { DeviceRole } from './types';
+import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
+import { validateYoutubeVideo } from './utils/youtubeValidation';
 
 const routineTaskIds = new Set(INITIAL_TASKS.map((task) => task.id));
 const routineTaskTemplates = new Map(INITIAL_TASKS.map((task) => [task.id, task]));
-// Öğren sekmesi (Harf Treni, Heceleme, İngilizce): ana kazanç yolu yine
-// günlük rutin görevler olsun diye öğrenmede puan hemen değil, birikimli
-// verilir — her 10 doğru cevapta 1 Tren Parası.
-const LEARN_ANSWERS_PER_COIN = 10;
 
 function getBrowserDeviceLabel(): string {
   if (typeof navigator === 'undefined') return '';
@@ -87,12 +80,6 @@ function getBrowserDeviceLabel(): string {
   return device ? `${browser} · ${device}` : browser;
 }
 
-function getDeviceRoleLabel(role: DeviceRole | null, owner?: string): string {
-  if (role === 'player') return '🚂 Rüzgar\'ın cihazı';
-  if (role === 'viewer') return owner ? `👀 İzleyici (${owner})` : '👀 İzleyici';
-  return '';
-}
-
 function getLocalDateKey(value: Date | string = new Date()) {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '';
@@ -100,6 +87,29 @@ function getLocalDateKey(value: Date | string = new Date()) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function calculateLedgerBalance(ledger: CoinLedgerEntry[], fallback: number) {
+  if (ledger.length === 0) return fallback;
+  let balance = 0;
+  for (const entry of [...ledger].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    balance = typeof entry.balanceAfter === 'number' ? entry.balanceAfter : balance + entry.coinDelta;
+  }
+  return Math.max(0, balance);
+}
+
+function getCloudErrorMessage(error: unknown, fallback = 'Eşitleme sırasında bir sorun oluştu.') {
+  const raw = error instanceof Error ? error.message : String(error || '');
+  if (raw.includes('auth/network-request-failed') || raw.includes('network-request-failed')) {
+    return 'İnternet bağlantısı sorunu. Lütfen bağlantınızı kontrol edip tekrar deneyin.';
+  }
+  if (raw.includes('permission-denied') || raw.includes('insufficient permissions')) {
+    return 'Bulut erişim izni reddedildi. Aile bağlantısını veya ayarları kontrol edin.';
+  }
+  if (raw.includes('Firebase yapılandırması eksik')) {
+    return 'Bulut eşitlemesi yapılandırılmamış. Oyun bu cihazda yerel olarak çalışıyor.';
+  }
+  return fallback;
 }
 
 function isRoutineTask(task: RoutineTask) {
@@ -135,6 +145,18 @@ function reopenCompletedRoutineTasksFromPastDays(tasks: RoutineTask[], todayKey:
   return { tasks: nextTasks, changed };
 }
 
+/**
+ * A stale/empty Firebase world must not erase a real local placement. This is
+ * intentionally conservative: a non-empty remote world remains authoritative;
+ * only an empty/malformed remote value falls back to the current local world or
+ * the published defaults.
+ */
+function chooseSyncedWorld(remoteWorld: unknown, localWorld: PlacedWorldItem[]) {
+  const remote = Array.isArray(remoteWorld) ? remoteWorld as PlacedWorldItem[] : [];
+  if (remote.length > 0) return remote;
+  return localWorld.length > 0 ? localWorld : INITIAL_WORLD;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
   // Kullanıcı Google hesabı görmez. Firebase anonim oturumu arka planda
@@ -152,41 +174,45 @@ export default function App() {
   const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>(() => getStoredVoiceMessages());
   const [videos, setVideos] = useState<StoryVideo[]>(() => getStoredVideos());
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>(() => getStoredActivityLog());
+  const [coinLedger, setCoinLedger] = useState<CoinLedgerEntry[]>(() => {
+    const stored = getStoredCoinLedger();
+    if (stored.length > 0) return stored;
+    const openingBalance = getStoredUser().coins;
+    return [{ id: 'migration-opening-balance-v1', type: 'initial', coinDelta: openingBalance, balanceAfter: openingBalance, createdAt: new Date().toISOString() }];
+  });
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
-  // Bu FİZİKSEL cihazın rolü: "player" = Rüzgar bu telefonda oynuyor,
-  // "viewer" = sadece takip eden/onaylayan bir aile üyesinin cihazı.
-  // Buluta gitmez, sadece bu cihazda kalıcıdır.
-  const [deviceRole, setDeviceRole] = useState(() => getDeviceRole());
-  // Buluttan gelen "en son hangi cihaz/rol yazdı" bilgisi — Ebeveyn panelinde gösterilir.
-  const [lastSyncedBy, setLastSyncedBy] = useState<{ roleLabel: string; device: string; timestamp: string } | undefined>();
+  const [activeChildDevice, setActiveChildDevice] = useState<ActiveChildDevice | null | undefined>(undefined);
+  const [adultUser, setAdultUser] = useState<{ uid: string; name: AdultName } | null>(null);
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [networkEpoch, setNetworkEpoch] = useState(0);
   const remoteUpdateRef = useRef(false);
   const syncReadyRef = useRef(false);
   const pendingSyncRef = useRef(false);
-  // ÖNEMLİ: Sayfa yeni açıldığında (ör. satın alma) ilk bulut senkronu daha
-  // gelmeden bir değişiklik yapılırsa, biraz sonra gelen "ilk" bulut verisi
-  // (henüz bu değişikliği içermeyen eski veri) bu değişikliği SESSİZCE
-  // eziyordu — puan düşmüş görünmüyor, satın alınan parça envanterde
-  // çıkmıyordu. Bu bayrak, kaydedilmemiş yerel bir değişiklik varken gelen
-  // bulut verisinin üzerine yazmasını engeller; bunun yerine yerel veri
-  // buluta yazılır.
-  // Sayfa yeniden açıldığında, önceki oturumdan buluta ULAŞMAMIŞ olabilecek
-  // bir değişiklik varsa (bkz. markPendingCloudWrite yorumu) bunu baştan
-  // biliyor olmalıyız — yoksa ilk bulut anlık görüntüsü bu değişikliği
-  // sessizce silebilir.
-  const hasLocalPendingWriteRef = useRef(hasPendingCloudWrite());
   const latestFamilyDataRef = useRef<import('./utils/cloudSync').FamilyData | null>(null);
-  // ÖNEMLİ: Rutin otomatik eşitleme buluta HER ALANI değil, SADECE son
-  // buluta yazılan/buluttan alınan halinden FARKLI olan alanları gönderir
-  // (bkz. aşağıdaki debounce efekti). Bu ref, "buluttaki güncel hal bu"
-  // diye bildiğimiz referansları tutar; state değişmeden bu referanslar da
-  // değişmez (bu kod tabanında state hep immutable güncellenir).
-  const lastUploadedFieldsRef = useRef<Partial<import('./utils/cloudSync').FamilyData>>({});
   const videosRef = useRef(videos);
   const voiceMessagesRef = useRef(voiceMessages);
   const activityLogRef = useRef(activityLog);
+  const authUidRef = useRef<string | null | undefined>(undefined);
+  const deviceIdRef = useRef<string>(getOrCreateDeviceId());
+
+  useEffect(() => {
+    if (!isCloudConfigured) return;
+    let cancelled = false;
+    const unsubscribe = subscribeToAuth((firebaseUser) => {
+      if (cancelled) return;
+      const nextUid = firebaseUser?.uid || null;
+      if (authUidRef.current !== nextUid) {
+        authUidRef.current = nextUid;
+        setNetworkEpoch((value) => value + 1);
+      }
+      const adultName = getAdultName(firebaseUser);
+      setAdultUser(adultName && firebaseUser ? { uid: firebaseUser.uid, name: adultName } : null);
+    }, () => {
+      if (!cancelled) setAdultUser(null);
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
 
   // Davet bağlantısı (?aile=...) başka bir telefonda açıldığında aile kodu
   // otomatik doğrulanır. PIN sadece ebeveyn kilididir; eşitleme anahtarı
@@ -197,10 +223,16 @@ export default function App() {
     let cancelled = false;
     setCloudStatus('Davet bağlantısı doğrulanıyor…');
     familyExists(inviteCode)
-      .then((exists) => {
+      .then(async (exists) => {
         if (cancelled) return;
         if (!exists) {
           setCloudStatus('Davet bağlantısı geçersiz. Ebeveynden yeni bağlantıyı isteyin.');
+          return;
+        }
+        try {
+          await acceptFamilyInvite(inviteCode);
+        } catch (error) {
+          if (!cancelled) setCloudStatus(getCloudErrorMessage(error, 'Davet kabul edilemedi.'));
           return;
         }
         saveFamilyCode(inviteCode);
@@ -231,6 +263,7 @@ export default function App() {
   useEffect(() => { videosRef.current = videos; }, [videos]);
   useEffect(() => saveStoredActivityLog(activityLog), [activityLog]);
   useEffect(() => { activityLogRef.current = activityLog; }, [activityLog]);
+  useEffect(() => saveStoredCoinLedger(coinLedger), [coinLedger]);
 
   useEffect(() => {
     const todayKey = getLocalDateKey();
@@ -245,52 +278,14 @@ export default function App() {
     }
   }, [tasks, user.lastTaskResetDate]);
 
-  // Öğren sekmesinde doğru cevap verildiğinde çağrılır: doğru cevap sayacını
-  // artırır, her 10 doğru cevapta 1 Tren Parası verir (kutlama/ses zaten
-  // LearnView içinde çalıyor, burada sadece ödül hesabı yapılır).
-  const handleLearnCorrectAnswer = useCallback(() => {
-    const todayKey = getLocalDateKey();
-    hasLocalPendingWriteRef.current = true;
-    markPendingCloudWrite();
-    setUser((prev) => {
-      const isToday = prev.learnCoinsResetDate === todayKey;
-      const answersToday = (isToday ? prev.learnAnswersToday ?? 0 : 0) + 1;
-      const coinsToday = isToday ? prev.learnCoinsToday ?? 0 : 0;
-      const earnsCoin = answersToday % LEARN_ANSWERS_PER_COIN === 0;
-      return {
-        ...prev,
-        coins: prev.coins + (earnsCoin ? 1 : 0),
-        learnAnswersToday: answersToday,
-        learnCoinsToday: coinsToday + (earnsCoin ? 1 : 0),
-        learnCoinsResetDate: todayKey,
-      };
-    });
-  }, []);
-
   const currentFamilyData = (): import('./utils/cloudSync').FamilyData => ({
-    user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog,
-    lastSyncedBy: {
-      roleLabel: getDeviceRoleLabel(deviceRole.role, deviceRole.owner) || 'Bilinmeyen cihaz',
-      device: getBrowserDeviceLabel(),
-      timestamp: new Date().toISOString(),
-    },
+    user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog, coinLedger,
+    activeChildDevice,
   });
 
   useEffect(() => {
     latestFamilyDataRef.current = currentFamilyData();
-  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog]);
-
-  // markLocalPendingWrite(): SADECE gerçek kullanıcı eylemlerinde (satın alma,
-  // görev tamamlama, dünyaya yerleştirme, bonus vb.) doğrudan çağrılır — genel
-  // bir state-izleme efekti KULLANMIYORUZ, çünkü "yeni gün" damgalama gibi
-  // otomatik/arka plan değişiklikler de aynı state alanlarını (user, tasks)
-  // değiştirebiliyor ve bunlar gerçek bir çakışma değil. Genel efekt bunu
-  // ayırt edemediği için buluttaki güncel veriyi gereksiz yere reddedip eski
-  // yerel veriyi üzerine yazabiliyordu.
-  const markLocalPendingWrite = () => {
-    hasLocalPendingWriteRef.current = true;
-    markPendingCloudWrite();
-  };
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog, coinLedger, activeChildDevice]);
 
   useEffect(() => {
     if (!cloudEnabled || !isCloudConfigured || !familyCode) return;
@@ -299,53 +294,38 @@ export default function App() {
     setCloudStatus('Aile verisine bağlanıyor…');
     (async () => {
       try {
-        if (!(await familyExists(familyCode))) {
-          const initialData = currentFamilyData();
-          await uploadFamilyData(familyCode, initialData);
-          lastUploadedFieldsRef.current = initialData;
-        }
+        // Eski sürümde aile koduyla giriş yapan cihazlar davet kabulünü
+        // atlamış olabilir. Abonelikten önce üyeliği idempotent biçimde tamamla;
+        // böylece Firestore rules bu cihazın aile verisini okumasına izin verir.
+        if (await familyExists(familyCode)) await acceptFamilyInvite(familyCode);
+        else await uploadFamilyData(familyCode, currentFamilyData());
         if (cancelled) return;
         unsubscribe = await subscribeToFamily(familyCode, (remote, metadata) => {
           if (metadata.fromCache) {
             setCloudStatus(navigator.onLine ? 'Bulut doğrulanıyor…' : 'Çevrimdışı: kayıtlı oyun açık');
             return;
           }
-          if (hasLocalPendingWriteRef.current) {
-            // Bu cihazda buluta henüz yazılmamış taze bir değişiklik var (ör.
-            // az önce yapılan bir satın alma). Buluttan gelen bu veri o
-            // değişiklikten ÖNCEKİ eski hali olabilir — üzerine yazarsak
-            // satın alma "sessizce" kaybolur. Bunun yerine yerel değişikliği
-            // hemen buluta yazıyoruz (debounce efektine güvenmiyoruz, çünkü
-            // ref değişikliği tek başına o efekti tetiklemez).
-            syncReadyRef.current = true;
-            setCloudStatus('Yerel değişiklik buluta yazılıyor…');
-            uploadFamilyData(familyCode, latestFamilyDataRef.current ?? currentFamilyData())
-              .then(() => {
-                hasLocalPendingWriteRef.current = false;
-                clearPendingCloudWrite();
-                lastUploadedFieldsRef.current = latestFamilyDataRef.current ?? currentFamilyData();
-                setCloudStatus('Eşitlendi ✓');
-              })
-              .catch(() => setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'));
-            return;
-          }
           remoteUpdateRef.current = true;
+          setActiveChildDevice(remote.activeChildDevice ?? null);
+          const syncedLedger = mergeById(remote.coinLedger || [], coinLedger);
           const syncedUser: UserProfile = {
             ...INITIAL_USER,
             ...remote.user,
+            coins: calculateLedgerBalance(syncedLedger, remote.user.coins),
           };
 
           const syncedShop = mergeShopItemsWithCatalog(remote.shop);
           const shopCatalogChanged = syncedShop.length !== remote.shop.length;
+          const localWorld = latestFamilyDataRef.current?.world || [];
+          const mergedWorld = mergeById(remote.world || [], localWorld, true);
+          const syncedWorld = mergedWorld.filter((item) => !item.deletedAt);
+          const remoteWorldCount = Array.isArray(remote.world) ? remote.world.length : 0;
+          const worldChanged = JSON.stringify(mergedWorld) !== JSON.stringify(remote.world || []);
 
-          // Buluttaki görev fotoğrafı yolu eski adresten (ör. gorev-treni)
-          // kalmış olabilir; her zaman bu derlemenin güncel yoluyla değiştir,
-          // yoksa resimler açılışta kısa görünüp bulut verisiyle bozuluyordu.
-          const syncedTasks = fixTaskImages(remote.tasks);
           setUser(syncedUser); setParentConfig(remote.parentConfig);
-          setTasks(syncedTasks);
-          setShop(syncedShop); setWorld(remote.world); setBonuses(remote.bonuses);
-          if (remote.lastSyncedBy) setLastSyncedBy(remote.lastSyncedBy);
+          setTasks(mergeById(remote.tasks || [], tasks));
+          setShop(mergeById(syncedShop, shop)); setWorld(syncedWorld); setBonuses(mergeById(remote.bonuses || [], bonuses));
+          setCoinLedger(syncedLedger);
           const remoteMessages = remote.voiceMessages || [];
           const localMessages = voiceMessagesRef.current;
           const combinedMessages = [...remoteMessages];
@@ -368,33 +348,20 @@ export default function App() {
             if (!combinedActivityLog.some((remoteEntry) => remoteEntry.id === entry.id)) combinedActivityLog.push(entry);
           }
           setActivityLog(combinedActivityLog);
-          // Yerel state artık buluttakiyle aynı — bir sonraki otomatik
-          // eşitlemenin bu alanları gereksiz yere tekrar göndermemesi için
-          // "son buluta yazılan" referanslarını da güncelliyoruz.
-          lastUploadedFieldsRef.current = {
-            user: syncedUser,
-            parentConfig: remote.parentConfig,
-            tasks: syncedTasks,
-            shop: syncedShop,
-            world: remote.world,
-            bonuses: remote.bonuses,
-            voiceMessages: combinedMessages,
-            videos: syncedVideos,
-            activityLog: combinedActivityLog,
-          };
           setCloudStatus('Eşitlendi ✓');
           pendingSyncRef.current = false;
           window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
           syncReadyRef.current = true;
-          if (shopCatalogChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
-            // Bu cihazda olup henüz buluta gitmemiş videoyu/notu/etkinliği ve yeni
-            // mağaza katalog parçalarını koru; buluttaki diğer güncel veriler aynen kalır.
-            uploadFamilyData(familyCode, { ...remote, shop: syncedShop, videos: syncedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog })
-              .catch(() => setCloudStatus('Çevrimdışı: yerel not veya video bu cihazda güvenle bekliyor'));
+          if (shopCatalogChanged || worldChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
+            // Bu cihazda olup henüz buluta gitmemiş dünya yerleşimini, videoyu,
+            // notu/etkinliği ve yeni mağaza katalog parçalarını koru; buluttaki
+            // diğer güncel veriler aynen kalır.
+            uploadFamilyData(familyCode, { ...remote, shop: syncedShop, world: mergedWorld, videos: syncedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog, coinLedger: syncedLedger })
+              .catch(() => setCloudStatus('Çevrimdışı: yerel dünya, not veya video bu cihazda güvenle bekliyor'));
           }
-        }, (message) => setCloudStatus(`Eşitleme hatası: ${message}`));
+        }, (message) => setCloudStatus(`Eşitleme hatası: ${getCloudErrorMessage(message)}`));
       } catch (error) {
-        setCloudStatus(error instanceof Error ? `Eşitleme hatası: ${error.message}` : 'Eşitleme hatası oluştu.');
+        setCloudStatus(`Eşitleme hatası: ${getCloudErrorMessage(error)}`);
       }
     })();
     return () => { cancelled = true; unsubscribe?.(); syncReadyRef.current = false; };
@@ -410,33 +377,12 @@ export default function App() {
       return;
     }
     const timer = window.setTimeout(() => {
-      // Sadece son buluta yazılan halinden GERÇEKTEN farklı olan alanları
-      // gönder — ör. bir görev tamamlandığında sadece "tasks" (ve dolaylı
-      // "user" puanı) değişir; mağaza, dünya, 60 kayıtlık etkinlik geçmişi
-      // vb. değişmediyse hiç gönderilmez. Böylece her küçük değişiklikte
-      // tüm aile belgesi yeniden yazılmaz.
-      const current = currentFamilyData();
-      const last = lastUploadedFieldsRef.current;
-      const diff: Partial<import('./utils/cloudSync').FamilyData> = {};
-      (Object.keys(current) as (keyof import('./utils/cloudSync').FamilyData)[]).forEach((key) => {
-        if (last[key] !== current[key]) (diff as Record<string, unknown>)[key] = current[key];
-      });
-      if (Object.keys(diff).length === 0) {
-        pendingSyncRef.current = false;
-        hasLocalPendingWriteRef.current = false;
-        clearPendingCloudWrite();
-        setCloudStatus('Eşitlendi ✓');
-        return;
-      }
-      uploadFamilyData(familyCode, diff)
-        .then(() => {
-          lastUploadedFieldsRef.current = { ...lastUploadedFieldsRef.current, ...diff };
-          pendingSyncRef.current = false; hasLocalPendingWriteRef.current = false; clearPendingCloudWrite(); setCloudStatus('Eşitlendi ✓');
-        })
+      uploadFamilyData(familyCode, currentFamilyData())
+        .then(() => { pendingSyncRef.current = false; setCloudStatus('Eşitlendi ✓'); })
         .catch(() => { pendingSyncRef.current = true; setCloudStatus('Çevrimdışı: değişiklikler bu cihazda güvenle bekliyor'); });
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog, familyCode, cloudEnabled]);
+  }, [user, parentConfig, tasks, shop, world, bonuses, voiceMessages, videos, activityLog, coinLedger, activeChildDevice, familyCode, cloudEnabled]);
 
   // Uygulama her açıldığında (sekme/sayfa yüklendiğinde) hangi tarayıcı/cihazdan
   // girildiğini kaydeder; sekme arka plana alınınca veya kapanınca aynı kaydın
@@ -445,15 +391,14 @@ export default function App() {
   useEffect(() => {
     const id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const sessionStart = Date.now();
-    const roleLabel = getDeviceRoleLabel(deviceRole.role, deviceRole.owner);
     const entry: ActivityLogEntry = {
       id,
       type: 'app_open',
       label: 'Uygulama açıldı',
-      detail: roleLabel ? `${getBrowserDeviceLabel()} · ${roleLabel}` : getBrowserDeviceLabel(),
+      detail: getBrowserDeviceLabel(),
       timestamp: new Date().toISOString(),
     };
-    setActivityLog((prev) => [entry, ...prev].slice(0, 60));
+    setActivityLog((prev) => [entry, ...prev].slice(0, 300));
 
     const updateDuration = () => {
       const durationMs = Date.now() - sessionStart;
@@ -498,18 +443,9 @@ export default function App() {
     setIsManualSyncing(true);
     setCloudStatus('Şimdi eşitleniyor…');
     try {
-      // ÖNEMLİ: Sadece "çevrimdışıydık" (pendingSyncRef) durumunu değil,
-      // "az önce bir değişiklik yapıldı ama 900ms'lik otomatik yazma henüz
-      // tetiklenmedi" (hasLocalPendingWriteRef) durumunu da kontrol ediyoruz.
-      // Aksi halde: kullanıcı bir işlem yapıp HEMEN "Şimdi eşitle"ye
-      // basarsa, bu kod önce eski buluttaki veriyi çekip yerel state'in
-      // üzerine yazıyordu — az önce yapılan değişiklik hiç buluta gitmeden
-      // sessizce kayboluyordu.
-      if ((pendingSyncRef.current || hasLocalPendingWriteRef.current) && latestFamilyDataRef.current) {
+      if (pendingSyncRef.current && latestFamilyDataRef.current) {
         await uploadFamilyData(familyCode, latestFamilyDataRef.current);
         pendingSyncRef.current = false;
-        hasLocalPendingWriteRef.current = false;
-        clearPendingCloudWrite();
       }
       const remote = await getFamilyData(familyCode);
       if (!remote) throw new Error('Bu aile kaydı bulunamadı.');
@@ -530,31 +466,24 @@ export default function App() {
       for (const entry of localActivityLog) {
         if (!combinedActivityLog.some((remoteEntry) => remoteEntry.id === entry.id)) combinedActivityLog.push(entry);
       }
-      if (combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
-        await uploadFamilyData(familyCode, { ...remote, shop: mergeShopItemsWithCatalog(remote.shop), videos: combinedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog });
+      const mergedWorld = mergeById(remote.world || [], world, true);
+      const syncedWorld = mergedWorld.filter((item) => !item.deletedAt);
+      const remoteWorldCount = Array.isArray(remote.world) ? remote.world.length : 0;
+      const worldChanged = JSON.stringify(mergedWorld) !== JSON.stringify(remote.world || []);
+      const syncedLedger = mergeById(remote.coinLedger || [], coinLedger);
+      if (worldChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
+        await uploadFamilyData(familyCode, { ...remote, shop: mergeShopItemsWithCatalog(remote.shop), world: mergedWorld, videos: combinedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog, coinLedger: syncedLedger });
       }
       remoteUpdateRef.current = true;
-      const syncedUser: UserProfile = { ...INITIAL_USER, ...remote.user };
-      const syncedTasks = fixTaskImages(remote.tasks);
-      const syncedShop = mergeShopItemsWithCatalog(remote.shop);
-      setUser(syncedUser);
-      setParentConfig(remote.parentConfig); setTasks(syncedTasks); setShop(syncedShop);
-      setWorld(remote.world); setBonuses(remote.bonuses); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
-      if (remote.lastSyncedBy) setLastSyncedBy(remote.lastSyncedBy);
-      // Manuel eşitleme sonrası yerel state buluttakiyle birebir aynı —
-      // otomatik eşitlemenin bir sonraki turda bunları gereksiz yere tekrar
-      // göndermemesi için referansları güncelliyoruz.
-      lastUploadedFieldsRef.current = {
-        user: syncedUser,
-        parentConfig: remote.parentConfig,
-        tasks: syncedTasks,
-        shop: syncedShop,
-        world: remote.world,
-        bonuses: remote.bonuses,
-        voiceMessages: combinedMessages,
-        videos: combinedVideos,
-        activityLog: combinedActivityLog,
-      };
+      setUser({
+        ...INITIAL_USER,
+        ...remote.user,
+        coins: calculateLedgerBalance(syncedLedger, remote.user.coins),
+      });
+      setCoinLedger(syncedLedger);
+      setParentConfig(remote.parentConfig); setTasks(remote.tasks); setShop(mergeShopItemsWithCatalog(remote.shop));
+      setWorld(syncedWorld); setBonuses(mergeById(remote.bonuses || [], bonuses)); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
+      setActiveChildDevice(remote.activeChildDevice ?? null);
       window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
@@ -571,18 +500,42 @@ export default function App() {
     setFamilyCode(code);
     setCloudStatus('Aile oluşturuluyor…');
     try {
-      const initialData = currentFamilyData();
-      await uploadFamilyData(code, initialData);
-      lastUploadedFieldsRef.current = initialData;
+      await uploadFamilyData(code, currentFamilyData());
       syncReadyRef.current = true;
       setCloudStatus('Eşitlendi ✓');
     } catch (error) { setCloudStatus(error instanceof Error ? `Eşitleme hatası: ${error.message}` : 'Eşitleme başlatılamadı.'); }
     return code;
   };
 
+  const handleSetActiveChildDevice = async (checked: boolean) => {
+    if (!adultUser) return;
+    const nextValue: ActiveChildDevice | null = checked
+      ? {
+          deviceId: deviceIdRef.current,
+          setByUid: adultUser.uid,
+          setByName: adultUser.name,
+          setAt: new Date().toISOString(),
+          label: `${adultUser.name} · ${getBrowserDeviceLabel()}`,
+        }
+      : null;
+    setActiveChildDevice(nextValue);
+  };
+
+  const handleOpenAdultLogin = () => setHasGameAccess(false);
+
+  const handleSwitchAccount = async () => {
+    if (isCloudConfigured) {
+      try { await signOutAdult(); } catch (error) { setCloudStatus(getCloudErrorMessage(error, 'Hesaptan çıkış yapılamadı.')); }
+    }
+    setAdultUser(null);
+    setActiveChildDevice(undefined);
+    setHasGameAccess(false);
+  };
+
   const handleJoinFamily = async (code: string) => {
     const normalized = saveFamilyCode(code);
-    if (!(await familyExists(normalized))) throw new Error('Bu aile koduyla kayıt bulunamadı.');
+    if (!(await familyExists(normalized))) throw new Error('Bu davet bağlantısı geçersiz veya kapatılmış.');
+    await acceptFamilyInvite(normalized);
     // Yeni aile verisi gelene kadar bu cihazdaki eski verinin yeni aileyi
     // ezmesini engelle. Önce yalnızca buluttaki aile kaydı okunur.
     syncReadyRef.current = false;
@@ -593,34 +546,55 @@ export default function App() {
 
   // Etkinlik geçmişi: ebeveyn panelindeki "ne zaman girmiş, ne yapmış" akışı
   // için tek, hafif bir kayıt fonksiyonu. Liste 300 kayıtla sınırlı tutulur.
-  const logActivity = (type: ActivityLogEntry['type'], label: string, detail?: string) => {
+  const appendCoinLedger = (entry: Omit<CoinLedgerEntry, 'id' | 'createdAt'> & { id?: string }) => {
+    const ledgerEntry: CoinLedgerEntry = {
+      ...entry,
+      id: entry.id || `coin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setCoinLedger((prev) => [...prev, ledgerEntry]);
+  };
+
+  const logActivity = (
+    type: ActivityLogEntry['type'],
+    label: string,
+    detail?: string,
+    metadata: Pick<ActivityLogEntry, 'taskId' | 'dateKey' | 'scheduledTaskCount'> = {},
+  ) => {
     const entry: ActivityLogEntry = {
       id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type,
       label,
       detail,
       timestamp: new Date().toISOString(),
+      ...metadata,
     };
-    setActivityLog((prev) => [entry, ...prev].slice(0, 60));
+    setActivityLog((prev) => [entry, ...prev].slice(0, 300));
   };
 
   // Task Completion / Approval Logic
   const handleMarkTaskDone = (taskId: string) => {
-    markLocalPendingWrite();
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task || task.status !== 'todo') return;
+    const completedAt = new Date().toISOString();
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: 'pending_approval', completedAt: new Date().toISOString() } : t))
+      prev.map((t) => (t.id === taskId ? { ...t, status: 'pending_approval', completedAt, updatedAt: completedAt } : t))
     );
+    logActivity('task_complete', task.title, 'Çocuk görevi tamamladı; ebeveyn onayı bekleniyor.', {
+      taskId,
+      dateKey: getLocalDateKey(completedAt),
+      scheduledTaskCount: tasks.filter((item) => !item.isExtra).length,
+    });
   };
 
   const handleApproveTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    if (!task || task.status === 'completed') return;
+    if (!task || task.status !== 'pending_approval') return;
     const now = new Date().toISOString();
     const todayKey = getLocalDateKey(now);
 
-    markLocalPendingWrite();
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: 'completed', approvedAt: now } : t))
+      prev.map((t) => (t.id === taskId ? { ...t, status: 'completed', approvedAt: now, updatedAt: now } : t))
     );
 
     setUser((prev) => ({
@@ -629,7 +603,12 @@ export default function App() {
       totalCompletedTasks: prev.totalCompletedTasks + 1,
       lastTaskResetDate: todayKey,
     }));
-    logActivity('task_complete', task.title, `+${task.rewardCoins} Tren Parası`);
+    appendCoinLedger({ id: `task-reward-${task.id}-${task.completedAt || now}`, type: 'task_reward', coinDelta: task.rewardCoins, referenceId: task.id });
+    logActivity('task_approved', task.title, `+${task.rewardCoins} Tren Parası`, {
+      taskId,
+      dateKey: todayKey,
+      scheduledTaskCount: tasks.filter((item) => !item.isExtra).length,
+    });
   };
 
   const handleApproveAllTasks = () => {
@@ -640,9 +619,8 @@ export default function App() {
     const now = new Date().toISOString();
     const todayKey = getLocalDateKey(now);
 
-    markLocalPendingWrite();
     setTasks((prev) =>
-      prev.map((t) => (t.status === 'pending_approval' ? { ...t, status: 'completed', approvedAt: now } : t))
+      prev.map((t) => (t.status === 'pending_approval' ? { ...t, status: 'completed', approvedAt: now, updatedAt: now } : t))
     );
 
     setUser((prev) => ({
@@ -651,27 +629,39 @@ export default function App() {
       totalCompletedTasks: prev.totalCompletedTasks + pending.length,
       lastTaskResetDate: todayKey,
     }));
-    pending.forEach((task) => logActivity('task_complete', task.title, `+${task.rewardCoins} Tren Parası`));
+    pending.forEach((task) => {
+      appendCoinLedger({ id: `task-reward-${task.id}-${task.completedAt || now}`, type: 'task_reward', coinDelta: task.rewardCoins, referenceId: task.id });
+      logActivity('task_approved', task.title, `+${task.rewardCoins} Tren Parası`, {
+      taskId: task.id,
+      dateKey: todayKey,
+        scheduledTaskCount: tasks.filter((item) => !item.isExtra).length,
+      });
+    });
   };
 
   const handleRejectTask = (taskId: string) => {
-    markLocalPendingWrite();
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'todo' } : t)));
+    const task = tasks.find((item) => item.id === taskId);
+    const now = new Date().toISOString();
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'todo', completedAt: undefined, approvedAt: undefined, updatedAt: now } : t)));
+    if (task) logActivity('task_rejected', task.title, 'Ebeveyn görevi yeniden yapılmak üzere geri gönderdi.', {
+      taskId,
+      dateKey: getLocalDateKey(),
+      scheduledTaskCount: tasks.filter((item) => !item.isExtra).length,
+    });
   };
 
   const handleReactivateTask = (taskId: string) => {
     const todayKey = getLocalDateKey();
-    markLocalPendingWrite();
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId && isRoutineTask(t) ? reopenRoutineTask(t) : t))
+      prev.map((t) => (t.id === taskId && isRoutineTask(t) ? { ...reopenRoutineTask(t), updatedAt: new Date().toISOString() } : t))
     );
     setUser((prev) => ({ ...prev, lastTaskResetDate: todayKey }));
   };
 
   const handleReactivateAllRoutineTasks = () => {
     const todayKey = getLocalDateKey();
-    markLocalPendingWrite();
-    setTasks((prev) => prev.map((t) => (isRoutineTask(t) && t.status === 'completed' ? reopenRoutineTask(t) : t)));
+    const now = new Date().toISOString();
+    setTasks((prev) => prev.map((t) => (isRoutineTask(t) && t.status === 'completed' ? { ...reopenRoutineTask(t), updatedAt: now } : t)));
     setUser((prev) => ({ ...prev, lastTaskResetDate: todayKey }));
   };
 
@@ -680,43 +670,46 @@ export default function App() {
       ...newTaskData,
       id: `task-${Date.now()}`,
       status: 'todo',
+      updatedAt: new Date().toISOString(),
     };
-    markLocalPendingWrite();
     setTasks((prev) => [newTask, ...prev]);
   };
 
   const handleDeleteTask = (taskId: string) => {
-    markLocalPendingWrite();
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
 
   // Shop & Inventory Handlers
   const handleBuyItem = (itemId: string, price: number) => {
     const item = shop.find((s) => s.id === itemId);
-    markLocalPendingWrite();
-    setUser((prev) => ({ ...prev, coins: Math.max(0, prev.coins - price) }));
-    setShop((prev) => prev.map((item) => (item.id === itemId ? { ...item, unlocked: true } : item)));
+    if (!item || item.unlocked || !Number.isFinite(price) || price < 0 || user.coins < price) return;
+    setUser((prev) => ({ ...prev, coins: prev.coins - price }));
+    setShop((prev) => prev.map((item) => (item.id === itemId ? { ...item, unlocked: true, updatedAt: new Date().toISOString() } : item)));
+    appendCoinLedger({ id: `purchase-${itemId}`, type: 'purchase', coinDelta: -price, referenceId: itemId });
     logActivity('purchase', item?.name || itemId, `-${price} Tren Parası`);
   };
 
   const handleSetActiveTrain = (icon: string) => {
-    markLocalPendingWrite();
     setUser((prev) => ({ ...prev, activeTrainIcon: icon }));
   };
 
   // World Canvas Handlers
+  const makeStableId = (prefix: string) => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`;
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  };
+
   const handlePlaceItem = (itemData: Omit<PlacedWorldItem, 'id'>) => {
     const newItem: PlacedWorldItem = {
       ...itemData,
-      id: `world-${Date.now()}`,
+      id: makeStableId('world'),
+      updatedAt: new Date().toISOString(),
     };
-    markLocalPendingWrite();
     setWorld((prev) => [...prev, newItem]);
   };
 
   const handleRemoveItem = (placedId: string) => {
-    markLocalPendingWrite();
-    setWorld((prev) => prev.filter((item) => item.id !== placedId));
+    setWorld((prev) => prev.map((item) => item.id === placedId ? { ...item, deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : item));
   };
 
   // Bonus Handlers
@@ -726,15 +719,18 @@ export default function App() {
       id: `bonus-${Date.now()}`,
       createdAt: new Date().toISOString(),
       claimed: false,
+      updatedAt: new Date().toISOString(),
     };
-    markLocalPendingWrite();
     setBonuses((prev) => [newBonus, ...prev]);
   };
 
   const handleClaimBonus = (bonusId: string, bonusCoins: number) => {
-    markLocalPendingWrite();
-    setBonuses((prev) => prev.map((b) => (b.id === bonusId ? { ...b, claimed: true } : b)));
-    setUser((prev) => ({ ...prev, coins: prev.coins + bonusCoins }));
+    const bonus = bonuses.find((item) => item.id === bonusId);
+    if (!bonus || bonus.claimed) return;
+    const now = new Date().toISOString();
+    setBonuses((prev) => prev.map((b) => (b.id === bonusId ? { ...b, claimed: true, updatedAt: now } : b)));
+    setUser((prev) => ({ ...prev, coins: prev.coins + bonus.coins }));
+    appendCoinLedger({ id: `bonus-reward-${bonusId}`, type: 'bonus_reward', coinDelta: bonus.coins, referenceId: bonusId });
   };
 
   const handleToggleSound = () => {
@@ -753,7 +749,8 @@ export default function App() {
       currentStreak: 0,
       progressVersion: START_LEVEL_VERSION,
     }));
-    setTasks(INITIAL_TASKS.map((task) => ({ ...task })));
+    setTasks(INITIAL_TASKS.map((task) => ({ ...task, updatedAt: new Date().toISOString() })));
+    setCoinLedger((prev) => [...prev, { id: `coin-reset-${Date.now()}`, type: 'reset', coinDelta: 0, balanceAfter: 6, createdAt: new Date().toISOString() }]);
     setIsParentModalOpen(false);
   };
 
@@ -762,6 +759,10 @@ export default function App() {
       ...newVid,
       id: `v-${Date.now()}`,
       createdAt: new Date().toISOString(),
+      moderationStatus: 'pending',
+      embeddable: false,
+      privacyStatus: 'unknown',
+      lastCheckedAt: new Date().toISOString(),
     };
     pendingSyncRef.current = true;
     setVideos((prev) => {
@@ -770,6 +771,64 @@ export default function App() {
       return nextVideos;
     });
     setCloudStatus('Video eklendi, bulut eşitlemesi bekliyor…');
+  };
+
+  const handleApproveVideo = async (id: string) => {
+    const video = videos.find((item) => item.id === id);
+    if (!video) return;
+    setCloudStatus('YouTube videosu doğrulanıyor…');
+    const validation = await validateYoutubeVideo(video.youtubeId);
+    const verifiedAt = new Date().toISOString();
+    pendingSyncRef.current = true;
+
+    setVideos((prev) => {
+      const nextVideos = sortVideosNewestFirst(prev.map((item) => item.id === id
+        ? validation.ok
+          ? {
+              ...item,
+              title: validation.title || item.title,
+              moderationStatus: 'approved' as const,
+              embeddable: validation.embeddable,
+              privacyStatus: validation.privacyStatus || 'unknown',
+              madeForKids: validation.madeForKids,
+              sourceChannelId: validation.channelId,
+              sourceChannelTitle: validation.channelTitle,
+              verifiedAt,
+              lastCheckedAt: verifiedAt,
+              verifiedBy: parentConfig.parentName,
+              failureReason: undefined,
+              thumbnailUrl: `https://img.youtube.com/vi/${item.youtubeId}/hqdefault.jpg`,
+            }
+          : {
+              ...item,
+              moderationStatus: 'pending' as const,
+              embeddable: false,
+              lastCheckedAt: verifiedAt,
+              failureReason: validation.failureReason || 'Video doğrulanamadı.',
+            }
+        : item));
+      latestFamilyDataRef.current = { ...currentFamilyData(), videos: nextVideos };
+      return nextVideos;
+    });
+    setCloudStatus(validation.ok
+      ? 'Video doğrulandı ve çocuk ekranında gösteriliyor.'
+      : `Video onaylanamadı: ${validation.failureReason || 'Video kullanılamıyor.'}`);
+  };
+
+  const handleBlockVideo = (id: string) => {
+    pendingSyncRef.current = true;
+    setVideos((prev) => {
+      const nextVideos = prev.map((video) => video.id === id
+        ? { ...video, moderationStatus: 'blocked' as const, embeddable: false, failureReason: 'Ebeveyn tarafından engellendi' }
+        : video);
+      latestFamilyDataRef.current = { ...currentFamilyData(), videos: nextVideos };
+      return nextVideos;
+    });
+    setCloudStatus('Video çocuk ekranından kaldırıldı, bulut eşitlemesi bekliyor…');
+  };
+
+  const handleVideoStarted = (video: StoryVideo) => {
+    logActivity('video_started', video.title, 'Ebeveyn PIN ile süreli izleme başlatıldı.', { dateKey: getLocalDateKey() });
   };
 
   const handleDeleteVideo = (id: string) => {
@@ -785,7 +844,7 @@ export default function App() {
   const handleSendVoiceMessage = (msgData: Omit<VoiceMessage, 'id' | 'createdAt' | 'isNew'>) => {
     const newMsg: VoiceMessage = {
       ...msgData,
-      id: `vm-${Date.now()}`,
+      id: makeStableId('vm'),
       createdAt: new Date().toISOString(),
       isNew: true,
     };
@@ -817,52 +876,41 @@ export default function App() {
     if (journalTask?.status === 'todo') handleMarkTaskDone('task-8');
   };
 
+  const dailyProgress = buildDailyProgress(tasks, activityLog);
+  const calculatedStreak = calculateCurrentStreak(dailyProgress);
+  const weeklyStats = weeklyCompletion(dailyProgress);
+
+  useEffect(() => {
+    if (user.currentStreak !== calculatedStreak) {
+      setUser((prev) => prev.currentStreak === calculatedStreak ? prev : { ...prev, currentStreak: calculatedStreak });
+    }
+  }, [calculatedStreak, user.currentStreak]);
+
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const pendingCount = tasks.filter((t) => t.status === 'pending_approval').length;
   const unreadVoiceCount = voiceMessages.filter((m) => m.isNew).length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
-  // ÖNEMLİ: "ruzgar_game_access_v1" eski (bulut öncesi) sabit PIN döneminden
-  // kalma bir bayraktı. Bir cihazda bir kez "açık" olarak kaydedildiyse,
-  // sonradan site verisi kısmen temizlenip aile kodu kaybolsa bile bu bayrak
-  // kalıcı olarak kalabiliyor ve giriş ekranı hiç açılmadan uygulama boş/
-  // yanlış aile koduyla başlıyordu — veriler "gelmiyor" gibi görünüyordu.
-  // Bulut açıkken geçerli bir aile kodu yoksa giriş ekranı her zaman gösterilir.
-  const needsFamilyCode = isCloudConfigured && !familyCode;
-  if (!hasGameAccess || needsFamilyCode) {
+  if (!hasGameAccess) {
     // Giriş kodu artık doğrudan aile kodu: doğru kod hem oyunu açar hem bu
     // cihazı aynı aile verisine bağlar, ayrı bir "eşleşme" adımına gerek kalmaz.
     return (
-      <SimpleAccessGate
-        onUnlock={(code) => {
-          if (code) setFamilyCode(code);
-          setHasGameAccess(true);
-        }}
-      />
-    );
-  }
-
-  // Aile kodu doğrulandıktan sonra, bu fiziksel cihazın rolü henüz
-  // seçilmemişse sorulur: Rüzgar bu telefonda mı oynuyor, yoksa bu cihaz
-  // sadece takip eden/onaylayan biri mi?
-  if (!deviceRole.role) {
-    return (
-      <DeviceRoleGate
-        onSelect={(role, owner) => {
-          saveDeviceRole(role, owner);
-          setDeviceRole({ role, owner });
-        }}
-      />
+        <SimpleAccessGate
+          onUnlock={(code) => {
+            if (code) setFamilyCode(code);
+            setHasGameAccess(true);
+          }}
+        />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0e2531] via-[#112f3e] to-[#2f7533] text-slate-100 relative selection:bg-sky-200">
+    <div className="app-shell min-h-screen bg-[#F9F6F0] text-[#4E342E] relative selection:bg-[#FFF59D]">
       {/* Background Animated Sky & Clouds */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {/* Floating Sun */}
-        <div className="absolute top-4 right-6 w-16 h-16 sm:w-20 sm:h-20 bg-amber-300 rounded-full shadow-[0_0_40px_rgba(251,191,36,0.8)] animate-sun-spin flex items-center justify-center text-3xl opacity-90">
-          ☀️
+        <div className="absolute top-4 right-6 w-14 h-14 sm:w-18 sm:h-18 bg-[#FFF59D] rounded-full shadow-[0_0_34px_rgba(255,193,7,0.24)] animate-sun-spin flex items-center justify-center text-3xl opacity-60">
+          ☀
         </div>
 
         {/* Floating Sky Clouds */}
@@ -890,11 +938,36 @@ export default function App() {
           cloudStatus={cloudStatus}
           onManualSync={handleManualSync}
           isSyncing={isManualSyncing}
-          deviceRoleLabel={getDeviceRoleLabel(deviceRole.role, deviceRole.owner)}
+          adultName={adultUser?.name}
+          onOpenAdultLogin={adultUser ? undefined : handleOpenAdultLogin}
+          onSwitchAccount={adultUser ? handleSwitchAccount : undefined}
         />
 
+        {(adultUser || activeChildDevice) && (
+          <section className="mx-2 mt-2 rounded-2xl border border-sky-200 bg-white/85 px-3 py-2.5 shadow-sm sm:mx-3" aria-label="Aile cihaz durumu">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              {adultUser ? (
+                <label className="flex min-h-10 items-center gap-2 text-xs font-extrabold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={activeChildDevice?.deviceId === deviceIdRef.current}
+                    onChange={(event) => void handleSetActiveChildDevice(event.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  <span>Bu cihaz şu an çocuğun aktif cihazı</span>
+                </label>
+              ) : <span className="text-xs font-bold text-slate-500">Yetişkin girişi yapılmadı</span>}
+              <p className="text-xs font-black text-sky-800 sm:text-right">
+                {activeChildDevice
+                  ? <>Şu an aktif çocuk cihazı: <span className="text-emerald-700">{activeChildDevice.label || activeChildDevice.setByName}</span></>
+                  : 'Aktif çocuk cihazı henüz seçilmedi.'}
+              </p>
+            </div>
+          </section>
+        )}
+
         {/* Main Content Body */}
-        <main className="flex-1 p-3 sm:p-5">
+        <main className="app-main flex-1 p-2 sm:p-3">
           {activeTab === 'tasks' && (
             <TasksView
               tasks={tasks}
@@ -903,13 +976,12 @@ export default function App() {
               speechEnabled={user.speechEnabled}
               onOpenVoiceModal={openVoiceModal}
               onOpenJournal={openJournal}
-              unreadVoiceCount={unreadVoiceCount}
             />
           )}
 
           {activeTab === 'world' && (
             <TrainWorldView
-              worldItems={world}
+              worldItems={world.filter((item) => !item.deletedAt)}
               inventory={shop}
               user={user}
               onPlaceItem={handlePlaceItem}
@@ -917,6 +989,7 @@ export default function App() {
               onSetActiveTrain={handleSetActiveTrain}
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
+              onToggleSound={handleToggleSound}
             />
           )}
 
@@ -936,6 +1009,7 @@ export default function App() {
             <VideosView
               videos={videos}
               parentConfig={parentConfig}
+              onVideoStarted={handleVideoStarted}
             />
           )}
 
@@ -944,10 +1018,6 @@ export default function App() {
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
               syllableGameLevels={user.syllableGameLevels}
-              onCorrectAnswer={handleLearnCorrectAnswer}
-              learnCoinsEarnedToday={user.learnCoinsResetDate === getLocalDateKey() ? (user.learnCoinsToday ?? 0) : 0}
-              learnAnswersTowardNextCoin={(user.learnCoinsResetDate === getLocalDateKey() ? (user.learnAnswersToday ?? 0) : 0) % LEARN_ANSWERS_PER_COIN}
-              learnAnswersPerCoin={LEARN_ANSWERS_PER_COIN}
             />
           )}
         </main>
@@ -957,7 +1027,6 @@ export default function App() {
           activeTab={activeTab}
           onChangeTab={(tab) => setActiveTab(tab)}
           onOpenParentModal={() => setIsParentModalOpen(true)}
-          pendingCount={pendingCount}
         />
 
         {/* Parent Engine Room Modal */}
@@ -975,8 +1044,8 @@ export default function App() {
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
           onSendBonus={handleSendBonus}
-          onUpdateParentConfig={(config) => { markLocalPendingWrite(); setParentConfig(config); }}
-          onUpdateUserProfile={(profile) => { markLocalPendingWrite(); setUser(profile); }}
+          onUpdateParentConfig={setParentConfig}
+          onUpdateUserProfile={setUser}
           onResetData={handleResetData}
           soundEnabled={user.soundEnabled}
           speechEnabled={user.speechEnabled}
@@ -991,9 +1060,9 @@ export default function App() {
           onJoinFamily={handleJoinFamily}
           activityLog={activityLog}
           voiceMessages={voiceMessages}
-          deviceRoleLabel={getDeviceRoleLabel(deviceRole.role, deviceRole.owner)}
-          lastSyncedByLabel={lastSyncedBy ? `${lastSyncedBy.roleLabel} · ${lastSyncedBy.device}` : undefined}
-          onChangeDeviceRole={() => { clearDeviceRole(); setDeviceRole({ role: null }); }}
+          weeklyStats={weeklyStats}
+          onApproveVideo={handleApproveVideo}
+          onBlockVideo={handleBlockVideo}
         />
 
         {/* Voice Messages Modal */}

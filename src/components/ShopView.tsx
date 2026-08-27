@@ -72,7 +72,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
       </div>
 
       {/* Shop Category Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="relative flex items-center gap-2 overflow-x-auto pb-1 pr-5 no-scrollbar after:pointer-events-none after:absolute after:right-0 after:top-0 after:h-full after:w-8 after:bg-gradient-to-l after:from-[#102733] after:to-transparent sm:after:hidden">
         <button
           onClick={() => setActiveCategory('tracks')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${

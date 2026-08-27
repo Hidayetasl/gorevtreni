@@ -1,8 +1,31 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    match /families/{familyCode}/{allPaths=**} {
-      allow read, write: if request.auth != null;
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function familyDoc(familyCode) {
+      return firestore.get(/databases/(default)/documents/families/$(familyCode));
+    }
+
+    function isFamilyMember(familyCode) {
+      return signedIn()
+        && (familyDoc(familyCode).data.ownerUid == request.auth.uid
+          || familyDoc(familyCode).data.memberUids.hasAny([request.auth.uid]));
+    }
+
+    match /families/{familyCode}/voice/{fileName} {
+      allow read: if isFamilyMember(familyCode);
+      allow create, update: if isFamilyMember(familyCode)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if isFamilyMember(familyCode);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

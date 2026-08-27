@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { VoiceMessage } from '../types';
+import { JournalMood, VoiceMessage } from '../types';
 import { playPopSound, playCoinSound, speakText } from '../utils/audio';
-import { X, Mic, Square, Play, Send, Volume2, MessageCircle, Trash2 } from 'lucide-react';
+import { X, Mic, Square, Play, Send, Volume2, MessageCircle, Trash2, RotateCcw, Headphones } from 'lucide-react';
 
 interface VoiceMessagesModalProps {
   isOpen: boolean;
@@ -35,6 +35,14 @@ const audioBlobToDataUrl = (blob: Blob) =>
  * natively in both iPhone Safari and Chrome/Android, so a note sent from a
  * computer cannot become silent on an iPhone.
  */
+const moodOptions: { value: JournalMood; label: string; emoji: string }[] = [
+  { value: 'happy', label: 'Neşeli', emoji: '😊' },
+  { value: 'calm', label: 'Sakin', emoji: '😌' },
+  { value: 'proud', label: 'Gururlu', emoji: '🌟' },
+  { value: 'tired', label: 'Yorgun', emoji: '😴' },
+  { value: 'sad', label: 'Biraz üzgün', emoji: '💙' },
+];
+
 const encodeWav = (chunks: Float32Array[], sampleRate: number) => {
   const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
   const buffer = new ArrayBuffer(44 + length * 2);
@@ -82,8 +90,12 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   onJournalSaved,
 }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'record'>('inbox');
+  const [messageFilter, setMessageFilter] = useState<'all' | 'received' | 'sent'>('all');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playbackError, setPlaybackError] = useState('');
+  const [recordingError, setRecordingError] = useState('');
+  const [journalTitle, setJournalTitle] = useState('');
+  const [journalMood, setJournalMood] = useState<JournalMood>('happy');
 
   // Voice Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -119,6 +131,10 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
 
   const startRecording = async () => {
     playPopSound(soundEnabled);
+    setRecordingError('');
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setAudioBlob(null);
+    setAudioUrl(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recordingStreamRef.current = stream;
@@ -194,12 +210,11 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       }, 1000);
     } catch (err) {
       console.warn('Microphone permission denied or not available:', err);
-      // Fallback mode without real mic
-      setIsRecording(true);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      setIsRecording(false);
       setRecordingTime(0);
-      timerIntervalRef.current = window.setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
+      setRecordingError('Mikrofon açılamadı. Tarayıcı ayarlarından mikrofon izni verip yeniden deneyebilirsin. Kayıt olmadan mesaj gönderilmeyecek.');
     }
   };
 
@@ -231,13 +246,17 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       // stop all tracks
       mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
     } else {
-      // Simulated audio preview if real mic wasn't captured
-      setRecordingTime(Math.max(3, recordingTime));
+      setRecordingError('Bu tarayıcıda ses kaydı başlatılamadı. Mikrofon iznini kontrol edip yeniden dene.');
+      setRecordingTime(0);
     }
   };
 
   const handleSend = async () => {
-    const finalTranscript = recordingTime > 0 ? 'Rüzgar’dan sesli mesaj 🎙️' : 'Rüzgar’dan sevgiler! ❤️';
+    if (!audioBlob || !audioUrl) {
+      setRecordingError('Önce gerçek bir ses kaydı yapmalısın. Büyük düğmeye dokunup konuş, sonra kaydı dinle.');
+      return;
+    }
+    const finalTranscript = journalMode ? 'Rüzgar’ın günlüğünden bir ses kaydı 📔' : 'Rüzgar’dan sesli mesaj 🎙️';
     let persistentAudioUrl: string | undefined;
 
     if (audioBlob) {
@@ -257,6 +276,8 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       durationSeconds: recordingTime > 0 ? recordingTime : 5,
       audioUrl: persistentAudioUrl,
       kind: journalMode ? 'journal' : 'message',
+      title: journalMode ? (journalTitle.trim() || 'Bugünüm') : undefined,
+      mood: journalMode ? journalMood : undefined,
     });
 
     if (journalMode) onJournalSaved?.();
@@ -264,9 +285,13 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     speakText(finalTranscript, speechEnabled);
 
     // Reset recording form
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingTime(0);
+    setJournalTitle('');
+    setJournalMood('happy');
+    setRecordingError('');
     setActiveTab('inbox');
   };
 
@@ -321,8 +346,22 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     onDeleteMessage(id);
   };
 
+  const handleRedoRecording = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setRecordingTime(0);
+    setRecordingError('');
+    playPopSound(soundEnabled);
+  };
+
   const visibleMessages = messages.filter((message) => journalMode ? message.kind === 'journal' : message.kind !== 'journal');
+  const displayedMessages = journalMode || messageFilter === 'all'
+    ? visibleMessages
+    : visibleMessages.filter((message) => messageFilter === 'received' ? message.sender !== senderRole : message.sender === senderRole);
   const newMessagesCount = visibleMessages.filter((m) => m.isNew).length;
+  const receivedCount = visibleMessages.filter((message) => message.sender !== senderRole).length;
+  const sentCount = visibleMessages.filter((message) => message.sender === senderRole).length;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
@@ -395,7 +434,25 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                   {playbackError}
                 </div>
               )}
-              {visibleMessages.length === 0 ? (
+              {!journalMode && visibleMessages.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-700 bg-[#091720] p-1.5" aria-label="Mesaj filtresi">
+                  {([
+                    ['all', `Tümü (${visibleMessages.length})`],
+                    ['received', `Gelen (${receivedCount})`],
+                    ['sent', `Gönderilen (${sentCount})`],
+                  ] as const).map(([filter, label]) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setMessageFilter(filter)}
+                      className={`min-h-10 rounded-xl px-1 text-[11px] font-black ${messageFilter === filter ? 'bg-sky-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {displayedMessages.length === 0 ? (
                 <div className="bg-[#091720] border border-slate-800 rounded-2xl p-6 text-center text-slate-400 space-y-2">
                   <div className="text-4xl">📭</div>
                   <p className="font-game text-sm font-bold text-slate-300">
@@ -406,7 +463,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                   </p>
                 </div>
               ) : (
-                visibleMessages.map((msg) => {
+                    displayedMessages.map((msg) => {
                   const isPlaying = playingId === msg.id;
 
                   return (
@@ -421,7 +478,7 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                     >
                       {/* Sender Row */}
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
                           <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-lg">
                             {msg.sender === 'panda'
                               ? '🐼'
@@ -441,6 +498,9 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                             <span className="text-[10px] text-slate-400">
                               {new Date(msg.createdAt).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            <span className="text-[10px] font-bold text-sky-300">
+                              {msg.sender === senderRole ? 'Gönderdiğin kayıt' : 'Sana gelen kayıt'}
+                            </span>
                           </div>
                         </div>
                         <button
@@ -456,6 +516,13 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+
+                      {msg.kind === 'journal' && (msg.title || msg.mood) && (
+                        <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-indigo-400/30 bg-indigo-950/40 px-3 py-2">
+                          <span className="font-game text-xs font-black text-indigo-100">{msg.title || 'Bugünüm'}</span>
+                          {msg.mood && <span className="text-xs font-bold text-indigo-200">{moodOptions.find((mood) => mood.value === msg.mood)?.emoji} {moodOptions.find((mood) => mood.value === msg.mood)?.label}</span>}
+                        </div>
+                      )}
 
                       {/* Message Content & Waveform */}
                       <div className="bg-[#0a1820] border border-slate-800 rounded-xl p-2 grid grid-cols-2 gap-2">
@@ -514,9 +581,46 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                     {journalMode ? 'Bugününü Anlat' : 'Babama Ses Bırak'}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Önce konuş, sonra kaydı bitir ve gönder.
+                    Önce konuş, sonra kaydı dinle; hazırsa kaydet.
                   </p>
                 </div>
+
+                {journalMode && (
+                  <div className="space-y-3 text-left">
+                    <label className="block text-xs font-black text-slate-300" htmlFor="journal-title">Bugünün başlığı <span className="font-normal text-slate-500">(istersen)</span></label>
+                    <input
+                      id="journal-title"
+                      value={journalTitle}
+                      onChange={(event) => setJournalTitle(event.target.value)}
+                      placeholder="Örn. Parkta güzel bir gün"
+                      maxLength={45}
+                      className="min-h-11 w-full rounded-xl border border-slate-600 bg-slate-900 px-3 text-sm font-bold text-white placeholder:text-slate-500 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300/40"
+                    />
+                    <div>
+                      <p className="mb-1.5 text-xs font-black text-slate-300">Bugün kendini nasıl hissediyorsun?</p>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {moodOptions.map((mood) => (
+                          <button
+                            key={mood.value}
+                            type="button"
+                            onClick={() => setJournalMood(mood.value)}
+                            aria-label={mood.label}
+                            className={`min-h-14 rounded-xl border px-1 py-1 text-center text-[10px] font-black ${journalMood === mood.value ? 'border-amber-300 bg-amber-400/25 text-amber-100 ring-2 ring-amber-300/50' : 'border-slate-700 bg-slate-900 text-slate-300'}`}
+                          >
+                            <span className="block text-xl">{mood.emoji}</span>
+                            {mood.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {recordingError && (
+                  <div role="alert" className="rounded-xl border border-amber-300/70 bg-amber-950/70 px-3 py-2 text-left text-xs font-bold leading-relaxed text-amber-100">
+                    {recordingError}
+                  </div>
+                )}
 
                 {/* Clear 3-step recording flow */}
                 <div className="flex flex-col items-center justify-center gap-2">
@@ -554,13 +658,28 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
                 </div>
 
                 {audioUrl && !isRecording && (
-                  <button
-                    onClick={() => handleSend()}
-                    className="w-full min-h-12 px-4 rounded-xl font-game text-sm font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-2 border-emerald-300 hover:brightness-110 shadow-md flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <Send className="w-5 h-5" />
-                    <span>{journalMode ? 'Günlüğü Kaydet 📔' : 'Babaya Gönder 🚀'}</span>
-                  </button>
+                  <div className="space-y-2">
+                    <div className="rounded-xl border border-emerald-400/40 bg-emerald-950/35 p-2 text-left">
+                      <div className="mb-1 flex items-center gap-2 text-xs font-black text-emerald-100"><Headphones className="h-4 w-4" /> Kaydını önce dinle</div>
+                      <audio controls src={audioUrl} className="h-10 w-full" aria-label="Ses kaydı önizlemesi" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRedoRecording}
+                        className="min-h-12 rounded-xl border-2 border-slate-500 bg-slate-800 px-2 text-xs font-black text-slate-100 active:scale-95"
+                      >
+                        <RotateCcw className="mx-auto mb-0.5 h-4 w-4" /> Yeniden Kaydet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSend()}
+                        className="min-h-12 rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-500 to-teal-600 px-2 text-xs font-black text-white shadow-md active:scale-95"
+                      >
+                        <Send className="mx-auto mb-0.5 h-4 w-4" /> {journalMode ? 'Günlüğü Kaydet' : 'Babaya Gönder'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 

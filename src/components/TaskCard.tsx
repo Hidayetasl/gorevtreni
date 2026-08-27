@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+// Tasarım: Pastel Tren Rotası — beyaz istasyon kartları, sıcak kahve metin, krem puan alanı ve ray turuncusu eylem.
 import { RoutineTask } from '../types';
 import { playPopSound, speakText } from '../utils/audio';
 import confetti from 'canvas-confetti';
@@ -47,31 +48,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
-      onClick={isActiveTask ? handleClickDone : undefined}
-      role={isActiveTask ? 'button' : undefined}
-      tabIndex={isActiveTask ? 0 : undefined}
-      onKeyDown={(event) => {
-        if (!isActiveTask) return;
-        if (event.key === 'Enter' || event.key === ' ') handleClickDone(event as unknown as React.MouseEvent);
-      }}
-      className={`relative rounded-2xl sm:rounded-3xl p-2.5 sm:p-3 transition-all duration-200 flex flex-col justify-between border-2 sm:border-3 shadow-sm hover:shadow-md ${
+      className={`task-card-shell relative rounded-2xl sm:rounded-3xl p-2.5 sm:p-3 transition-all duration-200 flex flex-col justify-between border-2 sm:border-3 shadow-sm hover:shadow-md ${
         task.isExtra
-          ? 'ring-2 ring-purple-400/80 bg-gradient-to-b from-purple-50/60 to-white border-purple-300'
+          ? 'bg-white border-green-300'
           : task.status === 'completed'
-          ? 'bg-emerald-50/90 border-emerald-300'
+          ? 'bg-white border-green-300'
           : task.status === 'pending_approval'
-          ? 'bg-amber-50/90 border-amber-300 animate-pulse'
-          : 'bg-white border-sky-200 hover:border-sky-300'
-      } ${isActiveTask ? 'cursor-pointer ring-2 ring-amber-300/80' : ''}`}
+          ? 'bg-white border-orange-300 animate-pulse'
+          : 'bg-white border-blue-200 hover:border-blue-300'
+      } ${isActiveTask ? 'border-orange-300' : ''}`}
 	    >
-	      {task.status === 'todo' && (
-	        <div className="absolute left-2 top-2 z-10 rounded-full border border-yellow-200 bg-amber-400 px-2 py-0.5 font-game text-[9px] font-black uppercase tracking-wide text-amber-950 shadow-md">
-	          Görev Tamamla
-	        </div>
-	      )}
+	      
 
 	      {/* Task Image / Visual Header */}
-      <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full overflow-hidden mb-1.5 border-3 border-sky-500 ring-2 ring-white bg-gradient-to-b from-sky-50 to-blue-50/60 flex items-center justify-center p-0.5 shadow-lg">
+      <div className="task-card-image relative w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full overflow-hidden mb-1 border-2 border-[#F6B73C] ring-2 ring-[#FFF7D6] bg-[#FFFDF7] flex items-center justify-center p-0.5 shadow-md">
         {task.imageUrl ? (
           <img
             src={task.imageUrl}
@@ -84,14 +74,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         {/* Ek Görev Badge if parent added */}
         {task.isExtra && (
-          <div className="absolute top-1.5 left-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-game text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full shadow-md border border-purple-300 flex items-center gap-1 animate-pulse">
+          <div className="task-extra-badge absolute top-1.5 left-1.5 bg-green-600 text-white font-game text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full shadow-md border border-green-300 flex items-center gap-1 animate-pulse">
             <span>✨ EK GÖREV</span>
           </div>
         )}
 
         {/* Emoji Badge on corner if image exists */}
         {task.imageUrl && !task.isExtra && (
-          <div className="absolute bottom-0.5 left-0.5 bg-slate-950/80 text-sm sm:text-base px-1.5 py-0.5 rounded-full shadow-md border border-white/60 game-icon">
+          <div className="absolute bottom-0.5 left-0.5 bg-[#4E342E]/90 text-sm sm:text-base px-1.5 py-0.5 rounded-full shadow-md border border-white/60 game-icon">
             {task.icon}
           </div>
         )}
@@ -99,16 +89,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       </div>
 
       {/* Task Info */}
-      <div className="my-1 flex-1">
-        <h3 className="font-game text-slate-950 text-xs sm:text-sm font-black leading-snug line-clamp-2">
+      <div className="my-0.5 flex-1">
+        <h3 className="task-card-title font-game text-[#4E342E] text-sm sm:text-base font-black leading-snug line-clamp-2">
           {task.title}
         </h3>
-        <p className="text-[10px] sm:text-xs text-slate-700 font-semibold mt-0.5 line-clamp-1 leading-tight">
+        <p className="task-card-description text-xs sm:text-sm text-[#5D514D] font-semibold mt-0.5 line-clamp-2 leading-snug">
           {task.description}
         </p>
-        <div className="mt-1.5 bg-gradient-to-r from-amber-950 via-amber-900 to-yellow-950 border-2 border-amber-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-1 shadow-md">
-          <span className="text-[10px] sm:text-xs font-bold text-amber-100">Kazanılacak</span>
-          <span className="font-game text-lg sm:text-2xl font-black text-amber-300 drop-shadow-[0_2px_0_rgba(120,53,15,0.9)] whitespace-nowrap leading-none">
+        <div className="task-reward-row mt-1 bg-[#FFF8E1] border border-[#FDE68A] rounded-lg px-2 py-1 flex items-center justify-between gap-1 shadow-sm">
+          <span className="text-[11px] sm:text-xs font-bold text-[#6D4C41]">Kazanılacak</span>
+          <span className="font-game text-base sm:text-xl font-black text-[#C77600] whitespace-nowrap leading-none">
             +{task.rewardCoins} 🪙
           </span>
         </div>
@@ -118,13 +108,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       <div className="mt-1.5 pt-1 border-t border-gray-100">
 		        {task.status === 'todo' && (
               <div className="space-y-2">
-		          <button
-		            onClick={handleClickDone}
-		            disabled={isPressing}
-		            className={`w-full min-h-12 py-2 px-3 rounded-2xl font-game text-xs sm:text-sm font-black uppercase tracking-wide transition-all duration-150 shadow-xl ring-4 ring-yellow-200/80 active:translate-y-0.5 active:border-b-0 flex items-center justify-center gap-2 ${
+                  <button
+                    type="button"
+                    onClick={handleClickDone}
+                    disabled={isPressing}
+                  className={`task-card-action ${isPressing ? 'is-pressing' : ''} w-full min-h-11 py-1.5 px-2.5 rounded-xl font-game text-xs sm:text-sm font-black uppercase tracking-wide transition-all duration-150 shadow-md focus-visible:ring-4 focus-visible:ring-orange-200/80 active:translate-y-0.5 active:border-b-0 flex items-center justify-center gap-2 ${
 		              isPressing
-		                ? 'bg-yellow-300 text-amber-950 border-yellow-700 scale-95'
-		                : 'bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-500 text-amber-950 border-b-4 border-orange-800 hover:brightness-110'
+? 'bg-orange-300 text-green-950 border-orange-700 scale-95'
+			                : 'bg-gradient-to-b from-orange-400 via-orange-500 to-red-600 text-white border-b-4 border-red-800 hover:brightness-110'
 		            }`}
 		          >
                 <CheckCircle2 className="h-4 w-4" />
@@ -137,7 +128,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     event.stopPropagation();
                     onStartJournal();
                   }}
-                  className="w-full rounded-xl border border-sky-400/70 bg-sky-950/70 px-3 py-2 font-game text-[11px] font-black text-sky-100 shadow-md"
+                  className="task-card-journal w-full min-h-10 rounded-xl border border-[#E7B4A8] bg-[#C9483D] px-3 py-1.5 font-game text-xs font-black text-white shadow-sm"
                 >
                   GÜNÜMÜ ANLAT
                 </button>
@@ -147,8 +138,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         {task.status === 'pending_approval' && (
           <div className="space-y-1">
-            <div className="bg-amber-100 text-amber-800 rounded-lg px-2 py-1 text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 border border-amber-200">
-              <Clock className="w-3 h-3 animate-spin text-amber-600" />
+              <div className="bg-orange-50 text-orange-900 rounded-lg px-2 py-1 text-xs sm:text-sm font-bold flex items-center justify-center gap-1 border border-orange-300">
+              <Clock className="w-3 h-3 animate-spin text-orange-600" />
               <span>⏳ Onay Bekliyor</span>
             </div>
 
@@ -156,8 +147,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         )}
 
         {task.status === 'completed' && (
-          <div className="bg-emerald-100 text-emerald-800 rounded-lg px-2 py-1 text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 border border-emerald-300">
-            <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
+            <div className="bg-green-100 text-green-800 rounded-lg px-2 py-1 text-xs sm:text-sm font-bold flex items-center justify-center gap-1 border border-green-300">
+            <Star className="w-3 h-3 text-orange-500 fill-orange-300" />
             <span>Tamamlandı 🌟</span>
           </div>
         )}

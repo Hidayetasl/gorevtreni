@@ -1,5 +1,6 @@
-import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry, DeviceRole } from '../types';
+import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from '../types';
 import taskBrushTeethImg from '../assets/images/ruzgar-disfircalama.jpg';
+import type { CoinLedgerEntry } from '../types';
 import taskTidyToysImg from '../assets/images/ruzgar-oyuncak.jpg';
 import taskEatMealImg from '../assets/images/ruzgar-yemek.jpg';
 import taskWashHandsImg from '../assets/images/ruzgar-elyikama.jpg';
@@ -17,66 +18,21 @@ const STORAGE_KEYS = {
   VOICE_MESSAGES: 'ruzgar_voice_messages_v1',
   VIDEOS: 'ruzgar_videos_v1',
   ACTIVITY_LOG: 'ruzgar_activity_log_v1',
+  COIN_LEDGER: 'ruzgar_coin_ledger_v1',
 };
 
 const FIRST_DAY_RESET_VERSION = 'ruzgar_first_day_reset_v1';
+const DEVICE_ID_KEY = 'ruzgar_device_id_v1';
 export const START_LEVEL_VERSION = 'start-with-6-coins-v1';
 
-const DEVICE_ROLE_KEY = 'ruzgar_device_role_v1';
-const DEVICE_OWNER_KEY = 'ruzgar_device_owner_v1';
-
-// ÖNEMLİ: Bulut yazması 900ms geciktirilerek yapılır (gereksiz sık yazımı
-// önlemek için). Kullanıcı bir işlem yapıp bu süre dolmadan sayfayı
-// yenilerse (ör. satın alıp hemen yenileme yapılırsa) değişiklik HİÇ
-// buluta gitmeden sayfa kapanır; yeniden açılışta buluttaki eski veri
-// üzerine yazıp değişikliği "kaybettirir". Bu bayrak, "yerel değişiklik
-// buluta henüz ulaşmadı" bilgisini kalıcı olarak (sayfa yenilense bile)
-// saklar; App.tsx açılışta bunu okuyup, ilk bulut verisini körü körüne
-// kabul etmek yerine önce yerel veriyi buluta yazar.
-const PENDING_CLOUD_WRITE_KEY = 'ruzgar_pending_cloud_write_v1';
-export function markPendingCloudWrite() {
-  try {
-    localStorage.setItem(PENDING_CLOUD_WRITE_KEY, '1');
-  } catch {
-    // localStorage erişilemiyorsa sessizce geç.
-  }
-}
-export function clearPendingCloudWrite() {
-  try {
-    localStorage.removeItem(PENDING_CLOUD_WRITE_KEY);
-  } catch {
-    // localStorage erişilemiyorsa sessizce geç.
-  }
-}
-export function hasPendingCloudWrite(): boolean {
-  try {
-    return localStorage.getItem(PENDING_CLOUD_WRITE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Bu cihazın rolü hiçbir zaman buluta gitmez ve aileler arasında paylaşılmaz
- * — sadece "bu telefon/tablet ne işe yarıyor" bilgisini tutar. Rol seçilmemişse
- * (ilk açılış) role: null döner ve giriş ekranından sonra rol sorulur.
- */
-export function getDeviceRole(): { role: DeviceRole | null; owner?: string } {
-  const role = localStorage.getItem(DEVICE_ROLE_KEY);
-  const owner = localStorage.getItem(DEVICE_OWNER_KEY) || undefined;
-  if (role === 'player' || role === 'viewer') return { role, owner };
-  return { role: null };
-}
-
-export function saveDeviceRole(role: DeviceRole, owner?: string) {
-  localStorage.setItem(DEVICE_ROLE_KEY, role);
-  if (owner) localStorage.setItem(DEVICE_OWNER_KEY, owner);
-  else localStorage.removeItem(DEVICE_OWNER_KEY);
-}
-
-export function clearDeviceRole() {
-  localStorage.removeItem(DEVICE_ROLE_KEY);
-  localStorage.removeItem(DEVICE_OWNER_KEY);
+export function getOrCreateDeviceId() {
+  const existing = localStorage.getItem(DEVICE_ID_KEY);
+  if (existing) return existing;
+  const generated = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  localStorage.setItem(DEVICE_ID_KEY, generated);
+  return generated;
 }
 
 export const INITIAL_USER: UserProfile = {
@@ -94,8 +50,7 @@ export const INITIAL_USER: UserProfile = {
 
 export const INITIAL_PARENT: ParentConfig = {
   parentName: 'Baba / Anne',
-  // Her yeni cihazda da oyun giriş koduyla aynı ebeveyn PIN'i kullanılır.
-  pinHash: hashParentPin('1234'),
+  // İlk ebeveyn kurulumu PIN'i kullanıcıdan ister; sabit üretim PIN'i yoktur.
 };
 
 export const INITIAL_TASKS: RoutineTask[] = [
@@ -256,29 +211,29 @@ export const INITIAL_SHOP: ShopItem[] = [
 ];
 
 export const INITIAL_WORLD: PlacedWorldItem[] = [
-  // Tracks forming a nice mini world loop. Izgara artık her zaman boş kalan
-  // en üst gökyüzü satırı olmadan 6 satır olduğu için koordinatlar buna göre.
-  { id: 'w-1', itemId: 'track-straight', x: 2, y: 2, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-2', itemId: 'track-straight', x: 3, y: 2, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-3', itemId: 'track-straight', x: 4, y: 2, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-4', itemId: 'track-straight', x: 5, y: 2, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-5', itemId: 'track-curve', x: 6, y: 2, icon: '↩️', name: 'Viraj Ray' },
-  { id: 'w-6', itemId: 'track-straight', x: 6, y: 3, icon: '🛤️', name: 'Düz Ray' },
+  // Yayın varsayılanı: kasabanın altında tek, düz ve görünür hat.
+  // Kullanıcının daha önce kaydettiği dolu dünya dizisi bu fallback’i ezmez.
+  { id: 'w-1', itemId: 'track-straight', x: 0, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-2', itemId: 'track-straight', x: 1, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-3', itemId: 'track-straight', x: 2, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-4', itemId: 'track-straight', x: 3, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-5', itemId: 'track-straight', x: 4, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-6', itemId: 'track-straight', x: 5, y: 4, icon: '🛤️', name: 'Düz Ray' },
   { id: 'w-7', itemId: 'track-straight', x: 6, y: 4, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-8', itemId: 'track-curve', x: 6, y: 5, icon: '↩️', name: 'Viraj Ray' },
-  { id: 'w-9', itemId: 'track-straight', x: 5, y: 5, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-10', itemId: 'track-straight', x: 4, y: 5, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-11', itemId: 'track-straight', x: 3, y: 5, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-12', itemId: 'track-curve', x: 2, y: 5, icon: '↩️', name: 'Viraj Ray' },
-  { id: 'w-13', itemId: 'track-straight', x: 2, y: 4, icon: '🛤️', name: 'Düz Ray' },
-  { id: 'w-14', itemId: 'track-curve', x: 2, y: 3, icon: '↩️', name: 'Viraj Ray' },
+  { id: 'w-8', itemId: 'track-straight', x: 7, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-9', itemId: 'track-straight', x: 8, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-10', itemId: 'track-straight', x: 9, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-11', itemId: 'track-straight', x: 10, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-12', itemId: 'track-straight', x: 11, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-13', itemId: 'track-straight', x: 12, y: 4, icon: '🛤️', name: 'Düz Ray' },
+  { id: 'w-14', itemId: 'track-straight', x: 13, y: 4, icon: '🛤️', name: 'Düz Ray' },
 
-  // Scenery inside and around the track
-  { id: 'w-15', itemId: 'scenery-tree', x: 3, y: 3, icon: '🌳', name: 'Çam Ağacı' },
-  { id: 'w-16', itemId: 'scenery-house', x: 4, y: 3, icon: '🏠', name: 'Kırmızı Ev' },
-  { id: 'w-17', itemId: 'scenery-flower', x: 5, y: 3, icon: '🌻', name: 'Güneş Çiçeği' },
-  { id: 'w-18', itemId: 'scenery-tree', x: 7, y: 1, icon: '🌳', name: 'Çam Ağacı' },
-  { id: 'w-19', itemId: 'scenery-tree', x: 1, y: 1, icon: '🌳', name: 'Çam Ağacı' },
+  // Rayın üstünde hafif, sabit bir kasaba katmanı.
+  { id: 'w-15', itemId: 'scenery-tree', x: 2, y: 2, icon: '🌳', name: 'Çam Ağacı' },
+  { id: 'w-16', itemId: 'scenery-house', x: 6, y: 2, icon: '🏠', name: 'Kırmızı Ev' },
+  { id: 'w-17', itemId: 'scenery-flower', x: 10, y: 2, icon: '🌻', name: 'Güneş Çiçeği' },
+  { id: 'w-18', itemId: 'scenery-tree', x: 1, y: 1, icon: '🌳', name: 'Çam Ağacı' },
+  { id: 'w-19', itemId: 'scenery-tree', x: 12, y: 1, icon: '🌳', name: 'Çam Ağacı' },
 ];
 
 export const INITIAL_BONUSES: BonusCard[] = [];
@@ -318,24 +273,14 @@ export function hashParentPin(pin: string): string {
   return `v4-${(hash >>> 0).toString(36)}`;
 }
 
-// Görev fotoğrafları derleme sırasında oluşan bir yol içerir (ör.
-// /gorevtreni/assets/...). Site adresi değiştiğinde (gorev-treni ->
-// gorevtreni) localStorage'da veya buluttaki eski kayıtlarda bu yol eskide
-// kalıp resim kırık çıkabiliyor. Bu fonksiyon, kaynağı ne olursa olsun
-// (yerel veya bulut) görev listesindeki resimleri HER ZAMAN bu derlemenin
-// güncel/doğru yoluyla değiştirir.
-export const fixTaskImages = (tasks: RoutineTask[]): RoutineTask[] => {
-  return tasks.map((task) => {
-    const template = INITIAL_TASKS.find((initial) => initial.id === task.id);
-    return template?.imageUrl ? { ...task, imageUrl: template.imageUrl } : task;
-  });
-};
-
 export const getStoredTasks = (): RoutineTask[] => {
   const stored = loadFromStorage<RoutineTask[]>(STORAGE_KEYS.TASKS, INITIAL_TASKS);
   // Önceki V4 kayıtlarındaki görev durumu/puanı korunur; sadece bu sürümün
   // Rüzgar görselleri yerleşir.
-  return fixTaskImages(stored);
+  return stored.map((task) => {
+    const template = INITIAL_TASKS.find((initial) => initial.id === task.id);
+    return template?.imageUrl ? { ...task, imageUrl: template.imageUrl } : task;
+  });
 };
 export const saveStoredTasks = (tasks: RoutineTask[]) => saveToStorage(STORAGE_KEYS.TASKS, tasks);
 
@@ -355,6 +300,35 @@ export const getStoredShop = (): ShopItem[] => {
 export const saveStoredShop = (shop: ShopItem[]) => saveToStorage(STORAGE_KEYS.SHOP, shop);
 
 const WORLD_ROW_SHIFT_VERSION = 'ruzgar_world_row_shift_v1';
+const WORLD_DEFAULT_REPAIR_VERSION = 'ruzgar_world_default_repair_v2';
+
+// V4 halka varsayılanı, daha önce kaydedilmiş kullanıcı yerleşimleriyle aynı
+// w-1...w-19 kimliklerini kullanabildiği için yalnızca kimlik sayısına bakılarak
+// tanınamaz. Satır kaydırma sonrasındaki tam ray türü + koordinat imzası burada
+// özellikle sabit tutulur; farklı tek bir parça veya konum varsa kayıt kullanıcı
+// dünyası kabul edilir ve asla otomatik olarak silinmez.
+const LEGACY_RING_SIGNATURE: ReadonlyArray<Pick<PlacedWorldItem, 'id' | 'itemId' | 'x' | 'y'>> = [
+  { id: 'w-1', itemId: 'track-straight', x: 2, y: 1 },
+  { id: 'w-2', itemId: 'track-straight', x: 3, y: 1 },
+  { id: 'w-3', itemId: 'track-straight', x: 4, y: 1 },
+  { id: 'w-4', itemId: 'track-straight', x: 5, y: 1 },
+  { id: 'w-5', itemId: 'track-curve', x: 6, y: 1 },
+  { id: 'w-6', itemId: 'track-straight', x: 6, y: 2 },
+  { id: 'w-7', itemId: 'track-straight', x: 6, y: 3 },
+  { id: 'w-8', itemId: 'track-curve', x: 6, y: 4 },
+  { id: 'w-9', itemId: 'track-straight', x: 5, y: 4 },
+  { id: 'w-10', itemId: 'track-straight', x: 4, y: 4 },
+  { id: 'w-11', itemId: 'track-straight', x: 3, y: 4 },
+  { id: 'w-12', itemId: 'track-curve', x: 2, y: 4 },
+  { id: 'w-13', itemId: 'track-straight', x: 2, y: 3 },
+  { id: 'w-14', itemId: 'track-curve', x: 2, y: 2 },
+  { id: 'w-15', itemId: 'scenery-tree', x: 3, y: 2 },
+  { id: 'w-16', itemId: 'scenery-house', x: 4, y: 2 },
+  { id: 'w-17', itemId: 'scenery-flower', x: 5, y: 2 },
+  { id: 'w-18', itemId: 'scenery-tree', x: 7, y: 0 },
+  { id: 'w-19', itemId: 'scenery-tree', x: 1, y: 0 },
+];
+
 // Harita Çizimi'nde hep boş kalan en üstteki gökyüzü satırı kaldırılıp ızgara
 // 7 satırdan 6 satıra indirildi. Daha önce kaydedilmiş yerleşimlerin hepsi bu
 // yüzden bir satır yukarı kaydırılır; bu geçiş her cihazda sadece bir kez çalışır.
@@ -372,28 +346,64 @@ export const getStoredWorld = () => {
     }
     window.localStorage.setItem(WORLD_ROW_SHIFT_VERSION, 'done');
   }
-  return loadFromStorage<PlacedWorldItem[]>(STORAGE_KEYS.WORLD, INITIAL_WORLD);
+
+  const stored = loadFromStorage<PlacedWorldItem[] | null>(STORAGE_KEYS.WORLD, null);
+  if (typeof window !== 'undefined' && window.localStorage.getItem(WORLD_DEFAULT_REPAIR_VERSION) !== 'done') {
+    const looksLikeLegacyDefault = Array.isArray(stored)
+      && stored.length === LEGACY_RING_SIGNATURE.length
+      && stored.every((item, index) => {
+        const expected = LEGACY_RING_SIGNATURE[index];
+        return item.id === expected.id
+          && item.itemId === expected.itemId
+          && item.x === expected.x
+          && item.y === expected.y;
+      });
+    const shouldRestorePublishedDefault = !Array.isArray(stored) || stored.length === 0 || looksLikeLegacyDefault;
+    if (shouldRestorePublishedDefault) {
+      saveToStorage(STORAGE_KEYS.WORLD, INITIAL_WORLD);
+      window.localStorage.setItem(WORLD_DEFAULT_REPAIR_VERSION, 'done');
+      return INITIAL_WORLD;
+    }
+    window.localStorage.setItem(WORLD_DEFAULT_REPAIR_VERSION, 'done');
+  }
+
+  return Array.isArray(stored) ? stored : INITIAL_WORLD;
 };
 export const saveStoredWorld = (world: PlacedWorldItem[]) => saveToStorage(STORAGE_KEYS.WORLD, world);
 
 export const getStoredUser = (): UserProfile => {
   const stored = loadFromStorage<UserProfile>(STORAGE_KEYS.USER, INITIAL_USER);
 
-  // ÖNEMLİ: Bu bayrak da cihaz bazlıydı (aile bazlı değil) — bulut verisi
-  // yeni/temizlenmiş bir cihaza indiğinde gerçek puanı/görev sayısını
-  // sıfırlıyordu. Artık sadece bayrağı damgalıyoruz, veriye dokunmuyoruz.
+  // V4'ün ilk gerçek başlangıcı: yalnızca görev ilerlemesi ve para sıfırlanır.
+  // Mağaza, envanter, tren dünyası, PIN, mesajlar ve videolar korunur.
   if (typeof window !== 'undefined' && window.localStorage.getItem(FIRST_DAY_RESET_VERSION) !== 'done') {
+    const firstDayUser = {
+      ...INITIAL_USER,
+      name: stored.name || INITIAL_USER.name,
+      soundEnabled: stored.soundEnabled ?? INITIAL_USER.soundEnabled,
+      speechEnabled: stored.speechEnabled ?? INITIAL_USER.speechEnabled,
+      activeTrainIcon: stored.activeTrainIcon || INITIAL_USER.activeTrainIcon,
+      syllableGameLevels: stored.syllableGameLevels ?? INITIAL_USER.syllableGameLevels,
+    };
+    saveToStorage(STORAGE_KEYS.USER, firstDayUser);
+    saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));
     window.localStorage.setItem(FIRST_DAY_RESET_VERSION, 'done');
+    return firstDayUser;
   }
 
-  // ÖNEMLİ: Bu bayrak eskiden yeni cihazlarda puan/görev sayacını sıfırlıyordu.
-  // Ancak bulut verisi cihaza indirildiğinde "eski profil" sanılıp gerçek
-  // puanlar (ör. 129) sıfırlanıyordu — ciddi bir veri kaybına yol açtı.
-  // Artık sadece işareti damgalıyoruz, puan/görev/seri asla dokunulmuyor.
+  // Yeni ortak başlangıç seviyesi: görevler açılır, 6 Tren Parası verilir.
+  // Bu işaret profilin içinde taşındığı için ailede sadece bir kez uygulanır.
   if (stored.progressVersion !== START_LEVEL_VERSION) {
-    const stampedUser = { ...stored, progressVersion: START_LEVEL_VERSION };
-    saveToStorage(STORAGE_KEYS.USER, stampedUser);
-    return stampedUser;
+    const startLevelUser = {
+      ...stored,
+      coins: 6,
+      totalCompletedTasks: 0,
+      currentStreak: 0,
+      progressVersion: START_LEVEL_VERSION,
+    };
+    saveToStorage(STORAGE_KEYS.USER, startLevelUser);
+    saveToStorage(STORAGE_KEYS.TASKS, INITIAL_TASKS.map((task) => ({ ...task })));
+    return startLevelUser;
   }
 
   return stored;
@@ -416,44 +426,12 @@ export const saveStoredParent = (parent: ParentConfig) => saveToStorage(STORAGE_
 export const getStoredBonuses = () => loadFromStorage<BonusCard[]>(STORAGE_KEYS.BONUSES, INITIAL_BONUSES);
 export const saveStoredBonuses = (bonuses: BonusCard[]) => saveToStorage(STORAGE_KEYS.BONUSES, bonuses);
 
-export const INITIAL_VIDEOS: StoryVideo[] = [
-  {
-    id: 'v1',
-    title: 'NokNok Treni & Diş Fırçalama Şarkısı',
-    duration: '3:45',
-    thumbnailUrl: 'https://img.youtube.com/vi/3G1P2cMYeXw/hqdefault.jpg',
-    youtubeId: '3G1P2cMYeXw',
-    description: 'Neşeli tren ile sabah ve akşam diş fırçalama alışkanlığı şarkısı!',
-    category: 'Diş Fırçalama',
-  },
-  {
-    id: 'v2',
-    title: 'Kırmızı Buharlı Lokomotifin Masalı',
-    duration: '5:20',
-    thumbnailUrl: 'https://img.youtube.com/vi/W3q8Od5qJio/hqdefault.jpg',
-    youtubeId: 'W3q8Od5qJio',
-    description: 'Bütün görevlerini bitirip istasyona ulaşan küçük trenin hikayesi.',
-    category: 'Uyku Masalı',
-  },
-  {
-    id: 'v3',
-    title: 'Oyuncak Toplama Dansı Treni',
-    duration: '4:10',
-    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
-    youtubeId: 'dQw4w9WgXcQ',
-    description: 'Odadaki oyuncakları vagona doldurma oyunu ve şarkısı!',
-    category: 'Düzen & Temizlik',
-  },
-  {
-    id: 'v4',
-    title: 'Renkler ve Sayılar Tren Yolculuğu',
-    duration: '6:15',
-    thumbnailUrl: 'https://img.youtube.com/vi/L_LUpnjgPso/hqdefault.jpg',
-    youtubeId: 'L_LUpnjgPso',
-    description: 'Vagonlardaki meyvelerle 1\'den 10\'a kadar sayma macerası!',
-    category: 'Eğitici Oyun',
-  },
-];
+export const getStoredCoinLedger = (): CoinLedgerEntry[] => loadFromStorage<CoinLedgerEntry[]>(STORAGE_KEYS.COIN_LEDGER, []);
+export const saveStoredCoinLedger = (ledger: CoinLedgerEntry[]) => saveToStorage(STORAGE_KEYS.COIN_LEDGER, ledger);
+
+// Güvenlik gereği yeni kurulumda örnek/denetlenmemiş video çocuk ekranına gelmez.
+// Ebeveyn videoyu ekler, kontrol eder ve ayrıca "Çocukta göster" onayı verir.
+export const INITIAL_VIDEOS: StoryVideo[] = [];
 
 export function extractYoutubeId(urlOrId: string): string {
   if (!urlOrId) return '';
@@ -477,7 +455,22 @@ export const getStoredVoiceMessages = () => {
 };
 export const saveStoredVoiceMessages = (msgs: VoiceMessage[]) => saveToStorage(STORAGE_KEYS.VOICE_MESSAGES, msgs);
 
-export const getStoredVideos = () => loadFromStorage<StoryVideo[]>(STORAGE_KEYS.VIDEOS, INITIAL_VIDEOS);
+const LEGACY_DEMO_VIDEO_IDS = new Set(['v1', 'v2', 'v3', 'v4']);
+
+export const getStoredVideos = () => {
+  const stored = loadFromStorage<StoryVideo[]>(STORAGE_KEYS.VIDEOS, INITIAL_VIDEOS);
+  const migrated = stored
+    .filter((video) => !LEGACY_DEMO_VIDEO_IDS.has(video.id))
+    .map((video) => ({
+      ...video,
+      // Eski kayıtlarda moderasyon alanı yoksa çocuk ekranında görünmesin.
+      moderationStatus: video.moderationStatus || 'pending',
+      embeddable: video.embeddable ?? false,
+      thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`,
+    }));
+  if (JSON.stringify(migrated) !== JSON.stringify(stored)) saveToStorage(STORAGE_KEYS.VIDEOS, migrated);
+  return migrated;
+};
 export const saveStoredVideos = (videos: StoryVideo[]) => saveToStorage(STORAGE_KEYS.VIDEOS, videos);
 
 export const INITIAL_ACTIVITY_LOG: ActivityLogEntry[] = [];

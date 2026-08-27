@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+// Tasarım: Pastel Tren Rotası — kokpit görevleri beyaz/uyarıcı sarı yüzeylerle, başarılar canlı yeşille görünür.
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
-import { playTrainWhistle, playPopSound, speakText, startTrainEngineLoop, stopTrainEngineLoop } from '../utils/audio';
-import { Plus, Trash2, Sparkles, Volume2, FastForward, RotateCcw, MapPin, Eye, Compass, Layers, Move, MousePointer2, Maximize2, Minimize2, X, Map as MapIcon } from 'lucide-react';
+import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext } from '../utils/audio';
+import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -20,10 +21,6 @@ import altinVagonuImg from '../assets/images/altin-vagonu.webp';
 import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
-import kontrolDurKalkImg from '../assets/images/kontrol-dur-kalk.webp';
-import kontrolKornaImg from '../assets/images/kontrol-korna.webp';
-import kontrolIsikImg from '../assets/images/kontrol-isik.webp';
-import kontrolTrenSesiImg from '../assets/images/kontrol-tren-sesi.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
 
 interface TrainWorldViewProps {
@@ -35,108 +32,131 @@ interface TrainWorldViewProps {
   onSetActiveTrain?: (icon: string) => void;
   soundEnabled: boolean;
   speechEnabled: boolean;
+  onToggleSound?: () => void;
 }
 
 type ViewMode = 'ride' | 'builder';
 type EnvironmentTheme = 'farm' | 'mountains' | 'sunset' | 'night';
+
+type TrainLinePosition = { left: number; top: number; direction: 1 | -1 };
+type CockpitMissionId = 'start' | 'horn' | 'light' | 'movement' | 'stop';
+type CockpitProgress = { dayKey: string; score: number; completed: CockpitMissionId[] };
+
+const COCKPIT_PROGRESS_KEY = 'ruzgar_cockpit_missions_v1';
+const COCKPIT_MISSIONS: Array<{ id: CockpitMissionId; icon: string; title: string; points: number }> = [
+  { id: 'start', icon: '▶️', title: 'Treni başlat', points: 5 },
+  { id: 'horn', icon: '📣', title: 'Korna çal', points: 5 },
+  { id: 'light', icon: '💡', title: 'Farı yak', points: 5 },
+  { id: 'movement', icon: '🔊', title: 'Hareket sesini aç', points: 5 },
+  { id: 'stop', icon: '⏸️', title: 'Treni durdur', points: 5 },
+];
+
+function getLocalDayKey() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function loadCockpitProgress(): CockpitProgress {
+  const fresh: CockpitProgress = { dayKey: getLocalDayKey(), score: 0, completed: [] };
+  try {
+    const stored = JSON.parse(localStorage.getItem(COCKPIT_PROGRESS_KEY) || 'null') as Partial<CockpitProgress> | null;
+    if (!stored || stored.dayKey !== fresh.dayKey) return fresh;
+    const completed = Array.isArray(stored.completed)
+      ? stored.completed.filter((id): id is CockpitMissionId => COCKPIT_MISSIONS.some((mission) => mission.id === id))
+      : [];
+    return { dayKey: fresh.dayKey, score: completed.length * 5, completed };
+  } catch {
+    return fresh;
+  }
+}
+
+// Tren, sahnenin alt rayında eski oyundaki gibi tek hat üzerinde gidip gelir.
+// Progress 0..1 aralığında ping-pong olarak okunur; uçlarda sıçrama olmadan
+// yön değiştirir ve katar yalnızca yatay eksende kalır.
+function getStraightTrainPosition(progress: number): TrainLinePosition {
+  const normalized = ((progress % 1) + 1) % 1;
+  const travel = normalized < 0.5 ? normalized * 2 : 2 - normalized * 2;
+  return {
+    left: 12 + travel * 76,
+    top: 78,
+    direction: normalized < 0.5 ? 1 : -1,
+  };
+}
 
 // Harita Çizimi'ndeki 8x7'lik yerleşim ızgarasıyla aynı boyut; ana sahnedeki
 // dekor pozisyonu artık bu ızgar üzerinden (item.x / item.y) hesaplanıyor —
 // böylece çocuğun yerleştirdiği kare ile ana dünyada göründüğü yer birebir eşleşir.
 const GRID_COLS = 14; // Kasaba artık yana kaydırmalı: alan kazanmak için sütun sayısı 8'den 14'e çıkarıldı.
 const GRID_ROWS = 6; // Üstteki hep boş kalan gökyüzü satırı kaldırıldı, kalan satırlara daha çok dikey alan kaldı.
-// Hem Harita Çizimi hem Dünya sahnesi, görünür kutunun bu kadar genişinde bir
-// iç içerik barındırır; taşan kısım yana kaydırılarak görülür.
+// V4 yayın sürümündeki geniş manzara oranı korunur. Mobilde görünür kutu
+// kaydırılabilir kalır; böylece eski ray, köprü ve kasaba perspektifi kaybolmaz.
 const WORLD_WIDE_PERCENT = Math.round((GRID_COLS / 8) * 100);
 
 // Her eşya türünün ana sahnede kaç büyük çizileceği (konum artık sabit değil,
 // sadece görsel boyut sabit kalıyor).
-// (bkz. SCENE_IMG_SIZE'daki mobil boyut notu — aynı sığdırma mantığı burada
-// da geçerli: gerçek görseli olmayan eşyalar için emoji yedeği.)
 const SCENE_ITEM_SIZE: Record<string, string> = {
-  'scenery-tree': 'text-xl sm:text-6xl',
-  'scenery-flower': 'text-lg sm:text-5xl',
-  'scenery-cow': 'text-xl sm:text-6xl',
-  'scenery-house': 'text-base sm:text-4xl',
-  'scenery-traffic-light': 'text-base sm:text-4xl',
-  'scenery-park': 'text-lg sm:text-5xl',
-  'scenery-windmill': 'text-lg sm:text-5xl',
-  'scenery-market': 'text-base sm:text-4xl',
-  'scenery-school': 'text-base sm:text-4xl',
-  'scenery-hospital': 'text-base sm:text-4xl',
-  'scenery-train-repair': 'text-lg sm:text-5xl',
-  'scenery-ferris': 'text-2xl sm:text-7xl',
-  'scenery-bakery': 'text-lg sm:text-5xl',
-  'scenery-fountain': 'text-lg sm:text-5xl',
-  'scenery-house-2': 'text-base sm:text-4xl',
-  'scenery-house-3': 'text-base sm:text-4xl',
-  'scenery-house-4': 'text-base sm:text-4xl',
-  'scenery-house-5': 'text-base sm:text-4xl',
-  'scenery-house-6': 'text-base sm:text-4xl',
-  'scenery-cinema': 'text-base sm:text-4xl',
-  'scenery-airplane': 'text-lg sm:text-5xl',
-  'scenery-ambulance': 'text-lg sm:text-5xl',
-  'scenery-firestation': 'text-lg sm:text-5xl',
-  'scenery-firestation-building': 'text-base sm:text-4xl',
-  'scenery-squirrel-courier': 'text-base sm:text-4xl',
+  'scenery-tree': 'text-4xl sm:text-6xl',
+  'scenery-flower': 'text-3xl sm:text-5xl',
+  'scenery-cow': 'text-4xl sm:text-6xl',
+  'scenery-house': 'text-2xl sm:text-4xl',
+  'scenery-traffic-light': 'text-2xl sm:text-4xl',
+  'scenery-park': 'text-3xl sm:text-5xl',
+  'scenery-windmill': 'text-3xl sm:text-5xl',
+  'scenery-market': 'text-2xl sm:text-4xl',
+  'scenery-school': 'text-2xl sm:text-4xl',
+  'scenery-hospital': 'text-2xl sm:text-4xl',
+  'scenery-train-repair': 'text-3xl sm:text-5xl',
+  'scenery-ferris': 'text-5xl sm:text-7xl',
+  'scenery-bakery': 'text-3xl sm:text-5xl',
+  'scenery-fountain': 'text-3xl sm:text-5xl',
+  'scenery-house-2': 'text-2xl sm:text-4xl',
+  'scenery-house-3': 'text-2xl sm:text-4xl',
+  'scenery-house-4': 'text-2xl sm:text-4xl',
+  'scenery-house-5': 'text-2xl sm:text-4xl',
+  'scenery-house-6': 'text-2xl sm:text-4xl',
+  'scenery-cinema': 'text-2xl sm:text-4xl',
+  'scenery-airplane': 'text-3xl sm:text-5xl',
+  'scenery-ambulance': 'text-3xl sm:text-5xl',
+  'scenery-firestation': 'text-3xl sm:text-5xl',
+  'scenery-firestation-building': 'text-2xl sm:text-4xl',
+  'scenery-squirrel-courier': 'text-2xl sm:text-4xl',
 };
 
 // Gerçek görseli olan eşyaların (SCENERY_IMAGES) ana sahnedeki piksel boyutu.
 // Binalar biraz daha büyük ve net görünsün; araçlar (ambulans/itfaiye) ise
 // binaların yaklaşık yarısı büyüklüğünde kalsın ki manzarayı kaplamasınlar.
-//
-// ÖNEMLİ (mobil üst üste binme düzeltmesi): Sahne 14 sütunluk bir ızgaraya
-// göre konumlanıyor (WORLD_WIDE_PERCENT ile %175 genişlikte, yana kaydırmalı).
-// Masaüstünde kutu genişliği max-w-5xl (1024px) olduğu için sütun başına
-// ~135px düşüyor — sm: boyutları (64-144px) rahatça sığıyor. Ama telefonda
-// kutu genişliği ~350-390px'e düşünce sütun başına sadece ~45-50px kalıyor;
-// eski taban (sm: öncesi) boyutlar (64-96px) bundan büyük olduğu için
-// komşu eşyalar görsel olarak üst üste biniyordu. Taban boyutlar artık
-// mobil sütun genişliğine sığacak şekilde küçültüldü; sm: (≥640px, geniş
-// ekran) boyutları hiç değişmedi.
 const SCENE_IMG_SIZE: Record<string, string> = {
-  'scenery-ambulance': 'w-8 h-8 sm:w-20 sm:h-20',
-  'scenery-firestation': 'w-8 h-8 sm:w-20 sm:h-20',
-  'scenery-squirrel-courier': 'w-7 h-7 sm:w-16 sm:h-16',
+  'scenery-ambulance': 'w-12 h-12 sm:w-20 sm:h-20',
+  'scenery-firestation': 'w-12 h-12 sm:w-20 sm:h-20',
+  'scenery-squirrel-courier': 'w-10 h-10 sm:w-16 sm:h-16',
   // Lunapark dönme dolabı + sinema birleşik yapısı, diğer binalardan belirgin
   // şekilde daha yüksek bir görsel olduğu için kendi kutusunda daha uzun.
-  'scenery-ferris': 'w-9 h-14 sm:w-24 sm:h-36',
-  // Ev modelleri, diğer binalara göre hafifçe daha büyük görünsün.
-  'scenery-house': 'w-11 h-11 sm:w-28 sm:h-28',
-  'scenery-house-2': 'w-11 h-11 sm:w-28 sm:h-28',
-  'scenery-house-3': 'w-11 h-11 sm:w-28 sm:h-28',
-  'scenery-house-4': 'w-11 h-11 sm:w-28 sm:h-28',
-  'scenery-house-5': 'w-11 h-11 sm:w-28 sm:h-28',
-  'scenery-house-6': 'w-11 h-11 sm:w-28 sm:h-28',
-  // Sadece 3 ana kurumsal bina (okul, hastane, itfaiye istasyonu) belirgin
-  // büyük kalsın.
-  'scenery-school': 'w-12 h-12 sm:w-32 sm:h-32',
-  'scenery-hospital': 'w-12 h-12 sm:w-32 sm:h-32',
-  'scenery-firestation-building': 'w-12 h-12 sm:w-32 sm:h-32',
-  // Diğer tüm binalar (park, tamirhane, değirmen, market, fırın, sinema) ev
-  // boyutundan da %20 küçük — evlerin gölgesinde kalıp ana binaları öne çıkarsın.
-  'scenery-park': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
-  'scenery-train-repair': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
-  'scenery-windmill': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
-  'scenery-market': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
-  'scenery-bakery': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
-  'scenery-cinema': 'w-9 h-9 sm:w-[90px] sm:h-[90px]',
-  // Fıskiye ve uçak bina değil, daha küçük dekor öğeleri — ev boyutunda kalsın.
-  'scenery-fountain': 'w-11 h-11 sm:w-28 sm:h-28',
-  'scenery-airplane': 'w-11 h-11 sm:w-28 sm:h-28',
+  'scenery-ferris': 'w-16 h-24 sm:w-24 sm:h-36',
+  // Ev modelleri ve okul, diğer binalara göre hafifçe daha büyük görünsün.
+  'scenery-house': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-2': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-3': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
+  'scenery-school': 'w-20 h-20 sm:w-28 sm:h-28',
 };
-const DEFAULT_SCENE_IMG_SIZE = 'w-10 h-10 sm:w-24 sm:h-24';
+const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
 
 // Izgara hücresini (0..7, 0..6) ana sahnenin güvenli görüntü alanına (bulut ve
 // ray şeridi hariç) eşleyen yardımcı fonksiyon.
 function gridCellToScenePercent(x: number, y: number) {
-  // Öğe artık bu noktaya MERKEZLENEREK çizilir (bkz. -translate-x-1/2/-translate-y-1/2),
-  // bu yüzden kenar sütun/satırlarda görsel taşmaması için pay büyütüldü. Satırlar
-  // arası boşluk, 7 satırın küçültülmüş görsellerle bile üst üste binmemesi için
-  // olabildiğince açıldı.
+  // Öğeleri güvenli iç çerçevede merkezliyoruz; böylece kenar hücrelerde
+  // görseller kesilmez ve mobilde rastgele üst üste binme azalır.
   const left = 8 + (x / Math.max(GRID_COLS - 1, 1)) * 84; // %8 .. %92
   const top = 8 + (y / Math.max(GRID_ROWS - 1, 1)) * 76; // %8 .. %84
   return { left: `${left}%`, top: `${top}%` };
+}
+
+function getSceneDepthScale(y: number) {
+  // Üst satırlar daha uzakta, alt satırlar oyuncuya daha yakındır.
+  const depth = y / Math.max(GRID_ROWS - 1, 1);
+  return Number((0.78 + depth * 0.32).toFixed(2));
 }
 
 export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
@@ -148,77 +168,49 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   onSetActiveTrain,
   soundEnabled,
   speechEnabled,
+  onToggleSound,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('ride');
   const [envTheme, setEnvTheme] = useState<EnvironmentTheme>('farm');
-
-  // Tam ekran: kanvası (aşağıdaki canvasBoxRef) tam ekran yapıyoruz. Tam
-  // ekrandayken kanvasın altındaki kalıcı kontrol panelleri (kanvasın
-  // KARDEŞİ oldukları için) artık görünmez olur — bu yüzden tam ekranda
-  // ekrana dokununca açılıp kapanan, sol taraftan gelen kompakt bir kontrol
-  // menüsü gösteriyoruz.
-  //
-  // ÖNEMLİ: Bu tam ekran durumu CSS tabanlıdır (position:fixed, tüm ekranı
-  // kaplar) — native Element.requestFullscreen() API'sine BAĞIMLI DEĞİLDİR.
-  // Sebep: ailenin kullandığı iPhone'larda (mobil Safari) bu API arbitrary
-  // elemanlar için güvenilir çalışmıyor/desteklenmiyor; sadece bu API'ye
-  // güvenseydik "tam ekran" düğmesi telefonda sessizce hiçbir şey yapmazdı.
-  // CSS tabanlı yaklaşım her tarayıcıda çalışır; destekleyen tarayıcılarda
-  // (ör. masaüstü) native API'yi de EK OLARAK deneriz (OS seviyeli gerçek
-  // tam ekran + tarayıcı arayüzünü gizleme için), başarısız olursa sessizce
-  // yok sayılır.
-  const canvasBoxRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showFsControls, setShowFsControls] = useState(false);
-
-  useEffect(() => {
-    // Kullanıcı native tam ekrandan Esc tuşu / OS geri tuşu ile çıkarsa
-    // bizim CSS tabanlı durumumuzu da senkronize et.
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        setIsFullscreen(false);
-        setShowFsControls(false);
-      }
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  useEffect(() => {
-    // Tam ekrandayken arka sayfanın kaymasını engelle.
-    if (isFullscreen) {
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = previousOverflow; };
-    }
-  }, [isFullscreen]);
-
-  const handleToggleFullscreen = () => {
-    if (isFullscreen) {
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-      setIsFullscreen(false);
-      setShowFsControls(false);
-    } else {
-      setIsFullscreen(true);
-      setShowFsControls(true);
-      canvasBoxRef.current?.requestFullscreen?.().catch(() => {});
-    }
-  };
-
-  // Interactive train states for ride mode (straight railway track line)
+  
+  // V4 kokpit davranışı: düz hat üzerinde gerçek x-position + ping-pong yön.
   const [trainXPos, setTrainXPos] = useState(10);
   const [isTrainRunning, setIsTrainRunning] = useState(true);
-  // Lokomotifin ön farı — kapalı/açık; açıkken önünde sarı bir ışık halesi görünür.
-  const [lightsOn, setLightsOn] = useState(false);
-  // Motor (çuf-çuf) sesi için ayrı bir aç/kapat — genel ses ayarından bağımsız
-  // olarak sadece bu sesi susturabilmek için. Oyun her açıldığında otomatik
-  // çalmasın diye varsayılan kapalı; çocuk isterse kumanda panelinden açar.
-  const [engineSoundOn, setEngineSoundOn] = useState(false);
   const [trainSpeed, setTrainSpeed] = useState<'normal' | 'fast' | 'slow'>('normal');
   const [trainDirection, setTrainDirection] = useState<'right' | 'left'>('right');
   const [isWhistling, setIsWhistling] = useState(false);
-  const [smokePuffs, setSmokePuffs] = useState<{ id: number; x: number }[]>([]);
+  const [hornEnabled, setHornEnabled] = useState(true);
+  // Sessiz başlangıç: tren görsel olarak hareket eder, far ve ray sesi çocuk açana kadar kapalıdır.
+  const [trainLightEnabled, setTrainLightEnabled] = useState(false);
+  const [movementSoundEnabled, setMovementSoundEnabled] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [smokePuffs, setSmokePuffs] = useState<{ id: number; x: number; y: number }[]>([]);
   const [attachedWagons, setAttachedWagons] = useState<string[]>(['passenger', 'passenger_green', 'cargo_coins']);
+  const [cockpitProgress, setCockpitProgress] = useState<CockpitProgress>(loadCockpitProgress);
+
+  useEffect(() => {
+    localStorage.setItem(COCKPIT_PROGRESS_KEY, JSON.stringify(cockpitProgress));
+  }, [cockpitProgress]);
+
+  const completeCockpitMission = (missionId: CockpitMissionId) => {
+    const today = getLocalDayKey();
+    const current = cockpitProgress.dayKey === today
+      ? cockpitProgress
+      : { dayKey: today, score: 0, completed: [] as CockpitMissionId[] };
+    if (current.completed.includes(missionId)) {
+      if (cockpitProgress.dayKey !== today) setCockpitProgress(current);
+      return;
+    }
+    const mission = COCKPIT_MISSIONS.find((item) => item.id === missionId);
+    if (!mission) return;
+    setCockpitProgress({
+      dayKey: today,
+      score: current.score + mission.points,
+      completed: [...current.completed, missionId],
+    });
+    setInteractiveMessage(`Mini görev tamamlandı: ${mission.title} +${mission.points} puan! ⭐`);
+    playPopSound(soundEnabled);
+  };
 
   // Katar görsellerini (lokomotif + vagonlar) animasyon başlamadan ÖNCE tarayıcı
   // belleğine tam yükleyip decode ediyoruz. Bu sayede <img> elemanları ilk kareden
@@ -252,12 +244,10 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   }, []);
 
   const rideCanvasRef = useRef<HTMLDivElement | null>(null);
+  const fullScreenStageRef = useRef<HTMLDivElement | null>(null);
   const trainAssemblyRef = useRef<HTMLDivElement | null>(null);
-  // Katarın gerçek genişliğini kanvasa oranla ölçüyoruz; döngü sınırlarını
-  // tahmine dayalı sabit yüzdeler yerine bu ölçüme göre kuruyoruz ki katar
-  // ekrandan TAMAMEN çıkmadan diğer taraftan "sıçramasın".
+  // Katarın gerçek genişliği ölçülerek sağ uçta ekrandan taşması önlenir.
   const [assemblyWidthPercent, setAssemblyWidthPercent] = useState(45);
-
   useEffect(() => {
     const canvasEl = rideCanvasRef.current;
     const assemblyEl = trainAssemblyRef.current;
@@ -277,7 +267,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     observer.observe(assemblyEl);
     return () => observer.disconnect();
   }, [viewMode, attachedWagons, user.activeTrainIcon, trainImagesReady]);
-  const [interactiveMessage, setInteractiveMessage] = useState<string>('Panda Kaptan Rayların Üzerinde Düz Hatta İlerliyor! 🚂💨');
+  const [interactiveMessage, setInteractiveMessage] = useState<string>('Panda Kaptan tek ray hattında gidip geliyor! 🚂💨');
 
   // Check unlocked structures from inventory
   const hasPlacedBridge = worldItems.some((item) => item.itemId === 'track-bridge');
@@ -304,28 +294,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     ? Math.min(85, Math.max(4, 4 + (placedTunnel.x / Math.max(GRID_COLS - 1, 1)) * 90))
     : 88;
 
-  // Ray parçası satın almanın dünyada görünür bir karşılığı olsun diye, sahip
-  // olunan düz/viraj parçaları kasabanın arka kısmında ikinci (yedek) bir
-  // tren hattı olarak çiziliyor — bu olmadan ray satın almak görünmez kalıyordu.
+  // Sahip olunan düz/viraj ray parçalarının sayısı koleksiyon etiketinde
+  // gösterilir; çalışan tren her zaman ana düz hatta gidip gelir.
   const secondRailPieceCount = worldItems.filter(
     (item) => item.itemId === 'track-straight' || item.itemId === 'track-curve',
   ).length;
-  const secondRailWidthPercent = Math.min(78, Math.max(0, secondRailPieceCount * 6));
-
-  // Yedek Hat'ın gerçek uçları (world-yüzdesi koordinat sisteminde, ana rayla
-  // AYNI sistemde). Tren artık bu tam noktalar arasında ilerliyor, rayın
-  // dışına taşmıyor; ön hattın yüksekliği (frontRailTopPercent) ile virajlarla
-  // görsel olarak birleşiyor.
-  const secondRailStartLeft = 13;
-  const secondRailEndLeft = secondRailStartLeft + secondRailWidthPercent;
-  // top değerleri: ağaç tepeleri ~%12, bina çatıları ~%61 seviyesinde.
-  // Önceki deneme (14/22) ağaç tepelerinin bile üstüne, gökyüzüne taşıp dev
-  // bir gökkuşağı/halka gibi görünüyordu. 34/46 ise bina çatılarıyla
-  // çakışıyordu. Bu değer ikisinin ortasında: binaların arkasında ama
-  // ağaçların altında kalıyor, kavis çok daha ölçülü.
-  const secondRailStartTop = 36;
-  const secondRailEndTop = 44;
-  const frontRailTopPercent = 85;
+  // Ana ray üzerindeki V4 ping-pong hareketi; satın alınan parça sayısından bağımsızdır.
   const trainTransform = trainDirection === 'left' ? 'scaleX(-1)' : 'none';
 
   // Mağazadan "Dünyana Ekle" ile bırakılan her dekor ana manzarada da görünür.
@@ -351,81 +325,144 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [isBuildMode, setIsBuildMode] = useState(false);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<ShopItem | null>(null);
   const [draggedInventoryItem, setDraggedInventoryItem] = useState<ShopItem | null>(null);
+  const [placementRotation, setPlacementRotation] = useState(0);
+  const [previewCell, setPreviewCell] = useState<{ x: number; y: number } | null>(null);
+  const [placementHistory, setPlacementHistory] = useState<PlacedWorldItem[][]>([]);
   const [trainPositionIndex, setTrainPositionIndex] = useState(0);
 
-  // Continuous loop for Straight Line Railway Track Motion
+  const rememberPlacement = () => {
+    setPlacementHistory((history) => [...history.slice(-7), worldItems]);
+  };
+
+  const handleUndoPlacement = () => {
+    const snapshot = placementHistory[placementHistory.length - 1];
+    if (!snapshot) return;
+    worldItems.forEach((item) => onRemoveItem(item.id));
+    snapshot.forEach(({ id: _id, ...item }) => onPlaceItem(item));
+    setPlacementHistory((history) => history.slice(0, -1));
+    setSelectedInventoryItem(null);
+    setPreviewCell(null);
+    setInteractiveMessage('Son yerleşim geri alındı! İstersen yeniden deneyebilirsin. ↶');
+    playPopSound(soundEnabled);
+  };
+
+  // V4-style classic straight-line out-and-back motion.
   useEffect(() => {
-    if (!isTrainRunning || viewMode !== 'ride') return;
+    if (!isTrainRunning || viewMode !== 'ride' || !trainImagesReady) return;
 
-    if (!trainImagesReady) return;
-
-    const speedStep = trainSpeed === 'fast' ? 0.65 : trainSpeed === 'slow' ? 0.25 : 0.45;
-    const maxBound = 100 + 5;
-    const minBound = -(assemblyWidthPercent + 5);
-    // NOT: setState updater'ları React StrictMode'da (geliştirmede) birden
-    // fazla kez çağrılabilir; bu yüzden burada SADECE saf pozisyon hesabı
-    // yapılıyor, yön değişimi gibi yan etkiler ayrı bir effect'te (aşağıda)
-    // ref korumasıyla TEK SEFER tetikleniyor.
+    const step = trainSpeed === 'fast' ? 0.45 : trainSpeed === 'slow' ? 0.18 : 0.3;
+    let movementTick = 0;
     const interval = setInterval(() => {
       setTrainXPos((prev) => {
-        if (trainDirection === 'right') {
-          return prev >= maxBound ? maxBound : prev + speedStep;
+        const next = trainDirection === 'right' ? prev + step : prev - step;
+        // V4 yayın sürümündeki uçlar: katar sağda hafifçe dışarı taşmadan,
+        // solda ise son vagon görünür kalacak şekilde ping-pong yapar.
+        const rightLimit = 100 + 5;
+        const leftLimit = -(assemblyWidthPercent + 5);
+
+        if (next >= rightLimit) {
+          setTrainDirection('left');
+          return rightLimit;
         }
-        return prev <= minBound ? minBound : prev - speedStep;
+        if (next <= leftLimit) {
+          setTrainDirection('right');
+          return leftLimit;
+        }
+        return next;
       });
+
+      if (soundEnabled && movementSoundEnabled && movementTick++ % 9 === 0) {
+        playTrainMovementTick(true);
+      }
     }, 30);
 
     return () => clearInterval(interval);
-  }, [isTrainRunning, trainSpeed, trainDirection, viewMode, assemblyWidthPercent, trainImagesReady]);
+  }, [isTrainRunning, trainSpeed, trainDirection, viewMode, trainImagesReady, assemblyWidthPercent, movementSoundEnabled, soundEnabled]);
 
-  // Tren çalışırken sürekli "çuf-çuf" motor sesi — durunca, sekme değişince
-  // veya ses kapatılınca otomatik susturuluyor.
+  const toggleFullScreen = async () => {
+    const stage = fullScreenStageRef.current;
+    if (!stage) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (stage.requestFullscreen) {
+        await stage.requestFullscreen();
+      }
+    } catch {
+      setInteractiveMessage('Tam ekran bu tarayıcıda kullanılamıyor; normal görünüm devam ediyor.');
+    }
+  };
+
   useEffect(() => {
-    if (isTrainRunning && viewMode === 'ride' && engineSoundOn) {
-      startTrainEngineLoop(soundEnabled, trainSpeed);
-    } else {
-      stopTrainEngineLoop();
-    }
-    return () => stopTrainEngineLoop();
-  }, [isTrainRunning, viewMode, soundEnabled, trainSpeed, engineSoundOn]);
+    const syncFullScreenState = () => setIsFullScreen(document.fullscreenElement === fullScreenStageRef.current);
+    document.addEventListener('fullscreenchange', syncFullScreenState);
+    return () => document.removeEventListener('fullscreenchange', syncFullScreenState);
+  }, []);
 
-  // Tren ana rayın ucuna varınca yönünü tersine çevirir (sağdan sola, sonra
-  // soldan sağa) — Yedek Hat sadece görsel/dekoratif kalır, tren ona hiç
-  // uğramaz. Bir ref ile korunuyor ki StrictMode'un çift-çağrısı yönü iki kez
-  // değiştirip birbirini götürmesin.
-  const boundHandledRef = useRef(false);
-  useEffect(() => {
-    if (viewMode !== 'ride') return;
-    const maxBound = 100 + 5;
-    const minBound = -(assemblyWidthPercent + 5);
-    const isAtBound =
-      (trainDirection === 'right' && trainXPos >= maxBound) ||
-      (trainDirection === 'left' && trainXPos <= minBound);
-
-    if (isAtBound && !boundHandledRef.current) {
-      boundHandledRef.current = true;
-      setTrainDirection((dir) => (dir === 'right' ? 'left' : 'right'));
-    }
-
-    if (!isAtBound) {
-      boundHandledRef.current = false;
-    }
-  }, [trainXPos, trainDirection, assemblyWidthPercent, viewMode]);
-
-  // Whistle horn action
+  // Korna/düdük eylemi: kokpit düğmesi doğrudan ses üretir; kapalıysa açık bir durum mesajı verir.
   const handleWhistleBlow = () => {
+    unlockAudioContext();
+    if (!soundEnabled) {
+      setInteractiveMessage('Ses kapalı. Önce kokpitteki Ses düğmesine dokun! 🔈');
+      return;
+    }
+    if (!hornEnabled) {
+      setInteractiveMessage('Korna kapalı. Korna düğmesine basınca tekrar çalabilir!');
+      return;
+    }
     playTrainWhistle(soundEnabled);
+    completeCockpitMission('horn');
     speakText('Çuf Çuf! Tren kalkıyor!', speechEnabled);
     setIsWhistling(true);
     setInteractiveMessage('ÇUF ÇUF! Panda Kaptan Düdük Çaldı! 🚂💨');
 
     // Add animated smoke puff bubbles at locomotive chimney position
-    const newPuff = { id: Date.now(), x: trainXPos + (trainDirection === 'right' ? 8 : -8) };
+    const newPuff = { id: Date.now(), x: trainXPos, y: 0 };
     setSmokePuffs((prev) => [...prev.slice(-4), newPuff]);
 
     setTimeout(() => {
       setIsWhistling(false);
     }, 1500);
+  };
+
+  const handleThrottleClick = () => {
+    unlockAudioContext();
+    if (!isTrainRunning) {
+      setIsTrainRunning(true);
+      setTrainSpeed('normal');
+      completeCockpitMission('start');
+      return;
+    }
+    if (trainSpeed === 'normal') {
+      setTrainSpeed('fast');
+    } else if (trainSpeed === 'fast') {
+      setTrainSpeed('slow');
+    } else {
+      setIsTrainRunning(false);
+      completeCockpitMission('stop');
+    }
+  };
+
+  const handleTrainRunToggle = () => {
+    unlockAudioContext();
+    const nextRunning = !isTrainRunning;
+    setIsTrainRunning(nextRunning);
+    completeCockpitMission(nextRunning ? 'start' : 'stop');
+  };
+
+  const handleTrainLightToggle = () => {
+    unlockAudioContext();
+    const nextEnabled = !trainLightEnabled;
+    setTrainLightEnabled(nextEnabled);
+    if (nextEnabled) completeCockpitMission('light');
+  };
+
+  const handleMovementSoundToggle = () => {
+    unlockAudioContext();
+    const nextEnabled = !movementSoundEnabled;
+    if (import.meta.env.DEV) console.log('[Rüzgar ses] Hareket sesi düğmesi', { enabled: nextEnabled });
+    setMovementSoundEnabled(nextEnabled);
+    if (nextEnabled) completeCockpitMission('movement');
   };
 
   // Filter track items for builder mode
@@ -469,6 +506,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     playPopSound(soundEnabled);
 
     if (isBuildMode && selectedInventoryItem) {
+      rememberPlacement();
       const existing = worldItems.find((i) => i.x === x && i.y === y);
       if (existing) {
         onRemoveItem(existing.id);
@@ -479,6 +517,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
         y,
         icon: selectedInventoryItem.icon,
         name: selectedInventoryItem.name,
+        rotation: placementRotation,
       });
       setInteractiveMessage(`${selectedInventoryItem.name} haritaya yerleştirildi! ✨`);
       return;
@@ -538,30 +577,32 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       return;
     }
 
-    // Auto-place on world grid if not placed yet
+    // Auto-place on the actual 14×6 world grid if not placed yet.
     const alreadyPlaced = worldItems.some((w) => w.itemId === item.id);
     if (!alreadyPlaced) {
-      let slotX = 2;
-      let slotY = 2;
-      for (let r = 0; r < 7; r++) {
-        let found = false;
-        for (let c = 0; c < 8; c++) {
+      rememberPlacement();
+      let emptySlot: { x: number; y: number } | undefined;
+      for (let r = 0; r < GRID_ROWS && !emptySlot; r += 1) {
+        for (let c = 0; c < GRID_COLS; c += 1) {
           if (!worldItems.some((w) => w.x === c && w.y === r)) {
-            slotX = c;
-            slotY = r;
-            found = true;
+            emptySlot = { x: c, y: r };
             break;
           }
         }
-        if (found) break;
+      }
+      if (!emptySlot) {
+        setInteractiveMessage('Haritan dolu! Önce bir parçayı kaldırıp yeni yer açmalısın.');
+        setSelectedInventoryItem(item);
+        return;
       }
 
       onPlaceItem({
+        x: emptySlot.x,
+        y: emptySlot.y,
         itemId: item.id,
-        x: slotX,
-        y: slotY,
         icon: item.icon,
         name: item.name,
+        rotation: placementRotation,
       });
 
       setInteractiveMessage(`Harikalar Diyarı! ${item.name} dünyana eklendi! ✨`);
@@ -624,6 +665,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const placeInventoryOnMap = (item: ShopItem, x: number, y: number) => {
+    rememberPlacement();
     const existingAtCell = worldItems.find((placed) => placed.x === x && placed.y === y);
     const existingSameItem = worldItems.find((placed) => placed.itemId === item.id);
 
@@ -640,6 +682,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       y,
       icon: item.icon,
       name: item.name,
+      rotation: placementRotation,
     });
 
     if (item.type === 'train' && onSetActiveTrain) {
@@ -680,7 +723,59 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       placeInventoryOnMap(selectedInventoryItem, x, y);
       return;
     }
+    const placed = placedByCell.get(`${x}:${y}`);
+    if (isBuildMode && placed) {
+      const sourceItem = builderItems.find((item) => item.id === placed.itemId);
+      if (sourceItem) {
+        setSelectedInventoryItem(sourceItem);
+        setPlacementRotation(placed.rotation || 0);
+        setInteractiveMessage(`${placed.name} seçildi. Yeni hücreye dokunarak taşıyabilirsin.`);
+        return;
+      }
+    }
     handleTileClick(x, y);
+  };
+
+  const handleRotatePlacedItem = (placed: PlacedWorldItem) => {
+    rememberPlacement();
+    const { id: _id, ...item } = placed;
+    onRemoveItem(placed.id);
+    onPlaceItem({ ...item, rotation: ((placed.rotation || 0) + 90) % 360 });
+    setPlacementRotation(((placed.rotation || 0) + 90) % 360);
+    setInteractiveMessage(`${placed.name} döndürüldü! ↻`);
+    playPopSound(soundEnabled);
+  };
+
+  const handleRotateSelection = () => {
+    if (!selectedInventoryItem) {
+      setInteractiveMessage('Önce bir parça seç, sonra döndürme düğmesine dokun.');
+      return;
+    }
+    setPlacementRotation((rotation) => (rotation + 90) % 360);
+    setInteractiveMessage(`${selectedInventoryItem.name} ${((placementRotation + 90) % 360)}° döndürülmeye hazır.`);
+    playPopSound(soundEnabled);
+  };
+
+  const handleAutoPlaceSelected = () => {
+    if (!selectedInventoryItem) {
+      setInteractiveMessage('Önce envanterden bir parça seç.');
+      return;
+    }
+    const emptySlot = Array.from({ length: GRID_ROWS }).flatMap((_, row) =>
+      Array.from({ length: GRID_COLS }).map((__, column) => ({ x: column, y: row }))
+    ).find(({ x, y }) => !worldItems.some((placed) => placed.x === x && placed.y === y));
+    if (!emptySlot) {
+      setInteractiveMessage('Haritan dolu! Önce bir parçayı kaldırıp yer aç.');
+      return;
+    }
+    placeInventoryOnMap(selectedInventoryItem, emptySlot.x, emptySlot.y);
+    setInteractiveMessage(`${selectedInventoryItem.name} ilk boş hücreye yerleştirildi! ✨`);
+  };
+
+  const clearMapSelection = () => {
+    setSelectedInventoryItem(null);
+    setPreviewCell(null);
+    setInteractiveMessage('Parça seçimi temizlendi. Haritayı keşfetmeye devam edebilirsin.');
   };
 
   const renderSincapStation = (compact = false) => (
@@ -695,40 +790,40 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   );
 
   return (
-    <div className="space-y-2.5 pb-20">
+    <div className="world-view space-y-2.5 pb-20">
       {/* Top Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+      <div className="world-view-header flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
         <div>
           <div className="text-[11px] font-black text-sky-400 uppercase tracking-widest flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+            <Sparkles className="w-3.5 h-3.5 text-orange-300" />
             <span>BENİM CANLI TRENİM</span>
           </div>
-          <h2 className="font-game text-2xl sm:text-3xl font-black text-white">
+          <h2 className="font-game text-2xl sm:text-3xl font-black text-slate-900">
             Tren Dünyası
           </h2>
-          <p className="text-xs text-slate-300 font-medium mt-0.5">
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
             Çizgi film kalitesinde tren sür ve kendi dünyanı tasarla!
           </p>
         </div>
 
         {/* View Mode Toggle Switcher */}
-        <div className="flex items-center gap-1.5 bg-[#0a1822] p-1 rounded-2xl border border-slate-700 shadow-inner">
+        <div className="world-view-mode-switcher flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
           <button
             onClick={() => setViewMode('ride')}
-            className={`px-3.5 py-2 rounded-xl font-game font-black text-xs sm:text-sm flex items-center gap-1.5 transition-all ${
+            className={`world-mode-button px-3.5 py-2 rounded-xl font-game font-black text-xs sm:text-sm flex items-center gap-1.5 transition-all ${
               viewMode === 'ride'
-                ? 'bg-[#2263df] text-white shadow-md border border-blue-400'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#2b6f91] text-white shadow-md border border-sky-200/70'
+                : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
             }`}
           >
             <span>🚂 Sürüş Modu</span>
           </button>
           <button
             onClick={() => setViewMode('builder')}
-            className={`px-3.5 py-2 rounded-xl font-game font-black text-xs sm:text-sm flex items-center gap-1.5 transition-all ${
+            className={`world-mode-button px-3.5 py-2 rounded-xl font-game font-black text-xs sm:text-sm flex items-center gap-1.5 transition-all ${
               viewMode === 'builder'
-                ? 'bg-[#2263df] text-white shadow-md border border-blue-400'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#2b6f91] text-white shadow-md border border-sky-200/70'
+                : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
             }`}
           >
             <span>🗺️ Harita Çizimi</span>
@@ -737,23 +832,23 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       </div>
 
       {/* Interactive Status & Quick Whistle Bar */}
-      <div className="bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 rounded-3xl p-2.5 sm:p-3 text-white shadow-xl border-b-4 border-blue-800 flex items-center justify-between gap-3">
+      <div className="world-status-bar flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-900 shadow-sm sm:p-3">
         <div className="flex items-center gap-3">
           <button
             onClick={handleWhistleBlow}
-            className={`w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-amber-950 font-game text-2xl flex items-center justify-center border-b-4 border-amber-600 shadow-lg active:scale-90 transition-transform ${
-              isWhistling ? 'animate-bounce ring-4 ring-yellow-300' : ''
+            className={`cockpit-status-whistle flex h-11 w-11 items-center justify-center rounded-xl border border-orange-200/60 bg-[#24485a] text-xl text-orange-100 shadow-md transition-transform active:scale-90 ${
+              isWhistling ? 'animate-bounce ring-4 ring-orange-300' : ''
             }`}
             title="Düdük Çal! Çuf Çuf!"
           >
             📢
           </button>
           <div>
-            <div className="text-[11px] font-bold text-sky-200 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
+            <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-orange-300 animate-spin" />
               <span>Canlı Tren Durumu</span>
             </div>
-            <h3 className="font-game text-xs sm:text-sm font-black text-white drop-shadow-sm">
+            <h3 className="font-game text-xs sm:text-sm font-black text-slate-800">
               {interactiveMessage}
             </h3>
           </div>
@@ -761,7 +856,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
         <button
           onClick={handleWhistleBlow}
-          className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-game font-black text-xs sm:text-sm px-4 py-2 rounded-2xl shadow-md border-b-2 border-red-700 flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+          className="world-status-action flex items-center gap-1.5 rounded-xl border border-sky-200/60 bg-[#2b6f91] px-3 py-2 font-game text-xs font-black text-white shadow-md transition-transform active:scale-95 sm:px-4 sm:text-sm"
         >
           <span>DÜDÜK ÇAL 📢</span>
         </button>
@@ -771,135 +866,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* MODE 1: HIGH-QUALITY CARTOON RIDE GAME CANVAS (MATCHING USER PHOTO)   */}
       {/* ===================================================================== */}
       {viewMode === 'ride' && (
-        <div className="space-y-4">
+        <div ref={fullScreenStageRef} className={`world-ride-layout space-y-4 ${isFullScreen ? 'is-fullscreen' : ''}`}>
           {/* Main Graphic Canvas Box */}
-          <div
-            ref={canvasBoxRef}
-            onClick={() => { if (isFullscreen) setShowFsControls((prev) => !prev); }}
-            className={`overflow-hidden border-slate-700 shadow-2xl group select-none ${
-              isFullscreen
-                ? 'fixed inset-0 z-[100] w-screen h-screen border-0 rounded-none bg-black'
-                : 'relative w-full aspect-[16/9] min-h-[300px] sm:min-h-[420px] rounded-3xl border-4'
-            }`}
-          >
-            {/* Tam Ekran Aç/Kapat Düğmesi — her zaman görünür, sağ üstte. */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleToggleFullscreen(); }}
-              className="absolute top-3 right-3 z-50 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950/70 text-white border border-white/20 shadow-lg backdrop-blur-sm active:scale-90 transition-transform"
-              title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran Yap'}
-            >
-              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-            </button>
-
-            {/* Tam ekranda: ekrana dokununca açılıp kapanan, sol taraftan gelen
-                kompakt kontrol menüsü. Normal görünümde kanvasın altındaki kalıcı
-                paneller zaten var, bu menüye gerek yok. */}
-            {isFullscreen && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`absolute inset-y-0 left-0 z-50 w-48 sm:w-56 bg-slate-950/90 backdrop-blur-md border-r border-white/10 shadow-2xl p-3 flex flex-col gap-2.5 overflow-y-auto transition-transform duration-200 ${
-                  showFsControls ? 'translate-x-0' : '-translate-x-full'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-black text-sky-300 uppercase tracking-wider">Kontroller</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowFsControls(false)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white active:scale-90"
-                    title="Menüyü Kapat"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsTrainRunning(!isTrainRunning)}
-                    className={`flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] ring-2 text-white text-[10px] font-bold active:scale-90 ${
-                      isTrainRunning ? 'ring-emerald-400/80' : 'ring-rose-400/80'
-                    }`}
-                  >
-                    <img src={kontrolDurKalkImg} alt="Dur / Kalk" className="w-7 h-7 object-contain" draggable={false} />
-                    {isTrainRunning ? 'Durdur' : 'Başlat'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleWhistleBlow}
-                    className="flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] text-white text-[10px] font-bold active:scale-90"
-                  >
-                    <img src={kontrolKornaImg} alt="Korna" className="w-7 h-7 object-contain" draggable={false} />
-                    Korna
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLightsOn(!lightsOn)}
-                    className={`flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] text-white text-[10px] font-bold active:scale-90 ${
-                      lightsOn ? 'ring-2 ring-yellow-300/90' : ''
-                    }`}
-                  >
-                    <img src={kontrolIsikImg} alt="Işık" className={`w-7 h-7 object-contain transition-opacity ${lightsOn ? 'opacity-100' : 'opacity-45'}`} draggable={false} />
-                    Işık
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEngineSoundOn(!engineSoundOn)}
-                    className={`flex flex-col items-center justify-center gap-0.5 rounded-xl p-2 bg-[#102544] text-white text-[10px] font-bold active:scale-90 ${
-                      engineSoundOn ? 'ring-2 ring-orange-300/90' : ''
-                    }`}
-                  >
-                    <img src={kontrolTrenSesiImg} alt="Tren Sesi" className={`w-7 h-7 object-contain transition-opacity ${engineSoundOn ? 'opacity-100' : 'opacity-45'}`} draggable={false} />
-                    Motor
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setTrainSpeed('slow')}
-                    className={`flex-1 px-1.5 py-1.5 rounded-xl text-[10px] font-bold ${trainSpeed === 'slow' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
-                  >
-                    🐢
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTrainSpeed('normal')}
-                    className={`flex-1 px-1.5 py-1.5 rounded-xl text-[10px] font-bold ${trainSpeed === 'normal' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
-                  >
-                    🚂
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTrainSpeed('fast')}
-                    className={`flex-1 px-1.5 py-1.5 rounded-xl text-[10px] font-bold ${trainSpeed === 'fast' ? 'bg-amber-500 text-amber-950' : 'text-slate-400'}`}
-                  >
-                    🚀
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setTrainDirection(trainDirection === 'right' ? 'left' : 'right')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl bg-[#0e2531] border border-slate-700 text-white text-[11px] font-bold"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
-                  Yön Değiştir
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { document.exitFullscreen?.().catch(() => {}); setViewMode('builder'); }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-600/90 text-white text-[11px] font-bold active:scale-95"
-                >
-                  <MapIcon className="w-3.5 h-3.5" />
-                  Harita Çizimi'ne Git
-                </button>
-
-                <p className="mt-auto text-[9px] text-slate-400 leading-snug">Ekrana dokunarak bu menüyü açıp kapatabilirsin.</p>
-              </div>
-            )}
+          <div className="world-ride-canvas-shell relative w-full aspect-[16/9] min-h-[300px] overflow-hidden rounded-3xl border-4 border-slate-700 shadow-2xl group select-none sm:min-h-[420px]">
             {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
@@ -934,75 +903,6 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <div className="absolute top-8 left-1/4 text-yellow-200 text-xs">✨</div>
                 <div className="absolute top-12 left-2/3 text-yellow-200 text-sm">✨</div>
               </div>
-            )}
-
-            {/* Kasabanın arka kısmında ikinci (yedek) tren hattı — sahip olunan
-                düz/viraj ray parçalarının dünyada görünür karşılığı. Ana hatla
-                AYNI yüzde-koordinat sisteminde, tam iki nokta arasında çiziliyor
-                ki tren hiçbir zaman rayın dışına taşmasın; uçlarda ana hatla
-                birleşen görünür virajlar da var. */}
-            {secondRailPieceCount > 0 && (
-              <svg
-                className="absolute inset-0 w-full h-full z-[6] pointer-events-none opacity-80"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                title={`Yedek Hat: ${secondRailPieceCount} ray parçası`}
-              >
-                {/* Sol viraj: Yedek Hat'ın başlangıcını ana hattın yüksekliğine bağlar */}
-                <path
-                  d={`M ${secondRailStartLeft - 7} ${frontRailTopPercent} Q ${secondRailStartLeft - 7} ${secondRailStartTop}, ${secondRailStartLeft} ${secondRailStartTop}`}
-                  fill="none"
-                  stroke="#451a03"
-                  strokeWidth="1.4"
-                  strokeDasharray="1.2 1.4"
-                />
-                <path
-                  d={`M ${secondRailStartLeft - 7} ${frontRailTopPercent} Q ${secondRailStartLeft - 7} ${secondRailStartTop}, ${secondRailStartLeft} ${secondRailStartTop}`}
-                  fill="none"
-                  stroke="#94a3b8"
-                  strokeWidth="0.4"
-                />
-
-                {/* Sağ viraj: Yedek Hat'ın bitişini ana hattın yüksekliğine bağlar */}
-                <path
-                  d={`M ${secondRailEndLeft} ${secondRailEndTop} Q ${secondRailEndLeft + 7} ${secondRailEndTop}, ${secondRailEndLeft + 7} ${frontRailTopPercent}`}
-                  fill="none"
-                  stroke="#451a03"
-                  strokeWidth="1.4"
-                  strokeDasharray="1.2 1.4"
-                />
-                <path
-                  d={`M ${secondRailEndLeft} ${secondRailEndTop} Q ${secondRailEndLeft + 7} ${secondRailEndTop}, ${secondRailEndLeft + 7} ${frontRailTopPercent}`}
-                  fill="none"
-                  stroke="#94a3b8"
-                  strokeWidth="0.4"
-                />
-
-                {/* Yedek Hat'ın kendisi: iki nokta arasında düz çizgi (traversler + raylar) */}
-                <line
-                  x1={secondRailStartLeft} y1={secondRailStartTop}
-                  x2={secondRailEndLeft} y2={secondRailEndTop}
-                  stroke="#451a03" strokeWidth="1.4" strokeDasharray="1.2 1.4"
-                />
-                <line
-                  x1={secondRailStartLeft} y1={secondRailStartTop - 0.55}
-                  x2={secondRailEndLeft} y2={secondRailEndTop - 0.55}
-                  stroke="#e2e8f0" strokeWidth="0.4"
-                />
-                <line
-                  x1={secondRailStartLeft} y1={secondRailStartTop + 0.55}
-                  x2={secondRailEndLeft} y2={secondRailEndTop + 0.55}
-                  stroke="#e2e8f0" strokeWidth="0.4"
-                />
-              </svg>
-            )}
-            {secondRailPieceCount > 0 && (
-              <span
-                className="absolute z-[6] rounded-full bg-amber-950/80 text-amber-100 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 shadow whitespace-nowrap pointer-events-none"
-                style={{ left: `${secondRailStartLeft}%`, top: `${secondRailStartTop - 4}%` }}
-              >
-                Yedek Hat 🛤️ {secondRailPieceCount} parça
-              </span>
             )}
 
             {/* Clickable Interactive Scenery Hotspots */}
@@ -1067,24 +967,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               ☁️
             </div>
 
-            {/* Güneş: gündüz temalarında (gece hariç) gökyüzünde her zaman net
-                görünsün diye ayrı, hafif parlayan bir öğe olarak eklendi. */}
-            {envTheme !== 'night' && (
-              <div className="absolute top-3 right-4 sm:top-4 sm:right-6 z-10 text-3xl sm:text-5xl opacity-90 animate-pulse pointer-events-none drop-shadow-[0_0_12px_rgba(253,224,71,0.6)]">
-                ☀️
-              </div>
-            )}
-
-            {/* Ördek ve rüzgar gülü konumları önceki denemede yanlış çıktı
-                (gökyüzünde/alakasız yerde göründüler) — doğru asset ve doğru
-                nehir/tepe konumunu canlıda ölçüp sonra ekleyeceğiz. */}
-
             {/* Floating Smoke Puff Bubbles generated from whistle */}
             {smokePuffs.map((puff) => (
               <div
                 key={puff.id}
                 className="absolute bottom-[48%] z-30 text-2xl sm:text-4xl animate-float-smoke pointer-events-none"
-                style={{ left: `${puff.x}%` }}
+                  style={{ left: `${puff.x}%`, top: `${puff.y}%`, transform: 'translate(-50%, -50%)' }}
               >
                 💨
               </div>
@@ -1097,8 +985,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   key={item.id}
                   type="button"
                   onClick={() => handleTileClick(item.x, item.y)}
-                  className="group/item absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-300"
-                  style={{ left: anchor.left, top: anchor.top, zIndex: 20 + item.y }}
+                  className="group/item absolute flex flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  style={{ left: anchor.left, top: anchor.top, zIndex: 20 + item.y, transform: `translate(-50%, -50%) scale(${getSceneDepthScale(item.y)})` }}
                   title={`${item.name} — dokun ve keşfet`}
                 >
                   {SCENERY_IMAGES[item.itemId] ? (
@@ -1113,33 +1001,26 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               );
             })}
 
-            {/* 4. STRAIGHT HORIZONTAL RAILWAY TRACK OVERLAY */}
-            <div className="absolute bottom-[13%] left-0 w-full h-10 sm:h-14 z-10 pointer-events-none">
-              <svg className="w-full h-full" viewBox="0 0 1000 40" preserveAspectRatio="none">
+            {/* 4. CLASSIC STRAIGHT TWO-WAY RAIL */}
+            <div className="straight-track absolute bottom-[13%] left-0 z-10 h-10 w-full pointer-events-none sm:h-14">
+              <svg className="h-full w-full" viewBox="0 0 1000 64" preserveAspectRatio="none" role="img" aria-label="Tek düz tren hattı, gidiş ve dönüş">
                 <defs>
-                  <linearGradient id="railSteelGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="straightRailSteelGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f8fafc" />
-                    <stop offset="40%" stopColor="#cbd5e1" />
-                    <stop offset="70%" stopColor="#64748b" />
+                    <stop offset="45%" stopColor="#cbd5e1" />
+                    <stop offset="75%" stopColor="#64748b" />
                     <stop offset="100%" stopColor="#334155" />
                   </linearGradient>
                 </defs>
-
-                {/* Gravel Ballast Track Bed Foundation */}
-                <rect x="0" y="8" width="1000" height="26" fill="#1e293b" opacity="0.85" />
-                <rect x="0" y="11" width="1000" height="20" fill="#78350f" opacity="0.45" />
-
-                {/* Wooden Ties / Railway Sleepers */}
-                <line x1="0" y1="21" x2="1000" y2="21" stroke="#451a03" strokeWidth="16" strokeDasharray="6 10" />
-
-                {/* Top Steel Rail (Where train wheels sit!) */}
-                <rect x="0" y="13" width="1000" height="3" fill="url(#railSteelGradient)" />
-                <line x1="0" y1="13.5" x2="1000" y2="13.5" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
-
-                {/* Bottom Steel Rail */}
-                <rect x="0" y="27" width="1000" height="3" fill="url(#railSteelGradient)" />
-                <line x1="0" y1="27.5" x2="1000" y2="27.5" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
+                <rect x="0" y="8" width="1000" height="44" rx="5" fill="#17212b" opacity="0.82" />
+                <rect x="0" y="13" width="1000" height="34" rx="4" fill="#6b4428" opacity="0.52" />
+                <line x1="0" y1="30" x2="1000" y2="30" stroke="#451a03" strokeWidth="17" strokeDasharray="9 13" />
+                <line x1="0" y1="20" x2="1000" y2="20" stroke="url(#straightRailSteelGradient)" strokeWidth="3" />
+                <line x1="0" y1="40" x2="1000" y2="40" stroke="url(#straightRailSteelGradient)" strokeWidth="3" />
+                <line x1="0" y1="19" x2="1000" y2="19" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
+                <line x1="0" y1="39" x2="1000" y2="39" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
               </svg>
+              <div className="absolute left-[7%] top-0 rounded-full border border-sky-200/50 bg-slate-950/75 px-2 py-1 text-[8px] font-black text-sky-100 shadow-lg sm:text-[10px]">↔ TEK HAT · GİDİŞ / DÖNÜŞ{secondRailPieceCount > 0 ? ` · ${secondRailPieceCount} parça` : ''}</div>
             </div>
 
             {/* Red Steel Bridge Overlay when unlocked or placed */}
@@ -1243,7 +1124,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             </div>
 
-            {/* 6. DYNAMIC HORIZONTAL TRAIN ASSEMBLY MOVING ON THE STRAIGHT TRACK */}
+            {/* 6. DYNAMIC TRAIN ASSEMBLY ON THE CLASSIC STRAIGHT TRACK */}
             <div
               ref={trainAssemblyRef}
               className="absolute z-30 flex items-end flex-row-reverse pointer-events-auto cursor-pointer"
@@ -1269,14 +1150,10 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                     className="w-full h-auto object-contain"
                     draggable={false}
                   />
-                  {/* Ön far — açıkken lokomotifin burnunda sarı bir ışık halesi belirir */}
-                  {lightsOn && (
-                    <div
-                      className="absolute right-0 bottom-[28%] w-8 h-8 sm:w-12 sm:h-12 rounded-full pointer-events-none animate-pulse"
-                      style={{
-                        background: 'radial-gradient(circle, rgba(253,224,71,0.95) 0%, rgba(253,224,71,0.45) 40%, rgba(253,224,71,0) 75%)',
-                        transform: 'translate(45%, 0)',
-                      }}
+                  {trainLightEnabled && (
+                    <span
+                      className="train-headlight train-headlight--front"
+                      aria-label="Tren farı açık"
                     />
                   )}
                 </div>
@@ -1372,117 +1249,167 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             {/* Overlay Round Whistle Action Button on Bottom Right (Matching Screenshot Style) */}
             <div className="absolute bottom-4 right-4 z-40">
               <button
+                type="button"
                 onClick={handleWhistleBlow}
-                className="w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-gradient-to-tr from-red-500 via-orange-500 to-yellow-400 text-white flex items-center justify-center shadow-2xl border-4 border-white active:scale-90 transition-transform ring-4 ring-orange-500/50"
+                onPointerDown={unlockAudioContext}
+                className="cockpit-floating-horn w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-[#C9483D] hover:bg-[#B94137] text-white flex items-center justify-center shadow-2xl border-4 border-white active:scale-90 transition-transform ring-4 ring-[#E7B4A8]"
                 title="Düdük Çal!"
+                aria-label="Düdük çal"
               >
                 <span className="text-2xl sm:text-4xl">📢</span>
               </button>
             </div>
           </div>
 
-          {/* Ana Kumanda Paneli — çocuklar için büyük ikonlu, yuvarlatılmış
-              koyu lacivert panel. Dur/Kalk tek düğmede birleşik (ikili kol
-              görseli), Korna/Işık/Motor Sesi ayrı aç-kapat düğmeleri. */}
-          <div className="rounded-2xl sm:rounded-3xl bg-[#0a1830] border-2 border-[#1c3a5e] p-2 sm:p-3 shadow-xl">
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5">
+          {/* Controls & Customizer Toolbar */}
+          <div className="world-control-sidebar grid grid-cols-1 gap-3 md:grid-cols-2">
+            <section className="cockpit-mission-panel rounded-[1.6rem] border border-[#F3D878] bg-[#FFF9D7] p-3 text-[#4E342E] shadow-lg md:col-span-2" aria-labelledby="cockpit-missions-title">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p id="cockpit-missions-title" className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9A5B00]">Bugünün Kokpit Görevleri</p>
+                  <p className="mt-0.5 text-xs font-bold text-[#5D514D]">Kontrollere dokun, yıldızlarını topla!</p>
+                </div>
+                <div className="shrink-0 rounded-full border border-[#F6B73C] bg-white/85 px-2.5 py-1 text-xs font-black text-[#8A5700]">
+                  {cockpitProgress.score} / 25 puan ⭐
+                </div>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/90 border border-[#F3E5AB]" role="progressbar" aria-label="Günlük kokpit puanı" aria-valuemin={0} aria-valuemax={25} aria-valuenow={cockpitProgress.score}>
+                <div className="h-full rounded-full bg-gradient-to-r from-[#F6B73C] via-[#FF8A65] to-[#4CAF50] transition-[width] duration-200" style={{ width: `${Math.min(100, (cockpitProgress.score / 25) * 100)}%` }} />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+                {COCKPIT_MISSIONS.map((mission) => {
+                  const completed = cockpitProgress.completed.includes(mission.id);
+                  return (
+                    <div key={mission.id} className={`flex min-w-0 items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-bold ${completed ? 'border-[#A5D6A7] bg-[#E8F5E9] text-[#2E7D32]' : 'border-[#F3E5AB] bg-white/85 text-[#5D514D]'}`}>
+                      <span aria-hidden="true" className="shrink-0 text-sm">{completed ? '✅' : mission.icon}</span>
+                      <span className="truncate">{mission.title}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+            <div className="world-utility-controls grid grid-cols-4 gap-2 rounded-[2rem] border-4 border-slate-800/80 bg-[#0a1b26] p-2 text-white md:col-span-2">
               <button
                 type="button"
-                onClick={() => setIsTrainRunning(!isTrainRunning)}
-                className={`flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 transition-all active:scale-90 bg-[#102544] ring-2 ${
-                  isTrainRunning ? 'ring-emerald-400/80' : 'ring-rose-400/80'
+                onClick={handleThrottleClick}
+                onPointerDown={unlockAudioContext}
+                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${
+                  isTrainRunning ? 'border-emerald-500/70 bg-emerald-950/35' : 'border-slate-700 bg-slate-900/55'
                 }`}
-                title={isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}
+                title="Hız kolu: dur, yavaş, normal ve hızlı"
+                aria-label="Treni durdur veya hızını değiştir"
               >
-                <img src={kontrolDurKalkImg} alt="Dur / Kalk" className="w-7 h-7 sm:w-11 sm:h-11 object-contain" draggable={false} />
+                <span className="text-3xl leading-none drop-shadow-md sm:text-4xl">🕹️</span>
+                <span className="cockpit-control-label text-[10px] font-black text-sky-100">Hız / Dur</span>
               </button>
-
               <button
                 type="button"
                 onClick={handleWhistleBlow}
-                className="flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 bg-[#102544] transition-all active:scale-90"
-                title="Korna Çal"
+                onPointerDown={unlockAudioContext}
+                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${hornEnabled ? 'border-amber-300/90 bg-amber-950/45' : 'border-slate-700 bg-slate-900/55'}`}
+                title={hornEnabled ? 'Korna çal — ses açık' : 'Korna kapalı'}
+                aria-label={hornEnabled ? 'Korna çal — ses açık' : 'Korna kapalı'}
+                aria-pressed={hornEnabled}
               >
-                <img src={kontrolKornaImg} alt="Korna" className="w-7 h-7 sm:w-11 sm:h-11 object-contain" draggable={false} />
+                <span className="flex h-10 w-10 items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-xl shadow-lg sm:h-12 sm:w-12 sm:text-2xl">🎺</span>
+                <span className="cockpit-control-label text-[10px] font-black text-amber-100">Korna</span>
               </button>
-
               <button
                 type="button"
-                onClick={() => setLightsOn(!lightsOn)}
-                className={`flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 transition-all active:scale-90 bg-[#102544] ${
-                  lightsOn ? 'ring-2 ring-yellow-300/90' : ''
+                onClick={handleTrainLightToggle}
+                onPointerDown={unlockAudioContext}
+                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${
+                  trainLightEnabled ? 'border-sky-400/70 bg-sky-950/35' : 'border-slate-700 bg-slate-900/55'
                 }`}
-                title={lightsOn ? 'Işıkları Kapat' : 'Işıkları Aç'}
+                title="Işıkları aç veya kapat"
+                aria-label={trainLightEnabled ? 'Farı kapat' : 'Farı aç'}
+                aria-pressed={trainLightEnabled}
               >
-                <img
-                  src={kontrolIsikImg}
-                  alt="Işık"
-                  className={`w-7 h-7 sm:w-11 sm:h-11 object-contain transition-opacity ${lightsOn ? 'opacity-100' : 'opacity-45'}`}
-                  draggable={false}
-                />
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg sm:h-10 sm:w-10 sm:text-xl ${trainLightEnabled ? 'bg-sky-500' : 'bg-slate-700'}`}>💡</span>
+                <span className="cockpit-control-label text-[10px] font-black text-sky-100">Far</span>
+                <span className={`h-1.5 w-6 rounded-full ${trainLightEnabled ? 'bg-sky-300' : 'bg-slate-600'}`} />
               </button>
-
               <button
                 type="button"
-                onClick={() => setEngineSoundOn(!engineSoundOn)}
-                className={`flex items-center justify-center rounded-xl sm:rounded-2xl p-1 sm:p-1.5 transition-all active:scale-90 bg-[#102544] ${
-                  engineSoundOn ? 'ring-2 ring-orange-300/90' : ''
+                onClick={handleMovementSoundToggle}
+                onPointerDown={unlockAudioContext}
+                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${
+                  movementSoundEnabled ? 'border-orange-400/70 bg-orange-950/35' : 'border-slate-700 bg-slate-900/55'
                 }`}
-                title={engineSoundOn ? 'Tren Sesini Kapat' : 'Tren Sesini Aç'}
+                title="Hareket sesini aç veya kapat"
+                aria-label={movementSoundEnabled ? 'Hareket sesini kapat' : 'Hareket sesini aç'}
+                aria-pressed={movementSoundEnabled}
               >
-                <img
-                  src={kontrolTrenSesiImg}
-                  alt="Tren Sesi"
-                  className={`w-7 h-7 sm:w-11 sm:h-11 object-contain transition-opacity ${engineSoundOn ? 'opacity-100' : 'opacity-45'}`}
-                  draggable={false}
-                />
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg sm:h-10 sm:w-10 sm:text-xl ${movementSoundEnabled ? 'bg-orange-500' : 'bg-slate-700'}`}>🔊</span>
+                <span className="cockpit-control-label text-[10px] font-black text-orange-100">Hareket sesi</span>
+                <span className={`h-1.5 w-6 rounded-full ${movementSoundEnabled ? 'bg-orange-300' : 'bg-slate-600'}`} />
               </button>
+              <div className="cockpit-utility-footer col-span-4 flex items-center justify-between gap-1 border-t border-sky-200/15 pt-1">
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-sky-200">Tren Kokpiti</span>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={toggleFullScreen} className="cockpit-utility-button rounded-lg border border-sky-300/30 bg-[#183b4b] px-2 py-1 text-[11px] font-black text-sky-50 active:scale-95" aria-pressed={isFullScreen} aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}>
+                    {isFullScreen ? '⤢ Çık' : '⛶ Tam Ekran'}
+                  </button>
+                  {onToggleSound && (
+                    <button type="button" onPointerDown={unlockAudioContext} onClick={onToggleSound} className="cockpit-utility-button rounded-lg border border-sky-300/30 bg-[#183b4b] px-2 py-1 text-[11px] font-black text-sky-50 active:scale-95" aria-label={soundEnabled ? 'Ana sesi kapat' : 'Ana sesi aç'}>
+                      {soundEnabled ? '🔈 Ses' : '🔇 Sessiz'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Controls & Customizer Toolbar */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Speed & Direction Controls */}
             <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white space-y-2">
               <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
                 <FastForward className="w-4 h-4 text-sky-300" />
-                <span>Hız & Yön</span>
+                <span>Tren Sürüş Kontrolleri</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">
+                <button
+                  onClick={handleTrainRunToggle}
+                  onPointerDown={unlockAudioContext}
+                  className={`cockpit-secondary-button flex items-center gap-1.5 rounded-xl border px-3 py-2 font-game text-sm font-black text-white shadow-sm transition-transform active:scale-95 ${
+                    isTrainRunning
+                      ? 'border-sky-200/60 bg-[#2b6f91] hover:bg-[#347fa5]'
+                      : 'border-sky-300/25 bg-[#183b4b] hover:bg-[#214b5e]'
+                  }`}
+                >
+                  {isTrainRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  <span>{isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}</span>
+                </button>
+
+                <div className="cockpit-speed-group flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">
                   <button
                     onClick={() => setTrainSpeed('slow')}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-                      trainSpeed === 'slow' ? 'bg-sky-500 text-white' : 'text-slate-400'
+                    className={`cockpit-speed-button px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                      trainSpeed === 'slow' ? 'bg-[#2b6f91] text-white' : 'text-slate-400'
                     }`}
                   >
                     🐢 Yavaş
                   </button>
                   <button
                     onClick={() => setTrainSpeed('normal')}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-                      trainSpeed === 'normal' ? 'bg-sky-500 text-white' : 'text-slate-400'
+                    className={`cockpit-speed-button px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                      trainSpeed === 'normal' ? 'bg-[#2b6f91] text-white' : 'text-slate-400'
                     }`}
                   >
                     🚂 Normal
                   </button>
                   <button
                     onClick={() => setTrainSpeed('fast')}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-                      trainSpeed === 'fast' ? 'bg-amber-500 text-amber-950' : 'text-slate-400'
+                    className={`cockpit-speed-button px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                      trainSpeed === 'fast' ? 'bg-[#2b6f91] text-white' : 'text-slate-400'
                     }`}
                   >
                     🚀 Hızlı
                   </button>
                 </div>
 
-                <button
-                  onClick={() => setTrainDirection(trainDirection === 'right' ? 'left' : 'right')}
-                  className="px-3 py-2 rounded-2xl bg-[#0e2531] border border-slate-700 hover:bg-[#1a3a4d] text-xs font-bold flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Yön Değiştir</span>
-                </button>
+                <div className="cockpit-track-status flex items-center gap-1.5 rounded-2xl border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-xs font-bold text-emerald-100">
+                  <Compass className="h-3.5 w-3.5 text-emerald-300" />
+                  <span>Tek hat · Gidiş / Dönüş</span>
+                </div>
               </div>
             </div>
 
@@ -1494,44 +1421,48 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => toggleWagon('passenger')}
-                  className={`px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
+                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
                     attachedWagons.includes('passenger')
-                      ? 'bg-red-600 border-red-400 text-white'
-                      : 'bg-[#0a1820] border-slate-700 text-slate-400'
+                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
+                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
                   }`}
                 >
                   🚃 Yolcu Vagonu
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => toggleWagon('cargo_coins')}
-                  className={`px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
+                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
                     attachedWagons.includes('cargo_coins')
-                      ? 'bg-amber-500 border-amber-300 text-amber-950'
-                      : 'bg-[#0a1820] border-slate-700 text-slate-400'
+                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
+                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
                   }`}
                 >
                   🪙 Altın Vagonu
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => toggleWagon('cargo_fruits')}
-                  className={`px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
+                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
                     attachedWagons.includes('cargo_fruits')
-                      ? 'bg-emerald-600 border-emerald-300 text-white'
-                      : 'bg-[#0a1820] border-slate-700 text-slate-400'
+                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
+                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
                   }`}
                 >
                   🍎 Meyve Vagonu
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => toggleWagon('cargo_toys')}
-                  className={`px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
+                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
                     attachedWagons.includes('cargo_toys')
-                      ? 'bg-purple-600 border-purple-300 text-white'
-                      : 'bg-[#0a1820] border-slate-700 text-slate-400'
+                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
+                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
                   }`}
                 >
                   🧸 Oyuncak Vagonu
@@ -1542,25 +1473,28 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <div className="flex items-center gap-1.5 pt-1">
                 <span className="text-[11px] text-slate-400 font-bold">Tema:</span>
                 <button
+                  type="button"
                   onClick={() => setEnvTheme('farm')}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                    envTheme === 'farm' ? 'bg-sky-500 text-white' : 'bg-slate-800 text-slate-400'
+                  className={`cockpit-theme-button px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                    envTheme === 'farm' ? 'bg-[#2b6f91] text-white' : 'bg-[#102b3a] text-slate-400'
                   }`}
                 >
                   🌾 Çiftlik
                 </button>
                 <button
+                  type="button"
                   onClick={() => setEnvTheme('sunset')}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                    envTheme === 'sunset' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-400'
+                  className={`cockpit-theme-button px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                    envTheme === 'sunset' ? 'bg-[#2b6f91] text-white' : 'bg-[#102b3a] text-slate-400'
                   }`}
                 >
                   🌅 Gün Batımı
                 </button>
                 <button
+                  type="button"
                   onClick={() => setEnvTheme('night')}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                    envTheme === 'night' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                  className={`cockpit-theme-button px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                    envTheme === 'night' ? 'bg-[#2b6f91] text-white' : 'bg-[#102b3a] text-slate-400'
                   }`}
                 >
                   🌌 Gece
@@ -1601,6 +1535,41 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               }`}
             >
               {isBuildMode ? 'İnşayı Tamamla' : 'Parça Yerleştir'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Harita kolaylıkları">
+            <button
+              type="button"
+              onClick={handleAutoPlaceSelected}
+              className="min-h-12 rounded-2xl border-2 border-emerald-300 bg-emerald-600 px-2 py-2 font-game text-xs font-black text-white shadow-md active:scale-95"
+            >
+              <WandSparkles className="mx-auto mb-0.5 h-4 w-4" />
+              Otomatik Yerleştir
+            </button>
+            <button
+              type="button"
+              onClick={handleRotateSelection}
+              className="min-h-12 rounded-2xl border-2 border-sky-300 bg-sky-700 px-2 py-2 font-game text-xs font-black text-white shadow-md active:scale-95"
+            >
+              <RotateCw className="mx-auto mb-0.5 h-4 w-4" />
+              Döndür ({placementRotation}°)
+            </button>
+            <button
+              type="button"
+              onClick={handleUndoPlacement}
+              disabled={placementHistory.length === 0}
+              className="min-h-12 rounded-2xl border-2 border-amber-300 bg-amber-500 px-2 py-2 font-game text-xs font-black text-amber-950 shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Undo2 className="mx-auto mb-0.5 h-4 w-4" />
+              Geri Al
+            </button>
+            <button
+              type="button"
+              onClick={clearMapSelection}
+              className="min-h-12 rounded-2xl border-2 border-slate-500 bg-slate-700 px-2 py-2 font-game text-xs font-black text-white shadow-md active:scale-95"
+            >
+              Seçimi Temizle
             </button>
           </div>
 
@@ -1660,22 +1629,44 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                       type="button"
                       data-testid={`map-cell-${c}-${r}`}
                       onClick={() => handleMapCellClick(c, r)}
+                      onDragEnter={(event) => {
+                        event.preventDefault();
+                        setPreviewCell({ x: c, y: r });
+                      }}
                       onDragOver={(event) => {
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'copy';
+                        setPreviewCell({ x: c, y: r });
                       }}
-                      onDrop={(event) => handleMapCellDrop(event, c, r)}
+                      onDragLeave={() => setPreviewCell((current) => current?.x === c && current?.y === r ? null : current)}
+                      onDrop={(event) => {
+                        handleMapCellDrop(event, c, r);
+                        setPreviewCell(null);
+                      }}
                       className={`relative rounded-2xl border transition-all focus:outline-none focus:ring-4 focus:ring-amber-300/70 ${
-                        isSelectedTarget || isBuildMode
+                        previewCell?.x === c && previewCell?.y === r && selectedInventoryItem
+                          ? 'border-amber-200 bg-amber-200/30 ring-4 ring-amber-300/40'
+                          : placed && isBuildMode
+                          ? 'border-emerald-300/70 bg-emerald-400/10 hover:border-amber-200 hover:bg-amber-200/20'
+                          : isSelectedTarget || isBuildMode
                           ? 'border-white/45 bg-white/10 hover:border-amber-200 hover:bg-amber-200/20'
                           : 'border-transparent bg-transparent hover:bg-white/10'
                       }`}
-                      aria-label={`${c + 1}. sütun ${r + 1}. satır`}
-	                    >
-	                      {placed && (
+                      aria-label={`${c + 1}. sütun ${r + 1}. satır${placed ? `, ${placed.name}` : ''}`}
+                    >
+                      {!placed && previewCell?.x === c && previewCell?.y === r && selectedInventoryItem && (
+                        <span className="absolute inset-1 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-amber-200 bg-amber-200/25 opacity-90">
+                          {SCENERY_IMAGES[selectedInventoryItem.id] ? (
+                            <img src={SCENERY_IMAGES[selectedInventoryItem.id]} alt="Önizleme" className="h-full w-full object-contain opacity-75" draggable={false} />
+                          ) : (
+                            <span className="text-2xl opacity-80">{selectedInventoryItem.icon}</span>
+                          )}
+                        </span>
+                      )}
+                      {placed && (
 	                        <span className="absolute inset-0 flex items-center justify-center">
 	                          <span className={`absolute h-[72%] w-[72%] rounded-2xl blur-md ${accent?.glow}`} />
-	                          <span className={`relative flex h-[78%] w-[78%] items-center justify-center rounded-2xl border-2 shadow-[0_10px_16px_rgba(15,23,42,0.42)] ring-2 ${accent?.ring}`}>
+	                          <span className={`relative flex h-[78%] w-[78%] items-center justify-center rounded-2xl border-2 shadow-[0_10px_16px_rgba(15,23,42,0.42)] ring-2 ${accent?.ring}`} style={{ transform: `rotate(${placed.rotation || 0}deg)` }}>
 	                            <span className="absolute inset-1 rounded-xl bg-white/10" />
 	                            <span className="relative flex h-full w-full items-center justify-center text-2xl sm:text-4xl drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)] transition-transform hover:scale-110">
 	                              {SCENERY_IMAGES[placed.itemId] ? (
@@ -1693,18 +1684,35 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
                       {/* Delete button in build mode */}
                       {isBuildMode && placed && (
-                        <span
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onRemoveItem(placed.id);
-                            playPopSound(soundEnabled);
-                          }}
-                          className="absolute -right-1 -top-1 z-30 rounded-full bg-rose-600 p-1 text-white shadow-lg ring-2 ring-white/80"
-                          role="button"
-                          aria-label={`${placed.name} kaldır`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </span>
+                        <>
+                          <span
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onRemoveItem(placed.id);
+                              setPlacementHistory((history) => [...history.slice(-7), worldItems]);
+                              setInteractiveMessage(`${placed.name} kaldırıldı. İstersen Geri Al düğmesine dokunabilirsin.`);
+                              playPopSound(soundEnabled);
+                            }}
+                            className="absolute -right-1 -top-1 z-30 rounded-full bg-rose-600 p-1 text-white shadow-lg ring-2 ring-white/80"
+                            role="button"
+                            aria-label={`${placed.name} kaldır`}
+                            title="Kaldır"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </span>
+                          <span
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRotatePlacedItem(placed);
+                            }}
+                            className="absolute -left-1 -top-1 z-30 rounded-full bg-sky-600 p-1 text-white shadow-lg ring-2 ring-white/80"
+                            role="button"
+                            aria-label={`${placed.name} döndür`}
+                            title="Döndür"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                          </span>
+                        </>
                       )}
                     </button>
                   );

@@ -4,6 +4,12 @@
  */
 
 let audioCtx: AudioContext | null = null;
+let audioUnlockLogged = false;
+let movementSoundLogCount = 0;
+
+function audioLog(message: string, details?: Record<string, unknown>) {
+  if (import.meta.env.DEV) console.log(`[Rüzgar ses] ${message}`, details || '');
+}
 
 function getAudioContext(): AudioContext {
   if (!audioCtx) {
@@ -11,9 +17,30 @@ function getAudioContext(): AudioContext {
     audioCtx = new AudioContextClass();
   }
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    // Calling resume here is safe; browsers will resolve it after the next
+    // user gesture when the first sound was requested by an animation tick.
+    void audioCtx.resume().catch(() => undefined);
   }
   return audioCtx;
+}
+
+/**
+ * Unlock Web Audio from a real button/pointer gesture. Autoplay policies can
+ * keep an AudioContext suspended when it is first created by the train timer.
+ */
+export function unlockAudioContext(): boolean {
+  try {
+    const ctx = getAudioContext();
+    if (audioCtx.state === 'suspended') void ctx.resume().catch(() => undefined);
+    if (!audioUnlockLogged) {
+      audioUnlockLogged = true;
+      audioLog('Web Audio hazır', { state: ctx.state });
+    }
+    return true;
+  } catch (error) {
+    if (import.meta.env.DEV) console.warn('[Rüzgar ses] Audio context kullanılamıyor', error);
+    return false;
+  }
 }
 
 /**
@@ -39,7 +66,7 @@ export function playPopSound(enabled: boolean = true) {
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
   } catch (e) {
-    console.debug('Audio not allowed yet', e);
+    if (import.meta.env.DEV) console.warn('[Rüzgar ses] Pop sesi henüz kullanılamıyor', e);
   }
 }
 
@@ -76,7 +103,35 @@ export function playCoinSound(enabled: boolean = true) {
     osc2.start(now + 0.08);
     osc2.stop(now + 0.35);
   } catch (e) {
-    console.debug('Audio error', e);
+    if (import.meta.env.DEV) console.warn('[Rüzgar ses] Coin sesi üretilemedi', e);
+  }
+}
+
+/**
+ * Very short, low-volume rail movement tick used sparingly while the train moves.
+ */
+export function playTrainMovementTick(enabled: boolean = true) {
+  if (!enabled) return;
+  try {
+    const ctx = getAudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(128, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(78, ctx.currentTime + 0.09);
+    // V6 kokpitinde hareket sesi açıkken düşük ama duyulabilir bir ray ritmi.
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.11);
+    if (movementSoundLogCount < 3) {
+      movementSoundLogCount += 1;
+      audioLog('Hareket sesi üretildi', { count: movementSoundLogCount, state: ctx.state });
+    }
+  } catch (e) {
+    console.warn('[Rüzgar ses] Hareket sesi üretilemedi', e);
   }
 }
 
@@ -88,6 +143,7 @@ export function playTrainWhistle(enabled: boolean = true) {
   try {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
+    audioLog('Korna çalıyor', { state: ctx.state });
 
     const playPulse = (startTime: number, duration: number) => {
       const osc1 = ctx.createOscillator();
@@ -101,8 +157,8 @@ export function playTrainWhistle(enabled: boolean = true) {
       osc1.frequency.setValueAtTime(466.16, startTime);
       osc2.frequency.setValueAtTime(587.33, startTime);
 
-      gain.gain.setValueAtTime(0.01, startTime);
-      gain.gain.linearRampToValueAtTime(0.18, startTime + 0.04);
+      gain.gain.setValueAtTime(0.015, startTime);
+      gain.gain.linearRampToValueAtTime(0.28, startTime + 0.04);
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
 
       osc1.connect(gain);
@@ -119,81 +175,7 @@ export function playTrainWhistle(enabled: boolean = true) {
     playPulse(now, 0.18);
     playPulse(now + 0.22, 0.45);
   } catch (e) {
-    console.debug('Train sound error', e);
-  }
-}
-
-// Tren çalışırken tekrar eden "çuf-çuf" motor sesi için tek bir interval
-// referansı — aynı anda birden fazla döngü üst üste binmesin diye modül
-// seviyesinde tutuluyor.
-let engineLoopInterval: number | null = null;
-
-function playEngineChuff() {
-  try {
-    const ctx = getAudioContext();
-    const now = ctx.currentTime;
-
-    // Gövde: yumuşak üçgen dalga "puf" — önceki sert kare dalgadan daha
-    // yuvarlak/sevimli bir tını verir. Her vuruşta hafif rastgele perde
-    // farkı, robotik/tekdüze değil canlı bir his katıyor.
-    const wobble = 0.9 + Math.random() * 0.2;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(210 * wobble, now);
-    osc.frequency.exponentialRampToValueAtTime(85 * wobble, now + 0.09);
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.1);
-
-    // Buhar dokusu: kısa, sönümlenen filtrelenmiş gürültü — "puf!" hissini
-    // tamamlayan yumuşak nefes sesi (steam puff).
-    const bufferSize = Math.floor(ctx.sampleRate * 0.07);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i += 1) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-    }
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.value = 850;
-    noiseFilter.Q.value = 0.6;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.05, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    noise.start(now);
-  } catch (e) {
-    console.debug('Engine chuff error', e);
-  }
-}
-
-/**
- * Tren hareket ederken sürekli çalan "çuf-çuf" motor sesini başlatır.
- * `speed` tempo aralığını belirler (hızlı tren = daha sık darbe).
- * Zaten çalan bir döngü varsa önce o durdurulur, üst üste binme olmaz.
- */
-export function startTrainEngineLoop(enabled: boolean = true, speed: 'slow' | 'normal' | 'fast' = 'normal') {
-  stopTrainEngineLoop();
-  if (!enabled) return;
-  const intervalMs = speed === 'fast' ? 220 : speed === 'slow' ? 430 : 320;
-  playEngineChuff();
-  engineLoopInterval = window.setInterval(playEngineChuff, intervalMs);
-}
-
-/** Motor sesi döngüsünü durdurur (tren durunca veya ses kapatılınca çağrılır). */
-export function stopTrainEngineLoop() {
-  if (engineLoopInterval !== null) {
-    window.clearInterval(engineLoopInterval);
-    engineLoopInterval = null;
+    if (import.meta.env.DEV) console.warn('[Rüzgar ses] Korna üretilemedi', e);
   }
 }
 
@@ -228,90 +210,16 @@ export function playFanfare(enabled: boolean = true) {
   }
 }
 
-// Tarayıcının ses listesi ASENKRON yüklenir (ilk çağrıda boş dönebilir). Sesler
-// hazır olur olmaz önbelleğe alınıyor ki her konuşmada doğru/kaliteli sesi
-// seçebilelim — özellikle İngilizce'de varsayılan (bazen düşük kaliteli veya
-// yanlış aksanlı) sesi değil, bilinen net sesleri tercih ediyoruz.
-let cachedVoices: SpeechSynthesisVoice[] = [];
-
-function loadVoices() {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  const list = window.speechSynthesis.getVoices();
-  if (list.length > 0) cachedVoices = list;
-}
-
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  loadVoices();
-  window.speechSynthesis.onvoiceschanged = loadVoices;
-}
-
-// İyi bilinen, net telaffuzlu sesler ÖNCELİK SIRASINA göre denenir (ilk
-// eşleşen kazanır). macOS/iOS'un normal konuşma sesleri (Samantha, Ava, Alex,
-// Daniel, Karen) ile Chrome'un ağ tabanlı Google sesleri en başta; işletim
-// sistemlerinin "eğlence/karakter" sesleri (aşağıdaki kara listede) hiçbir
-// zaman seçilmez — aksi halde cihazda başka uygun ses yoksa yanlışlıkla
-// robotik/komik bir ses (ör. "Zarvox", "Bahh", "Albert") seçilebiliyordu, bu
-// da "telaffuz net değil" şikayetinin bir kısmının kaynağıydı.
-const PREFERRED_VOICE_NAMES = [
-  'Google US English',
-  'Samantha',
-  'Ava',
-  'Alex',
-  'Microsoft Aria Online (Natural)',
-  'Microsoft Guy Online (Natural)',
-  'Microsoft Zira',
-  'Microsoft David',
-  'Karen',
-  'Daniel',
-  'Google UK English Female',
-];
-
-// macOS/iOS'un "eğlence" (novelty) sesleri: dil öğretimi için ASLA uygun
-// değil, net biçimde hariç tutulur.
-const BLOCKED_VOICE_NAMES = [
-  'Albert', 'Bahh', 'Bells', 'Boing', 'Bubbles', 'Cellos', 'Eddy', 'Flo',
-  'Fred', 'Grandma', 'Grandpa', 'Jester', 'Junior', 'Organ', 'Org', 'Ralph',
-  'Reed', 'Rocko', 'Sandy', 'Shelley', 'Superstar', 'Trinoids', 'Whisper',
-  'Wobble', 'Zarvox', 'Bad News', 'Good News', 'İyi Haber', 'Kötü Haber',
-];
-
-function pickVoice(lang: string): SpeechSynthesisVoice | null {
-  if (cachedVoices.length === 0) loadVoices();
-  if (cachedVoices.length === 0) return null;
-  const langPrefix = lang.slice(0, 2).toLowerCase();
-  const allowed = cachedVoices.filter(
-    (v) => v.lang.toLowerCase().startsWith(langPrefix) && !BLOCKED_VOICE_NAMES.some((name) => v.name.includes(name)),
-  );
-  if (allowed.length === 0) return null;
-  // Önce istenen dilin TAM eşleşmesi (ör. tam olarak "en-US"), sonra dil
-  // önekiyle eşleşen herhangi bir ses (ör. "en-GB") denenir.
-  const exact = allowed.filter((v) => v.lang.toLowerCase() === lang.toLowerCase());
-  const pool = exact.length > 0 ? exact : allowed;
-  for (const name of PREFERRED_VOICE_NAMES) {
-    const match = pool.find((v) => v.name.includes(name));
-    if (match) return match;
-  }
-  const local = pool.find((v) => v.localService);
-  return local || pool[0];
-}
-
 /**
- * Web Speech API text-to-speech engine for encouraging Turkish feedback.
- * `lang` varsayılan olarak Türkçe'dir; İngilizce kelime/telaffuz öğretimi gibi
- * durumlar için 'en-US' geçilebilir (tarayıcının İngilizce sesi kullanılır).
- * `pitch` varsayılan olarak çocuklar için hafif enerjik (1.2); İngilizce
- * kelime öğretiminde netlik için genelde 1.0 (doğal) geçiriliyor — aşırı
- * pitch kayması sentezlenmiş sesi anlaşılmaz/bozuk hale getirebiliyor.
+ * Web Speech API text-to-speech engine for encouraging Turkish feedback
  */
-export function speakText(text: string, enabled: boolean = true, rate: number = 0.95, lang: string = 'tr-TR', pitch: number = 1.2) {
+export function speakText(text: string, enabled: boolean = true, rate: number = 0.95) {
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel(); // Stop ongoing speech
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
-    const voice = pickVoice(lang);
-    if (voice) utterance.voice = voice;
-    utterance.pitch = pitch;
+    utterance.lang = 'tr-TR';
+    utterance.pitch = 1.2; // Slightly higher energetic pitch for children
     utterance.rate = rate; // Çağıran, gerektiğinde (ör. harf öğretimi) daha yavaş bir hız verebilir
     window.speechSynthesis.speak(utterance);
   } catch (e) {

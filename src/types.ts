@@ -16,6 +16,8 @@ export interface RoutineTask {
   isExtra?: boolean;
   completedAt?: string;
   approvedAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 export type ShopCategory = 'tracks' | 'trains' | 'wagons' | 'scenery' | 'rewards';
@@ -31,6 +33,7 @@ export interface ShopItem {
   type: 'track' | 'train' | 'wagon' | 'decoration' | 'real_reward';
   trackType?: 'straight' | 'curve' | 'bridge' | 'station' | 'tunnel';
   wagonType?: 'passenger' | 'passenger_green' | 'cargo_coins' | 'cargo_fruits' | 'cargo_toys' | 'cargo_animals' | 'cargo_candy' | 'cargo_space';
+  updatedAt?: string;
 }
 
 export interface PlacedWorldItem {
@@ -41,7 +44,11 @@ export interface PlacedWorldItem {
   icon: string;
   name: string;
   rotation?: number;
+  updatedAt?: string;
+  deletedAt?: string;
 }
+
+export type JournalMood = 'happy' | 'calm' | 'proud' | 'tired' | 'sad';
 
 export interface VoiceMessage {
   id: string;
@@ -53,6 +60,17 @@ export interface VoiceMessage {
   createdAt: string;
   isNew: boolean;
   kind?: 'message' | 'journal';
+  title?: string;
+  mood?: JournalMood;
+}
+
+export interface CoinLedgerEntry {
+  id: string;
+  type: 'initial' | 'task_reward' | 'bonus_reward' | 'purchase' | 'reset';
+  coinDelta: number;
+  referenceId?: string;
+  balanceAfter?: number;
+  createdAt: string;
 }
 
 export interface UserProfile {
@@ -70,18 +88,22 @@ export interface UserProfile {
   progressVersion?: string;
   /** Rutin görevlerin en son hangi yerel takvim gününde açıldığını tutar. */
   lastTaskResetDate?: string;
-  /** Öğren sekmesinde bugün doğru cevapla kazanılan Tren Parası. */
-  learnCoinsToday?: number;
-  /** Öğren sekmesinde bugün verilen toplam doğru cevap sayısı (her 10 doğru = 1 Tren Parası). */
-  learnAnswersToday?: number;
-  /** learnCoinsToday/learnAnswersToday sayaçlarının en son hangi yerel takvim gününe ait olduğunu tutar. */
-  learnCoinsResetDate?: string;
 }
 
 export interface ParentConfig {
   parentName: string;
   /** Yerel, tek ebeveyn PIN'inin geriye uyumlu özeti. */
   pinHash?: string;
+}
+
+export type AdultName = 'Baba' | 'Anne' | 'Anneanne';
+
+export interface ActiveChildDevice {
+  deviceId: string;
+  setByUid: string;
+  setByName: AdultName;
+  setAt: string;
+  label?: string;
 }
 
 export interface BonusCard {
@@ -92,25 +114,32 @@ export interface BonusCard {
   icon: string;
   createdAt: string;
   claimed: boolean;
+  updatedAt?: string;
 }
 
-/**
- * Bu FİZİKSEL cihazın (telefon/tablet) rolü — bulutta değil, sadece bu
- * cihazın localStorage'ında tutulur. "Rüzgar cihazı" oyunun oynandığı,
- * görevlerin işaretlendiği telefondur; "izleyici" sadece takip eden/onaylayan
- * aile üyelerinin (baba/anne/anneanne/dede) cihazıdır.
- */
-export type DeviceRole = 'player' | 'viewer';
+export type ActivityType =
+  | 'app_open'
+  | 'task_complete'
+  | 'task_approved'
+  | 'task_rejected'
+  | 'purchase'
+  | 'video_started'
+  | 'video_blocked';
 
 export interface ActivityLogEntry {
   id: string;
-  type: 'app_open' | 'task_complete' | 'purchase';
+  type: ActivityType;
   label: string;
   detail?: string;
   timestamp: string;
+  taskId?: string;
+  dateKey?: string;
+  scheduledTaskCount?: number;
   /** Uygulama açılışları için: oturumun ne kadar sürdüğü (ms). */
   durationMs?: number;
 }
+
+export type VideoModerationStatus = 'pending' | 'approved' | 'blocked';
 
 export interface StoryVideo {
   id: string;
@@ -121,4 +150,16 @@ export interface StoryVideo {
   description: string;
   category: string;
   createdAt?: string;
+  /** Çocuk ekranında yalnızca approved içerik gösterilir. */
+  moderationStatus?: VideoModerationStatus;
+  /** Sunucu doğrulaması veya ebeveynin manuel testinden sonra true olur. */
+  embeddable?: boolean;
+  privacyStatus?: 'public' | 'unlisted' | 'private' | 'unknown';
+  madeForKids?: boolean;
+  sourceChannelId?: string;
+  sourceChannelTitle?: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  lastCheckedAt?: string;
+  failureReason?: string;
 }

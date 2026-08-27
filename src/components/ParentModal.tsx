@@ -6,12 +6,6 @@ import { getFamilyInviteLink } from '../utils/cloudSync';
 import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw, History, LogIn, ShoppingBag, BookOpen } from 'lucide-react';
 
-// Ebeveyn panelini açan aile içi PIN'ler (baba/anne/anneanne/dede). Oyuna
-// giriş artık tek ortak bir aile koduyla (RUZGAR123) yapılıyor, ama bu 4 PIN
-// Ebeveyn paneli için ayrı ve değişmeden kalıyor — herkes kendi bildiği
-// PIN'iyle ebeveyn işlemlerine girebilir.
-const ROLE_PIN_SET = new Set<string>(['0123', '1234', '2345', '3456']);
-
 interface ParentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,6 +29,8 @@ interface ParentModalProps {
   videos?: StoryVideo[];
   onAddVideo?: (video: Omit<StoryVideo, 'id'>) => void;
   onDeleteVideo?: (id: string) => void;
+  onApproveVideo?: (id: string) => void;
+  onBlockVideo?: (id: string) => void;
   cloudConfigured: boolean;
   cloudStatus: string;
   familyCode: string;
@@ -42,9 +38,7 @@ interface ParentModalProps {
   onJoinFamily: (code: string) => Promise<void>;
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
-  deviceRoleLabel?: string;
-  lastSyncedByLabel?: string;
-  onChangeDeviceRole?: () => void;
+  weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
 }
 
 export const ParentModal: React.FC<ParentModalProps> = ({
@@ -70,6 +64,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   videos = [],
   onAddVideo,
   onDeleteVideo,
+  onApproveVideo,
+  onBlockVideo,
   cloudConfigured,
   cloudStatus,
   familyCode,
@@ -77,9 +73,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onJoinFamily,
   activityLog = [],
   voiceMessages = [],
-  deviceRoleLabel,
-  lastSyncedByLabel,
-  onChangeDeviceRole,
+  weeklyStats = [],
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -96,6 +90,10 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [videoError, setVideoError] = useState('');
   const [videoSuccess, setVideoSuccess] = useState(false);
   const orderedVideos = sortVideosNewestFirst(videos);
+  const journalEntries = voiceMessages.filter((message) => message.kind === 'journal');
+  const receivedVoiceMessages = voiceMessages.filter((message) => message.kind !== 'journal' && message.sender === 'child');
+  const sentVoiceMessages = voiceMessages.filter((message) => message.kind !== 'journal' && message.sender === 'parent');
+  const latestJournal = [...journalEntries].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
   // New Task Form State
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -166,7 +164,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
           setIsAuthenticated(true);
           setPinMessage('');
           speakText('Ebeveyn PIN kodu belirlendi', speechEnabled);
-        } else if (ROLE_PIN_SET.has(newPin) || hashParentPin(newPin) === parentConfig.pinHash) {
+        } else if (hashParentPin(newPin) === parentConfig.pinHash) {
           setPinInput('');
           setIsAuthenticated(true);
           setPinMessage('');
@@ -388,7 +386,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
           /* Authenticated Dashboard */
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Dashboard Sub-Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar border-b border-gray-100">
+            <div className="relative flex items-center gap-1.5 overflow-x-auto pb-1 pr-5 no-scrollbar border-b border-gray-100 after:pointer-events-none after:absolute after:right-0 after:top-0 after:h-full after:w-8 after:bg-gradient-to-l after:from-white after:to-transparent sm:after:hidden">
               <button
                 onClick={() => setActiveTab('approvals')}
 	                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
@@ -778,7 +776,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   {videoSuccess && (
                     <div className="bg-emerald-100 border border-emerald-400 text-emerald-800 text-xs p-2.5 rounded-xl font-bold flex items-center gap-1.5">
                       <Check className="w-4 h-4 text-emerald-600" />
-                      <span>YouTube videosu 'İzlet' sekmesine başarıyla eklendi! 🎉</span>
+                      <span>Video eklendi; önce siz kontrol edip "Çocukta göster" onayı vermelisiniz.</span>
                     </div>
                   )}
 
@@ -843,35 +841,48 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                     className="w-full py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white rounded-xl font-game text-xs font-bold shadow-md border-b-2 border-red-800 flex items-center justify-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Videoyu 'İzlet' Bölümüne Ekle</span>
+                    <span>Videoyu onay kuyruğuna ekle</span>
                   </button>
                 </form>
 
-                {/* List of existing videos to delete if needed */}
+                {/* Video doğrulama kuyruğu */}
                 {orderedVideos.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-game text-xs font-bold text-gray-700">Mevcut Çizgi Film / Videolar ({orderedVideos.length})</h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {orderedVideos.map((vid) => (
-                        <div key={vid.id} className="p-2.5 bg-white border border-gray-200 rounded-xl flex items-center justify-between gap-2 shadow-sm">
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <img src={vid.thumbnailUrl} alt={vid.title} className="w-12 h-8 rounded object-cover flex-shrink-0" />
-                            <div className="truncate">
-                              <div className="text-xs font-bold text-gray-800 truncate">{vid.title}</div>
-                              <div className="text-[10px] text-gray-500 font-bold">{vid.category}</div>
+                    <h4 className="font-game text-xs font-bold text-gray-700">Video doğrulama kuyruğu ({orderedVideos.length})</h4>
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {orderedVideos.map((vid) => {
+                        const status = vid.moderationStatus || 'pending';
+                        const statusLabel = status === 'approved' ? 'Çocukta gösteriliyor' : status === 'blocked' ? 'Gizlendi' : 'Onay bekliyor';
+                        const statusClass = status === 'approved' ? 'bg-emerald-100 text-emerald-700' : status === 'blocked' ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700';
+                        return (
+                          <div key={vid.id} className="p-2.5 bg-white border border-gray-200 rounded-xl space-y-2 shadow-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <img src={vid.thumbnailUrl} alt={vid.title} className="w-12 h-8 rounded object-cover flex-shrink-0" />
+                                <div className="truncate">
+                                  <div className="text-xs font-bold text-gray-800 truncate">{vid.title}</div>
+                                  <div className="text-[10px] text-gray-500 font-bold truncate">{vid.category} · YouTube ID: {vid.youtubeId}</div>
+                                  {vid.failureReason && <div className="text-[10px] text-amber-700 font-bold truncate">{vid.failureReason}</div>}
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-black px-2 py-1 rounded-lg whitespace-nowrap ${statusClass}`}>{statusLabel}</span>
+                            </div>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {status !== 'approved' && onApproveVideo && (
+                                <button type="button" onClick={() => onApproveVideo(vid.id)} className="min-h-9 px-2.5 rounded-lg bg-emerald-600 text-white text-[10px] font-black">Çocukta göster</button>
+                              )}
+                              {status !== 'blocked' && onBlockVideo && (
+                                <button type="button" onClick={() => onBlockVideo(vid.id)} className="min-h-9 px-2.5 rounded-lg bg-gray-100 border border-gray-300 text-gray-700 text-[10px] font-black">Gizle</button>
+                              )}
+                              {onDeleteVideo && (
+                                <button type="button" onClick={() => onDeleteVideo(vid.id)} className="min-h-9 px-2 rounded-lg text-red-500 hover:bg-red-50" title="Kalıcı sil">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
-                          {onDeleteVideo && (
-                            <button
-                              onClick={() => onDeleteVideo(vid.id)}
-                              className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
-                              title="Sil"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -892,21 +903,50 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <h4 className="font-game text-sm font-black text-indigo-900">Günlük ve iletişim özeti</h4>
+                      <p className="text-[11px] font-semibold text-indigo-700">İçerikler yalnızca bu aile alanında görünür; otomatik oynatılmaz.</p>
+                    </div>
+                    <span className="text-2xl">🎙️</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl bg-white p-2">
+                      <div className="text-[10px] font-bold text-gray-500">Günlük</div>
+                      <div className="font-game text-lg font-black text-indigo-900">{journalEntries.length}</div>
+                    </div>
+                    <div className="rounded-xl bg-white p-2">
+                      <div className="text-[10px] font-bold text-gray-500">Gelen</div>
+                      <div className="font-game text-lg font-black text-sky-900">{receivedVoiceMessages.length}</div>
+                    </div>
+                    <div className="rounded-xl bg-white p-2">
+                      <div className="text-[10px] font-bold text-gray-500">Gönderilen</div>
+                      <div className="font-game text-lg font-black text-emerald-900">{sentVoiceMessages.length}</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-[11px] font-semibold text-indigo-800">
+                    {latestJournal ? `Son günlük: ${latestJournal.title || 'Bugünüm'} · ${new Date(latestJournal.createdAt).toLocaleDateString('tr-TR')}` : 'Henüz günlük kaydı yok. Rüzgar Günlüğüm bölümünden bir kayıt başlatabilir.'}
+                  </p>
+                </div>
+
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2">
                   <h4 className="font-game text-xs font-bold text-gray-700">Haftalık Tamamlama Rutin Oranı</h4>
                   <div className="space-y-1.5">
-                    {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'].map((day, idx) => (
-                      <div key={day} className="flex items-center gap-2 text-xs font-bold">
-                        <span className="w-20 text-gray-500">{day}</span>
-                        <div className="flex-1 bg-gray-200 h-3 rounded-full overflow-hidden">
-                          <div
-                            className="bg-emerald-500 h-full rounded-full"
-                            style={{ width: `${Math.min(100, (idx + 3) * 15)}%` }}
-                          />
+                    {weeklyStats.map((day) => {
+                      const labels: Record<string, string> = { Paz: 'Pazar', Pzt: 'Pazartesi', Sal: 'Salı', Çar: 'Çarşamba', Per: 'Perşembe', Cum: 'Cuma', Cmt: 'Cumartesi' };
+                      const hasData = day.rate !== null;
+                      const rate = day.rate ?? 0;
+                      return (
+                        <div key={day.dateKey} className="flex items-center gap-2 text-xs font-bold">
+                          <span className="w-20 text-gray-500">{labels[day.label] || day.label}</span>
+                          <div className="flex-1 bg-gray-200 h-3 rounded-full overflow-hidden" aria-label={hasData ? `${rate}% tamamlandı` : 'Henüz veri yok'}>
+                            <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${rate}%` }} />
+                          </div>
+                          <span className={`font-game ${hasData ? 'text-emerald-700' : 'text-gray-400'}`}>{hasData ? `${rate}%` : '—'}</span>
                         </div>
-                        <span className="text-emerald-700 font-game">{Math.min(100, (idx + 3) * 15)}%</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1073,25 +1113,6 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   )}
                   {syncMessage && <p role="status" className="text-[11px] font-bold text-sky-800">{syncMessage}</p>}
                 </div>
-
-                {(deviceRoleLabel || onChangeDeviceRole) && (
-                  <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-3 space-y-2">
-                    <h3 className="font-game text-sm text-slate-900">📱 Bu Cihazın Rolü</h3>
-                    {deviceRoleLabel && <p className="text-xs font-semibold text-slate-700">{deviceRoleLabel}</p>}
-                    {lastSyncedByLabel && (
-                      <p className="text-[11px] leading-relaxed text-slate-500">Buluta son yazan: {lastSyncedByLabel}</p>
-                    )}
-                    {onChangeDeviceRole && (
-                      <button
-                        type="button"
-                        onClick={onChangeDeviceRole}
-                        className="w-full min-h-10 rounded-xl bg-slate-700 text-white font-game text-xs font-bold"
-                      >
-                        Cihaz Rolünü Değiştir
-                      </button>
-                    )}
-                  </div>
-                )}
 
                 <div className="pt-3 border-t border-gray-200">
                   <button

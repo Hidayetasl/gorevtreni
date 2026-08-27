@@ -7,13 +7,18 @@ import { Tv, Play, X, Youtube, LockKeyhole, Timer } from 'lucide-react';
 interface VideosViewProps {
   videos: StoryVideo[];
   parentConfig: ParentConfig;
+  onVideoStarted?: (video: StoryVideo) => void;
 }
 
 export const VideosView: React.FC<VideosViewProps> = ({
   videos,
   parentConfig,
+  onVideoStarted,
 }) => {
-  const orderedVideos = sortVideosNewestFirst(videos);
+  // Güvenlik kararı: çocuk yüzeyine yalnızca ebeveyn onaylı ve embed edilebilir içerik çıkar.
+  const orderedVideos = sortVideosNewestFirst(videos).filter(
+    (video) => video.moderationStatus === 'approved' && video.embeddable === true,
+  );
   const [activeVideo, setActiveVideo] = useState<StoryVideo | null>(null);
   const [lockedVideo, setLockedVideo] = useState<StoryVideo | null>(null);
   const [pin, setPin] = useState('');
@@ -58,6 +63,11 @@ export const VideosView: React.FC<VideosViewProps> = ({
       setPinError('Süre 1 ile 180 dakika arasında olmalı.');
       return;
     }
+    if (!lockedVideo || lockedVideo.moderationStatus !== 'approved' || lockedVideo.embeddable !== true) {
+      setPinError('Bu video ebeveyn tarafından henüz onaylanmadı.');
+      return;
+    }
+    onVideoStarted?.(lockedVideo);
     setActiveVideo(lockedVideo);
     setPlayUntil(Date.now() + duration * 60_000);
     setSecondsLeft(duration * 60);
@@ -98,9 +108,9 @@ export const VideosView: React.FC<VideosViewProps> = ({
       {orderedVideos.length === 0 ? (
         <div className="bg-[#122834] border border-slate-700/80 rounded-3xl p-8 text-center text-slate-300 space-y-3">
           <div className="text-5xl animate-bounce">📺</div>
-          <h3 className="font-game text-lg font-bold text-white">Henüz Eklenmiş Video Yok</h3>
+          <h3 className="font-game text-lg font-bold text-white">Henüz onaylanmış video yok</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Sağ üstteki 🔐 Ebeveyn Portalı butonuna basıp PIN şifrenizi girerek çocuğunuz için YouTube çizgi filmleri ve eğitici videolar ekleyebilirsiniz!
+            Ebeveyn Portalı’ndan bir video ekleyin, içeriği kontrol edin ve "Çocukta göster" onayını verin. Onaylanmayan videolar burada görünmez.
           </p>
         </div>
       ) : (
@@ -213,7 +223,7 @@ export const VideosView: React.FC<VideosViewProps> = ({
               <div className="aspect-video rounded-2xl overflow-hidden bg-black relative shadow-inner border border-slate-800">
                 <iframe
                   className="w-full h-full"
-                  src={`https://www.youtube-nocookie.com/embed/${activeVideo.youtubeId}?autoplay=1`}
+                  src={`https://www.youtube-nocookie.com/embed/${activeVideo.youtubeId}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`}
                   title={activeVideo.title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen

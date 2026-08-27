@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+// Tasarım: Pastel Tren Rotası — gökyüzü mavisi başlık, altın profil çerçevesi ve sıcak kahverengi marka metni.
 import { UserProfile, TabType } from '../types';
-import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play, RefreshCw, BookOpen } from 'lucide-react';
+import { Volume2, VolumeX, Settings, Sparkles, Star, Train, Store, Play, RefreshCw, BookOpen, LogIn, LogOut, UserRound } from 'lucide-react';
 import familyPhoto from '../assets/images/rb-family.jpg';
 
 interface HeaderProps {
@@ -19,7 +20,9 @@ interface HeaderProps {
   cloudStatus?: string;
   onManualSync?: () => void;
   isSyncing?: boolean;
-  deviceRoleLabel?: string;
+  adultName?: string;
+  onOpenAdultLogin?: () => void;
+  onSwitchAccount?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,7 +41,9 @@ export const Header: React.FC<HeaderProps> = ({
   cloudStatus,
   onManualSync,
   isSyncing = false,
-  deviceRoleLabel,
+  adultName,
+  onOpenAdultLogin,
+  onSwitchAccount,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -55,25 +60,52 @@ export const Header: React.FC<HeaderProps> = ({
   });
 
   const tabs = [
-    { id: 'tasks' as TabType, label: 'Görev', icon: '⭐', LucideIcon: Star },
-    { id: 'world' as TabType, label: 'Dünya', icon: '🚂', LucideIcon: Train },
-    { id: 'learn' as TabType, label: 'Öğren', icon: '🔤', LucideIcon: BookOpen },
-    { id: 'shop' as TabType, label: 'Mağaza', icon: '🏪', LucideIcon: Store },
-    { id: 'videos' as TabType, label: 'İzlet', icon: '►', LucideIcon: Play },
+    { id: 'tasks' as TabType, label: 'Görev', Icon: Star },
+    { id: 'world' as TabType, label: 'Dünya', Icon: Train },
+    { id: 'learn' as TabType, label: 'Öğren', Icon: BookOpen },
+    { id: 'shop' as TabType, label: 'Mağaza', Icon: Store },
+    { id: 'videos' as TabType, label: 'İzlet', Icon: Play },
   ];
 
   return (
-    <header className="relative z-30 bg-[#0e2531] border-b-2 border-slate-800/80 shadow-xl rounded-b-3xl text-white">
-      <div className="max-w-6xl mx-auto px-4 pt-3 pb-3">
+    <header className="app-header relative z-30 bg-[#E1F5FE] border-b border-sky-200 shadow-sm rounded-b-3xl text-[#4E342E]">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-2.5 pb-2">
+        {onManualSync && cloudStatus && (
+          <div
+            className={`cloud-status-strip ${
+              cloudStatus.startsWith('Eşitleme hatası')
+                ? 'cloud-status-strip--error'
+                : cloudStatus.startsWith('Çevrimdışı')
+                  ? 'cloud-status-strip--offline'
+                  : 'cloud-status-strip--ok'
+            }`}
+            role="status"
+            aria-live="polite"
+            title={cloudStatus}
+          >
+            <span className="cloud-status-dot" aria-hidden="true" />
+            <span className="cloud-status-label">
+              {cloudStatus.startsWith('Eşitleme hatası')
+                ? 'Bulut eşleşme sorunu'
+                : cloudStatus.startsWith('Çevrimdışı')
+                  ? 'Çevrimdışı'
+                  : 'Bulut eşleşti'}
+            </span>
+            <span className="cloud-status-detail">
+              {cloudStatus.startsWith('Eşitleme hatası') ? 'Ayarları kontrol edin' : cloudStatus}
+            </span>
+          </div>
+        )}
+
         {/* Top Header Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 mb-3">
+        <div className="app-header-top-row flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 mb-3">
           {/* Child Profile & Title */}
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-sky-900 border-2 border-sky-300 shadow-md overflow-hidden">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-white border-2 border-[#F6B73C] ring-2 ring-[#FFF7D6] shadow-sm overflow-hidden">
                 <img src={familyPhoto} alt="Rüzgar ve babası" className="h-full w-full object-cover object-[50%_30%]" />
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-amber-400 text-yellow-950 text-[10px] px-1.5 py-0.2 rounded-full font-black border border-amber-200 shadow-xs">
+              <div className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black border border-orange-200 shadow-xs">
                 6 Yaş
               </div>
             </div>
@@ -82,23 +114,23 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="text-[11px] font-extrabold tracking-widest text-sky-400 uppercase">
                 RÜZGAR'IN
               </div>
-              <h1 className="font-game text-xl sm:text-3xl font-black text-white tracking-tight leading-none drop-shadow-sm">
+              <h1 className="font-game text-xl sm:text-3xl font-black text-[#4E342E] tracking-tight leading-none">
                 Görev Treni
               </h1>
-              <p className="mt-1 text-[10px] sm:text-xs font-bold text-sky-200 capitalize">
+              <p className="mt-1 text-[10px] sm:text-xs font-bold text-slate-500 capitalize">
                 📅 {dateLabel} · 🕒 {timeLabel}
               </p>
             </div>
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2 w-full sm:w-auto">
+          <div className="app-header-actions flex items-center justify-end gap-1.5 sm:gap-2 w-full sm:w-auto">
             {hasUnclaimedBonus && (
               <button
                 onClick={onOpenBonusModal}
-                className="animate-bounce bg-gradient-to-r from-purple-500 to-pink-500 text-white font-game px-3 py-1.5 rounded-full border border-purple-300 shadow-lg flex items-center gap-1.5 text-xs font-bold"
+                className="animate-bounce bg-gradient-to-r from-orange-600 to-red-600 text-white font-game px-3 py-1.5 rounded-full border border-orange-200 shadow-lg flex items-center gap-1.5 text-xs font-bold"
               >
-                <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
+                <Sparkles className="w-3.5 h-3.5 text-white animate-spin" />
                 <span className="hidden sm:inline">Hediye Var! 🎁</span>
               </button>
             )}
@@ -107,13 +139,13 @@ export const Header: React.FC<HeaderProps> = ({
             {onOpenVoiceModal && (
               <button
                 onClick={onOpenVoiceModal}
-                className="bg-gradient-to-r from-rose-600 to-pink-600 hover:brightness-110 border border-rose-300 text-white h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl flex items-center gap-1.5 transition-all active:scale-95 shadow-md relative font-game text-xs font-bold"
+                className={`app-header-action app-header-action--message ${unreadVoiceCount > 0 ? 'app-header-action--message-unread' : ''} bg-gradient-to-r from-blue-500 to-blue-700 hover:brightness-110 border border-blue-200 text-white h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl flex items-center gap-1.5 transition-all active:scale-95 shadow-md relative font-game text-xs font-bold`}
                 title="Sesli Mesaj Kutusu"
               >
-                <span className="text-base">🎙️</span>
-                <span>Mesaj</span>
+                <span className="text-base" aria-hidden="true">🎙️</span>
+                <span className="app-header-action-label">Mesaj</span>
                 {unreadVoiceCount > 0 && (
-                  <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full border border-slate-900 animate-pulse">
+                  <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full border border-white/80 animate-pulse">
                     {unreadVoiceCount}
                   </span>
                 )}
@@ -124,7 +156,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onManualSync}
                 disabled={isSyncing}
-                className="bg-[#183644] hover:bg-[#204558] disabled:opacity-60 border border-slate-600 text-sky-200 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm"
+                className="app-header-action app-header-action--technical bg-[#183644] hover:bg-[#204558] disabled:opacity-60 border border-slate-600 text-sky-200 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm"
                 title={cloudStatus || 'Şimdi bulutla eşitle'}
                 aria-label="Şimdi bulutla eşitle"
               >
@@ -132,10 +164,23 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {adultName ? (
+              <button type="button" onClick={onSwitchAccount} title="Hesap değiştir" className="flex max-w-[108px] items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2 py-2 text-[10px] font-black text-emerald-800 transition-all active:scale-95 sm:max-w-none sm:gap-1.5 sm:px-2.5 sm:text-xs">
+                <UserRound className="h-4 w-4" />
+                <span className="truncate">{adultName}</span>
+                {onSwitchAccount && <LogOut className="h-3.5 w-3.5" />}
+              </button>
+            ) : onOpenAdultLogin ? (
+              <button type="button" onClick={onOpenAdultLogin} title="Yetişkin girişi" aria-label="Yetişkin girişi" className="app-header-action bg-sky-600 hover:bg-sky-700 border border-sky-200 text-white h-9 sm:h-10 px-2.5 rounded-xl flex items-center gap-1.5 transition-all active:scale-95 shadow-sm font-game text-xs font-bold">
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Yetişkin girişi</span>
+              </button>
+            ) : null}
+
             {/* Currency Pill */}
-            <div className="bg-[#091720] border-2 border-amber-500/80 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-1.5">
+            <div className="app-header-coin bg-[#102c23] border-2 border-orange-400/80 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-1.5">
               <span className="text-base sm:text-lg">🪙</span>
-              <span className="font-game text-amber-400 text-sm sm:text-base font-extrabold">
+              <span className="font-game text-orange-300 text-sm sm:text-base font-extrabold">
                 {user.coins}
               </span>
             </div>
@@ -143,7 +188,8 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Sound Toggle Button */}
             <button
               onClick={onToggleSound}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border transition-all active:scale-95 shadow-sm ${
+              aria-label={user.soundEnabled ? 'Sesi kapat' : 'Sesi aç'}
+              className={`app-header-action app-header-action--sound w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border transition-all active:scale-95 shadow-sm ${
                 user.soundEnabled
                   ? 'bg-[#183644] border-slate-600 text-sky-300 hover:bg-[#204558]'
                   : 'bg-slate-800 border-slate-700 text-slate-400'
@@ -156,12 +202,13 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Parent Settings Button */}
             <button
               onClick={onOpenParentModal}
-              className="bg-[#183644] hover:bg-[#204558] border border-slate-600 text-slate-200 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm relative"
+              aria-label="Ebeveyn panelini aç"
+              className="app-header-action app-header-action--parent bg-[#183644] hover:bg-[#204558] border border-slate-600 text-slate-200 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm relative"
               title="Ebeveyn Paneli (Ayar)"
             >
               <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
               {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-slate-900 animate-pulse">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-slate-900 animate-pulse">
                   {pendingCount}
                 </span>
               )}
@@ -169,48 +216,26 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {(onManualSync && cloudStatus) || deviceRoleLabel ? (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {onManualSync && cloudStatus && (
-              <div
-                role="status"
-                aria-live="polite"
-                className={`flex items-center gap-1.5 text-[10px] sm:text-xs font-bold rounded-lg px-2.5 py-1.5 w-fit border ${
-                  cloudStatus.startsWith('Eşitleme hatası')
-                    ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
-                    : cloudStatus.startsWith('Çevrimdışı')
-                      ? 'bg-amber-950/50 border-amber-500/60 text-amber-100'
-                      : 'bg-sky-950/60 border-sky-600/60 text-sky-200'
-                }`}
-              >
-                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>Bulut: {cloudStatus}</span>
-              </div>
-            )}
-            {deviceRoleLabel && (
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold rounded-lg px-2.5 py-1.5 w-fit border bg-slate-800/60 border-slate-600/60 text-slate-200">
-                <span>{deviceRoleLabel}</span>
-              </div>
-            )}
-          </div>
-        ) : null}
 
         {/* Top Horizontal Pill Navigation Bar */}
-        <nav className="grid grid-cols-5 gap-1.5 sm:gap-3 pt-1">
+        <nav className="v4-header-nav grid-cols-5 gap-1.5 pt-1 sm:gap-3">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => onChangeTab(tab.id)}
-                className={`py-2 sm:py-2.5 px-2 sm:px-5 rounded-2xl font-game font-black text-xs sm:text-base flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 active:scale-95 border ${
+                aria-current={isActive ? 'page' : undefined}
+                title={tab.label}
+                aria-label={tab.label}
+                className={`app-primary-nav-button py-2 sm:py-2.5 px-2 sm:px-5 rounded-2xl font-game font-black text-xs sm:text-base flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 active:scale-95 border ${
                   isActive
-                    ? 'bg-[#2263df] hover:bg-[#1d58c8] text-white border-blue-400/50 shadow-lg shadow-blue-600/30'
-                    : 'bg-[#173340] hover:bg-[#1f4253] text-slate-200 border-slate-700/50'
+                    ? 'bg-[#FF8A65] hover:bg-[#FF7F50] text-white border-orange-300 shadow-lg shadow-orange-300/30'
+                    : 'bg-white/75 hover:bg-white text-[#6D4C41] border-[#D7CCC8]'
                 }`}
               >
-                <span className="text-sm sm:text-lg">{tab.icon}</span>
-                <span>{tab.label}</span>
+                <tab.Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} aria-hidden="true" />
+                <span className="app-primary-nav-label">{tab.label}</span>
               </button>
             );
           })}
