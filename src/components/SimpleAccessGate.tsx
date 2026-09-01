@@ -6,7 +6,9 @@ import {
   ensureAnonymousAuth,
   familyExists,
   getFamilyCode,
+  getFamilyData,
   isCloudConfigured,
+  type FamilyData,
   signInAdult,
   signOutAdult,
 } from '../utils/cloudSync';
@@ -16,7 +18,7 @@ const LOCAL_ACCESS_PIN_KEY = 'ruzgar_game_access_pin_hash_v1';
 
 interface SimpleAccessGateProps {
   /** Bulut açıksa geçerli aile kodunu taşır; kapalıysa hiç çağrılmaz. */
-  onUnlock: (familyCode?: string) => void;
+  onUnlock: (familyCode?: string, familyData?: FamilyData) => void;
 }
 
 type GateMode = 'adult' | 'child';
@@ -82,10 +84,10 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
   const normalizedCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   const storedOrTypedFamilyCode = normalizedCode || getFamilyCode();
 
-  const completeUnlock = (familyCode?: string) => {
+  const completeUnlock = (familyCode?: string, familyData?: FamilyData) => {
     if (familyCode) localStorage.setItem('ruzgar_family_code_v1', familyCode);
     localStorage.setItem('ruzgar_game_access_v1', 'open');
-    onUnlock(familyCode);
+    onUnlock(familyCode, familyData);
   };
 
   const handleAdultSignIn = async () => {
@@ -108,7 +110,9 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
       const exists = await familyExists(storedOrTypedFamilyCode);
       if (!exists) throw new Error('Bu aile koduyla kayıt bulunamadı. Kodu kontrol edin.');
       await acceptFamilyInvite(storedOrTypedFamilyCode);
-      completeUnlock(storedOrTypedFamilyCode);
+      const familyData = await getFamilyData(storedOrTypedFamilyCode);
+      if (!familyData) throw new Error("Family data not found");
+      completeUnlock(storedOrTypedFamilyCode, familyData);
     } catch (error) {
       setStatus('error');
       setErrorMessage(getAuthErrorMessage(error));
@@ -132,7 +136,9 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
           await acceptFamilyInvite(familyCode);
         }
       }
-      completeUnlock(familyCode || undefined);
+      const familyData = isCloudConfigured && familyCode.length >= 8 ? await getFamilyData(familyCode) : null;
+      if (isCloudConfigured && familyCode.length >= 8 && !familyData) throw new Error("Family data not found");
+      completeUnlock(familyCode || undefined, familyData || undefined);
     } catch (error) {
       setStatus('error');
       setErrorMessage(getAuthErrorMessage(error));
@@ -147,7 +153,9 @@ export const SimpleAccessGate: React.FC<SimpleAccessGateProps> = ({ onUnlock }) 
       const exists = await familyExists(normalizedCode);
       if (!exists) throw new Error('Bu aile koduyla kayıt bulunamadı. Kodu kontrol edin.');
       await acceptFamilyInvite(normalizedCode);
-      completeUnlock(normalizedCode);
+      const familyData = await getFamilyData(normalizedCode);
+      if (!familyData) throw new Error("Family data not found");
+      completeUnlock(normalizedCode, familyData);
     } catch (error) {
       setStatus('error');
       setErrorMessage(getAuthErrorMessage(error));

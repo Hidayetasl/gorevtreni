@@ -896,8 +896,22 @@ export default function App() {
     // cihazı aynı aile verisine bağlar, ayrı bir "eşleşme" adımına gerek kalmaz.
     return (
         <SimpleAccessGate
-          onUnlock={(code) => {
+          onUnlock={(code, familyData) => {
             if (code) setFamilyCode(code);
+            if (familyData) {
+              const syncedLedger = familyData.coinLedger || [];
+              setUser({ ...INITIAL_USER, ...familyData.user, coins: calculateLedgerBalance(syncedLedger, familyData.user.coins) });
+              setParentConfig(familyData.parentConfig || INITIAL_PARENT);
+              setTasks(familyData.tasks || INITIAL_TASKS);
+              setShop(mergeShopItemsWithCatalog(familyData.shop || INITIAL_SHOP));
+              setWorld(familyData.world || INITIAL_WORLD);
+              setBonuses(familyData.bonuses || INITIAL_BONUSES);
+              setVoiceMessages(familyData.voiceMessages || INITIAL_VOICE_MESSAGES);
+              setVideos(familyData.videos || INITIAL_VIDEOS);
+              setActivityLog(familyData.activityLog || []);
+              setCoinLedger(syncedLedger);
+              setActiveChildDevice(familyData.activeChildDevice ?? null);
+            }
             setHasGameAccess(true);
           }}
         />
