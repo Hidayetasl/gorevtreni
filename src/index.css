@@ -2952,3 +2952,20 @@ body,
     transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1) !important;
   }
 }
+
+/* Mobilde okunabilirlik: küçük Tailwind yazı boyutlarını büyüt.
+   @layer dışında olduğu için Tailwind'in layer'lı utility'lerinin
+   üzerine otomatik yazar (ekstra !important gerekmez). */
+@media (max-width: 640px) {
+  .text-\[10px\] {
+    font-size: 13px;
+  }
+  .text-xs {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .text-sm {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+}
