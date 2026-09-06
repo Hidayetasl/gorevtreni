@@ -54,7 +54,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           : task.status === 'completed'
           ? 'bg-white border-green-300'
           : task.status === 'pending_approval'
-          ? 'bg-white border-orange-300 animate-pulse'
+          ? 'bg-white border-orange-300'
           : 'bg-white border-blue-200 hover:border-blue-300'
       } ${isActiveTask ? 'border-orange-300' : ''}`}
 	    >

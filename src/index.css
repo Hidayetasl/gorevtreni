@@ -2969,3 +2969,77 @@ body,
     line-height: 1.45;
   }
 }
+
+/* Eksik Tailwind renk utility class'ları — kaynak: resmi tailwindcss@4.3.3 paketi
+   (node_modules/tailwindcss/theme.css), oklch degerleri birebir kopyalandi. */
+.bg-amber-200{background-color:oklch(92.4% 0.12 95.746)}
+.bg-blue-50{background-color:oklch(97% 0.014 254.604)}
+.bg-blue-500{background-color:oklch(62.3% 0.214 259.815)}
+.bg-blue-600{background-color:oklch(54.6% 0.245 262.881)}
+.bg-emerald-700{background-color:oklch(50.8% 0.118 165.612)}
+.bg-gray-300{background-color:oklch(87.2% 0.01 258.338)}
+.bg-gray-900{background-color:oklch(21% 0.034 264.665)}
+.bg-green-100{background-color:oklch(96.2% 0.044 156.743)}
+.bg-green-600{background-color:oklch(62.7% 0.194 149.214)}
+.bg-green-900{background-color:oklch(39.3% 0.095 152.535)}
+.bg-green-950{background-color:oklch(26.6% 0.065 152.934)}
+.bg-indigo-950{background-color:oklch(25.7% 0.09 281.288)}
+.bg-orange-300{background-color:oklch(83.7% 0.128 66.29)}
+.bg-orange-400{background-color:oklch(75% 0.183 55.934)}
+.bg-orange-50{background-color:oklch(98% 0.016 73.684)}
+.bg-orange-950{background-color:oklch(26.6% 0.079 36.259)}
+.bg-purple-700{background-color:oklch(49.6% 0.265 301.924)}
+.bg-red-200{background-color:oklch(88.5% 0.062 18.334)}
+.bg-red-500{background-color:oklch(63.7% 0.237 25.331)}
+.bg-rose-200{background-color:oklch(89.2% 0.058 10.001)}
+.bg-rose-700{background-color:oklch(51.4% 0.222 16.935)}
+.bg-sky-100{background-color:oklch(95.1% 0.026 236.824)}
+.bg-slate-600{background-color:oklch(44.6% 0.043 257.281)}
+.bg-slate-700{background-color:oklch(37.2% 0.044 257.287)}
+.border-blue-200{border-color:oklch(88.2% 0.059 254.128)}
+.border-blue-300{border-color:oklch(80.9% 0.105 251.813)}
+.border-blue-700{border-color:oklch(48.8% 0.243 264.376)}
+.border-green-300{border-color:oklch(87.1% 0.15 154.449)}
+.border-green-600{border-color:oklch(62.7% 0.194 149.214)}
+.border-indigo-400{border-color:oklch(67.3% 0.182 276.935)}
+.border-orange-200{border-color:oklch(90.1% 0.076 70.697)}
+.border-orange-300{border-color:oklch(83.7% 0.128 66.29)}
+.border-orange-400{border-color:oklch(75% 0.183 55.934)}
+.border-orange-500{border-color:oklch(70.5% 0.213 47.604)}
+.border-orange-700{border-color:oklch(55.3% 0.195 38.402)}
+.border-red-900{border-color:oklch(39.6% 0.141 25.723)}
+.border-slate-500{border-color:oklch(55.4% 0.046 257.417)}
+.border-violet-400{border-color:oklch(70.2% 0.183 293.541)}
+.from-blue-500{--tw-gradient-from:oklch(62.3% 0.214 259.815);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.from-green-700{--tw-gradient-from:oklch(52.7% 0.154 150.069);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.from-orange-400{--tw-gradient-from:oklch(75% 0.183 55.934);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.from-orange-600{--tw-gradient-from:oklch(64.6% 0.222 41.116);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.from-violet-950{--tw-gradient-from:oklch(28.3% 0.141 291.089);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.ring-orange-200{--tw-ring-color:oklch(90.1% 0.076 70.697)}
+.ring-orange-300{--tw-ring-color:oklch(83.7% 0.128 66.29)}
+.ring-red-400{--tw-ring-color:oklch(70.4% 0.191 22.216)}
+.ring-rose-400{--tw-ring-color:oklch(71.2% 0.194 13.428)}
+.text-blue-200{color:oklch(88.2% 0.059 254.128)}
+.text-blue-700{color:oklch(48.8% 0.243 264.376)}
+.text-green-100{color:oklch(96.2% 0.044 156.743)}
+.text-green-50{color:oklch(98.2% 0.018 155.826)}
+.text-green-800{color:oklch(44.8% 0.119 151.328)}
+.text-green-950{color:oklch(26.6% 0.065 152.934)}
+.text-indigo-100{color:oklch(93% 0.034 272.788)}
+.text-indigo-200{color:oklch(87% 0.065 274.039)}
+.text-indigo-700{color:oklch(45.7% 0.24 277.023)}
+.text-orange-100{color:oklch(95.4% 0.038 75.164)}
+.text-orange-200{color:oklch(90.1% 0.076 70.697)}
+.text-orange-300{color:oklch(83.7% 0.128 66.29)}
+.text-orange-500{color:oklch(70.5% 0.213 47.604)}
+.text-orange-600{color:oklch(64.6% 0.222 41.116)}
+.text-orange-900{color:oklch(40.8% 0.123 38.172)}
+.text-sky-50{color:oklch(97.7% 0.013 236.62)}
+.text-violet-200{color:oklch(89.4% 0.057 293.283)}
+.to-emerald-400{--tw-gradient-to:oklch(76.5% 0.177 163.223);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.to-green-400{--tw-gradient-to:oklch(79.2% 0.209 151.711);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.to-green-700{--tw-gradient-to:oklch(52.7% 0.154 150.069);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.to-red-700{--tw-gradient-to:oklch(50.5% 0.213 27.518);--tw-gradient-stops:var(--tw-gradient-via-stops,var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))}
+.via-green-600{--tw-gradient-via:oklch(62.7% 0.194 149.214);--tw-gradient-via-stops:var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-via-stops)}
+.via-orange-300{--tw-gradient-via:oklch(83.7% 0.128 66.29);--tw-gradient-via-stops:var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-via-stops)}
+.via-sky-950{--tw-gradient-via:oklch(29.3% 0.066 243.157);--tw-gradient-via-stops:var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-via-stops)}
