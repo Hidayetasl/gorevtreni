@@ -794,8 +794,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* Top Header Section */}
       <div className="world-view-header flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
         <div>
-          <div className="text-[11px] font-black text-sky-400 uppercase tracking-widest flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-orange-300" />
+          <div className="text-[11px] font-black text-sky-700 uppercase tracking-widest flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-orange-800" />
             <span>BENİM CANLI TRENİM</span>
           </div>
           <h2 className="font-game text-2xl sm:text-3xl font-black text-slate-900">
@@ -1300,7 +1300,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 aria-label="Treni durdur veya hızını değiştir"
               >
                 <span className="text-3xl leading-none drop-shadow-md sm:text-4xl">🕹️</span>
-                <span className="cockpit-control-label text-[10px] font-black text-sky-100">Hız / Dur</span>
+                <span className="cockpit-control-label text-[10px] font-black text-sky-700">Hız / Dur</span>
               </button>
               <button
                 type="button"
@@ -1312,7 +1312,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 aria-pressed={hornEnabled}
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-xl shadow-lg sm:h-12 sm:w-12 sm:text-2xl">🎺</span>
-                <span className="cockpit-control-label text-[10px] font-black text-amber-100">Korna</span>
+                <span className="cockpit-control-label text-[10px] font-black text-amber-800">Korna</span>
               </button>
               <button
                 type="button"
@@ -1326,7 +1326,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 aria-pressed={trainLightEnabled}
               >
                 <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg sm:h-10 sm:w-10 sm:text-xl ${trainLightEnabled ? 'bg-sky-500' : 'bg-slate-700'}`}>💡</span>
-                <span className="cockpit-control-label text-[10px] font-black text-sky-100">Far</span>
+                <span className="cockpit-control-label text-[10px] font-black text-sky-700">Far</span>
                 <span className={`h-1.5 w-6 rounded-full ${trainLightEnabled ? 'bg-sky-300' : 'bg-slate-600'}`} />
               </button>
               <button
@@ -1341,11 +1341,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 aria-pressed={movementSoundEnabled}
               >
                 <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg sm:h-10 sm:w-10 sm:text-xl ${movementSoundEnabled ? 'bg-orange-500' : 'bg-slate-700'}`}>🔊</span>
-                <span className="cockpit-control-label text-[10px] font-black text-orange-100">Hareket sesi</span>
+                <span className="cockpit-control-label text-[10px] font-black text-orange-800">Hareket sesi</span>
                 <span className={`h-1.5 w-6 rounded-full ${movementSoundEnabled ? 'bg-orange-300' : 'bg-slate-600'}`} />
               </button>
               <div className="cockpit-utility-footer col-span-4 flex items-center justify-between gap-1 border-t border-sky-200/15 pt-1">
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-sky-200">Tren Kokpiti</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">Tren Kokpiti</span>
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={toggleFullScreen} className="cockpit-utility-button rounded-lg border border-sky-300/30 bg-[#183b4b] px-2 py-1 text-[11px] font-black text-sky-50 active:scale-95" aria-pressed={isFullScreen} aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}>
                     {isFullScreen ? '⤢ Çık' : '⛶ Tam Ekran'}
@@ -1361,8 +1361,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
             {/* Speed & Direction Controls */}
             <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white space-y-2">
-              <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <FastForward className="w-4 h-4 text-sky-300" />
+              <div className="text-xs font-bold text-sky-700 flex items-center gap-1.5 uppercase tracking-wider">
+                <FastForward className="w-4 h-4 text-sky-700" />
                 <span>Tren Sürüş Kontrolleri</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1407,7 +1407,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 </div>
 
                 <div className="cockpit-track-status flex items-center gap-1.5 rounded-2xl border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-xs font-bold text-emerald-100">
-                  <Compass className="h-3.5 w-3.5 text-emerald-300" />
+                  <Compass className="h-3.5 w-3.5 text-emerald-700" />
                   <span>Tek hat · Gidiş / Dönüş</span>
                 </div>
               </div>
@@ -1415,8 +1415,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
             {/* Wagon Selector & Theme Switcher */}
             <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white space-y-2">
-              <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <Layers className="w-4 h-4 text-emerald-300" />
+              <div className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 uppercase tracking-wider">
+                <Layers className="w-4 h-4 text-emerald-700" />
                 <span>Vagon Ekle & Manzara Değiştir</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">

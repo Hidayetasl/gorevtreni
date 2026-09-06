@@ -180,31 +180,31 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {/* Task Status Summary Bar (Compact & Small) */}
       <div className="tasks-status-summary grid grid-cols-3 gap-1.5 sm:gap-3 py-0.5">
         <div className="bg-[#091720]/90 border border-sky-500/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-xs">
-          <span className="text-[11px] sm:text-xs font-bold text-sky-300 flex items-center gap-1">
+          <span className="text-[11px] sm:text-xs font-bold text-sky-700 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
             Yapılacak
           </span>
-          <span className="font-game text-xs sm:text-sm font-black text-sky-400 bg-sky-950/80 px-2 py-0.5 rounded-md border border-sky-600/50">
+          <span className="font-game text-xs sm:text-sm font-black text-sky-700 bg-sky-950/80 px-2 py-0.5 rounded-md border border-sky-600/50">
             {todoCount}
           </span>
         </div>
 
         <div className="bg-[#091720]/90 border border-emerald-500/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-xs">
-          <span className="text-[11px] sm:text-xs font-bold text-emerald-300 flex items-center gap-1">
+          <span className="text-[11px] sm:text-xs font-bold text-emerald-700 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             Onay Bekleyen
           </span>
-          <span className="font-game text-xs sm:text-sm font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-600/50">
+          <span className="font-game text-xs sm:text-sm font-black text-emerald-700 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-600/50">
             {pendingCount}
           </span>
         </div>
 
         <div className="bg-[#091720]/90 border border-emerald-500/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-xs">
-          <span className="text-[11px] sm:text-xs font-bold text-emerald-300 flex items-center gap-1">
+          <span className="text-[11px] sm:text-xs font-bold text-emerald-700 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             Tamamlanan
           </span>
-          <span className="font-game text-xs sm:text-sm font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-600/50">
+          <span className="font-game text-xs sm:text-sm font-black text-emerald-700 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-600/50">
             {completedCount}
           </span>
         </div>

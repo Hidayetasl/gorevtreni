@@ -54,10 +54,10 @@ export const ShopView: React.FC<ShopViewProps> = ({
       {/* View Header matching Screenshot 2 */}
       <div className="flex items-center justify-between gap-2 px-1">
         <div>
-          <div className="text-[11px] font-black text-sky-400 uppercase tracking-widest">
+          <div className="text-[11px] font-black text-sky-700 uppercase tracking-widest">
             PARÇA AL
           </div>
-          <h2 className="font-game text-2xl sm:text-3xl font-black text-white">
+          <h2 className="font-game text-2xl sm:text-3xl font-black text-slate-900">
             Mağaza
           </h2>
         </div>
