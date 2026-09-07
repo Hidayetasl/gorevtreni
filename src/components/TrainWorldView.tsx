@@ -421,6 +421,15 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     return () => { document.body.style.overflow = previousOverflow; };
   }, [isFullScreen]);
 
+  // Tam ekranda kokpit paneli varsayılan olarak KAPALI — ekranda sadece oyun
+  // alanı görünür. 🎛️ düğmesiyle alttan açılan bir panel olarak belirir, oyun
+  // alanına dokununca (backdrop) kapanır. Tam ekrandan çıkınca sıfırlanır ki
+  // bir dahaki girişte yine sadece oyun alanıyla başlansın.
+  const [showCockpitOverlay, setShowCockpitOverlay] = useState(false);
+  useEffect(() => {
+    if (!isFullScreen) setShowCockpitOverlay(false);
+  }, [isFullScreen]);
+
   // Korna/düdük eylemi: kokpit düğmesi doğrudan ses üretir; kapalıysa açık bir durum mesajı verir.
   const handleWhistleBlow = () => {
     unlockAudioContext();
@@ -888,9 +897,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* MODE 1: HIGH-QUALITY CARTOON RIDE GAME CANVAS (MATCHING USER PHOTO)   */}
       {/* ===================================================================== */}
       {viewMode === 'ride' && (
-        <div ref={fullScreenStageRef} className={`world-ride-layout space-y-4 ${isFullScreen ? 'is-fullscreen' : ''}`}>
+        <div ref={fullScreenStageRef} className={`world-ride-layout space-y-4 ${isFullScreen ? 'is-fullscreen' : ''} ${showCockpitOverlay ? 'cockpit-open' : ''}`}>
           {/* Main Graphic Canvas Box */}
-          <div className="world-ride-canvas-shell relative w-full aspect-[16/9] min-h-[300px] overflow-hidden rounded-3xl border-4 border-slate-700 shadow-2xl group select-none sm:min-h-[420px]">
+          <div
+            className="world-ride-canvas-shell relative w-full aspect-[16/9] min-h-[300px] overflow-hidden rounded-3xl border-4 border-slate-700 shadow-2xl group select-none sm:min-h-[420px]"
+          >
             {/* Oyun ekranının köşesinde her zaman görünür tam ekran düğmesi — kokpit
                 paneline kaydırmaya gerek kalmadan tek dokunuşla giriş/çıkış. */}
             <button
@@ -903,6 +914,20 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             >
               {isFullScreen ? '⤢' : '⛶'}
             </button>
+            {/* Tam ekranda kokpit varsayılan olarak gizli olduğu için, onu açmaya
+                yarayan ayrı bir köşe düğmesi — sadece tam ekran modunda görünür. */}
+            {isFullScreen && (
+              <button
+                type="button"
+                onClick={() => setShowCockpitOverlay((current) => !current)}
+                className="absolute top-2 left-2 z-30 flex h-10 items-center gap-1 rounded-full border-2 border-white/70 bg-black/50 px-3 text-sm font-black text-white shadow-lg backdrop-blur-sm transition-transform active:scale-90 sm:h-11"
+                aria-pressed={showCockpitOverlay}
+                aria-label={showCockpitOverlay ? 'Kokpiti kapat' : 'Kokpiti aç'}
+                title={showCockpitOverlay ? 'Kokpiti kapat' : 'Kokpiti aç'}
+              >
+                🎛️
+              </button>
+            )}
             {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
@@ -1294,6 +1319,15 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Kokpit açıkken oyun alanına dokununca paneli kapatan görünmez katman. */}
+          {isFullScreen && showCockpitOverlay && (
+            <div
+              className="cockpit-overlay-backdrop"
+              onClick={() => setShowCockpitOverlay(false)}
+              aria-hidden="true"
+            />
+          )}
 
           {/* Controls & Customizer Toolbar */}
           <div className="world-control-sidebar grid grid-cols-1 gap-3 md:grid-cols-2">

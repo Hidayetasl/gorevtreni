@@ -584,6 +584,42 @@ a[href],
   }
 }
 
+/* Tam ekranda kokpit paneli artık varsayılan olarak GİZLİ — ekranda sadece
+   oyun alanı görünür (önceki tasarımda kokpit her zaman yandan/alttan sabit
+   yer kaplıyordu, mobilde ekranın neredeyse yarısını götürüyordu). Oyun
+   ekranının köşesindeki 🎛️ düğmesiyle açılır: ekranı alttan kaplayan,
+   kaydırılabilir bir panel olarak belirir; arkasındaki karartılmış oyun
+   alanına dokununca kapanır. Bu kurallar, üstteki grid-template-columns
+   tanımlarıyla aynı özgüllükte (.world-ride-layout.is-fullscreen ...) ama
+   dosyada SONRA geldiği için kazanıyor; .cockpit-open varyantı ise bir class
+   fazlasıyla daha özgül olduğundan açıkken her zaman üstün geliyor.
+   Detay: bkz. https://developer.mozilla.org/docs/Web/CSS/CSS_cascade */
+.world-ride-layout.is-fullscreen { grid-template-columns: 1fr; }
+.world-ride-layout.is-fullscreen .world-control-sidebar { display: none; }
+.cockpit-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 205;
+  background: rgba(4, 12, 18, 0.55);
+}
+.world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar {
+  display: grid;
+  grid-template-columns: 1fr;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 210;
+  width: 100%;
+  max-height: min(78dvh, 640px);
+  overflow-y: auto;
+  border-radius: 22px 22px 0 0;
+  padding: 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  background: #0a1b26;
+  box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.55);
+  gap: 0.75rem;
+}
 
 .cockpit-floating-horn {
   min-width: 3.5rem;
