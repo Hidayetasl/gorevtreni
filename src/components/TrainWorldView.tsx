@@ -379,18 +379,31 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     return () => clearInterval(interval);
   }, [isTrainRunning, trainSpeed, trainDirection, viewMode, trainImagesReady, assemblyWidthPercent, movementSoundEnabled, soundEnabled]);
 
+  // iOS Safari (ve bazı gömülü tarayıcılar) Fullscreen API'yi hiç desteklemez
+  // (requestFullscreen tanımsızdır) — bu yüzden mobilde düğme tepki vermiyordu.
+  // Native API yoksa veya reddedilirse, saf CSS ile tüm ekranı kaplayan
+  // "sahte tam ekran"a (bkz. index.css: .is-fullscreen:not(:fullscreen)) düşülür.
   const toggleFullScreen = async () => {
     const stage = fullScreenStageRef.current;
     if (!stage) return;
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else if (stage.requestFullscreen) {
-        await stage.requestFullscreen();
-      }
-    } catch {
-      setInteractiveMessage('Tam ekran bu tarayıcıda kullanılamıyor; normal görünüm devam ediyor.');
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { /* yoksay, state zaten kapanacak */ }
+      setIsFullScreen(false);
+      return;
     }
+    if (isFullScreen) {
+      setIsFullScreen(false);
+      return;
+    }
+    if (typeof stage.requestFullscreen === 'function') {
+      try {
+        await stage.requestFullscreen();
+        return; // isFullScreen, fullscreenchange dinleyicisiyle senkronize edilir.
+      } catch {
+        // İzin politikası vb. yüzünden reddedildi — CSS moduna düş.
+      }
+    }
+    setIsFullScreen(true);
   };
 
   useEffect(() => {
@@ -398,6 +411,15 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     document.addEventListener('fullscreenchange', syncFullScreenState);
     return () => document.removeEventListener('fullscreenchange', syncFullScreenState);
   }, []);
+
+  // Sahte (CSS) tam ekran modundayken arkadaki sayfanın kaymasını engeller —
+  // native Fullscreen API zaten bunu kendisi hallediyor, ekstra zararı yok.
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isFullScreen]);
 
   // Korna/düdük eylemi: kokpit düğmesi doğrudan ses üretir; kapalıysa açık bir durum mesajı verir.
   const handleWhistleBlow = () => {
@@ -869,6 +891,18 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
         <div ref={fullScreenStageRef} className={`world-ride-layout space-y-4 ${isFullScreen ? 'is-fullscreen' : ''}`}>
           {/* Main Graphic Canvas Box */}
           <div className="world-ride-canvas-shell relative w-full aspect-[16/9] min-h-[300px] overflow-hidden rounded-3xl border-4 border-slate-700 shadow-2xl group select-none sm:min-h-[420px]">
+            {/* Oyun ekranının köşesinde her zaman görünür tam ekran düğmesi — kokpit
+                paneline kaydırmaya gerek kalmadan tek dokunuşla giriş/çıkış. */}
+            <button
+              type="button"
+              onClick={toggleFullScreen}
+              className="absolute top-2 right-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/70 bg-black/50 text-lg text-white shadow-lg backdrop-blur-sm transition-transform active:scale-90 sm:h-11 sm:w-11"
+              aria-pressed={isFullScreen}
+              aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}
+              title={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}
+            >
+              {isFullScreen ? '⤢' : '⛶'}
+            </button>
             {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}

@@ -84,6 +84,15 @@
   padding: 14px;
   background: #091b26;
 }
+/* iOS Safari gibi Fullscreen API'yi desteklemeyen tarayıcılarda `.is-fullscreen`
+   class'ı native `:fullscreen` OLMADAN uygulanır — bu durumda tarayıcı ekranı
+   kendisi kaplamadığı için biz `position: fixed` ile tüm viewport'u kaplarız. */
+.world-ride-layout.is-fullscreen:not(:fullscreen) {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow-y: auto;
+}
 .world-ride-layout.is-fullscreen > :not(:last-child) { margin-bottom: 0; }
 .world-ride-layout.is-fullscreen .world-ride-canvas-shell {
   min-height: 0;
