@@ -210,16 +210,90 @@ export function playFanfare(enabled: boolean = true) {
   }
 }
 
+// Tarayıcının ses listesi ASENKRON yüklenir (ilk çağrıda boş dönebilir). Sesler
+// hazır olur olmaz önbelleğe alınıyor ki her konuşmada doğru/kaliteli sesi
+// seçebilelim — özellikle İngilizce'de varsayılan (bazen düşük kaliteli veya
+// yanlış aksanlı) sesi değil, bilinen net sesleri tercih ediyoruz.
+let cachedVoices: SpeechSynthesisVoice[] = [];
+
+function loadVoices() {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  const list = window.speechSynthesis.getVoices();
+  if (list.length > 0) cachedVoices = list;
+}
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+// İyi bilinen, net telaffuzlu sesler ÖNCELİK SIRASINA göre denenir (ilk
+// eşleşen kazanır). macOS/iOS'un normal konuşma sesleri (Samantha, Ava, Alex,
+// Daniel, Karen) ile Chrome'un ağ tabanlı Google sesleri en başta; işletim
+// sistemlerinin "eğlence/karakter" sesleri (aşağıdaki kara listede) hiçbir
+// zaman seçilmez — aksi halde cihazda başka uygun ses yoksa yanlışlıkla
+// robotik/komik bir ses (ör. "Zarvox", "Bahh", "Albert") seçilebiliyordu, bu
+// da "telaffuz net değil" şikayetinin bir kısmının kaynağıydı.
+const PREFERRED_VOICE_NAMES = [
+  'Google US English',
+  'Samantha',
+  'Ava',
+  'Alex',
+  'Microsoft Aria Online (Natural)',
+  'Microsoft Guy Online (Natural)',
+  'Microsoft Zira',
+  'Microsoft David',
+  'Karen',
+  'Daniel',
+  'Google UK English Female',
+];
+
+// macOS/iOS'un "eğlence" (novelty) sesleri: dil öğretimi için ASLA uygun
+// değil, net biçimde hariç tutulur.
+const BLOCKED_VOICE_NAMES = [
+  'Albert', 'Bahh', 'Bells', 'Boing', 'Bubbles', 'Cellos', 'Eddy', 'Flo',
+  'Fred', 'Grandma', 'Grandpa', 'Jester', 'Junior', 'Organ', 'Org', 'Ralph',
+  'Reed', 'Rocko', 'Sandy', 'Shelley', 'Superstar', 'Trinoids', 'Whisper',
+  'Wobble', 'Zarvox', 'Bad News', 'Good News', 'İyi Haber', 'Kötü Haber',
+];
+
+function pickVoice(lang: string): SpeechSynthesisVoice | null {
+  if (cachedVoices.length === 0) loadVoices();
+  if (cachedVoices.length === 0) return null;
+  const langPrefix = lang.slice(0, 2).toLowerCase();
+  const allowed = cachedVoices.filter(
+    (v) => v.lang.toLowerCase().startsWith(langPrefix) && !BLOCKED_VOICE_NAMES.some((name) => v.name.includes(name)),
+  );
+  if (allowed.length === 0) return null;
+  // Önce istenen dilin TAM eşleşmesi (ör. tam olarak "en-US"), sonra dil
+  // önekiyle eşleşen herhangi bir ses (ör. "en-GB") denenir.
+  const exact = allowed.filter((v) => v.lang.toLowerCase() === lang.toLowerCase());
+  const pool = exact.length > 0 ? exact : allowed;
+  for (const name of PREFERRED_VOICE_NAMES) {
+    const match = pool.find((v) => v.name.includes(name));
+    if (match) return match;
+  }
+  const local = pool.find((v) => v.localService);
+  return local || pool[0];
+}
+
 /**
- * Web Speech API text-to-speech engine for encouraging Turkish feedback
+ * Web Speech API text-to-speech engine for encouraging Turkish feedback.
+ * `lang` varsayılan olarak Türkçe'dir; İngilizce kelime/telaffuz öğretimi gibi
+ * durumlar için 'en-US' geçilebilir (tarayıcının İngilizce sesi kullanılır).
+ * `pitch` varsayılan olarak çocuklar için hafif enerjik (1.2); İngilizce
+ * kelime öğretiminde netlik için genelde 1.0 (doğal) geçiriliyor — aşırı
+ * pitch kayması sentezlenmiş sesi anlaşılmaz/bozuk hale getirebiliyor.
  */
-export function speakText(text: string, enabled: boolean = true, rate: number = 0.95) {
+export function speakText(text: string, enabled: boolean = true, rate: number = 0.95, lang: string = 'tr-TR', pitch: number = 1.2) {
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel(); // Stop ongoing speech
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'tr-TR';
-    utterance.pitch = 1.2; // Slightly higher energetic pitch for children
+    utterance.lang = lang;
+    const voice = pickVoice(lang);
+    if (voice) utterance.voice = voice;
+    utterance.pitch = pitch;
     utterance.rate = rate; // Çağıran, gerektiğinde (ör. harf öğretimi) daha yavaş bir hız verebilir
     window.speechSynthesis.speak(utterance);
   } catch (e) {
