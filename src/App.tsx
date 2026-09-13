@@ -307,7 +307,15 @@ export default function App() {
           }
           remoteUpdateRef.current = true;
           setActiveChildDevice(remote.activeChildDevice ?? null);
-          const syncedLedger = mergeById(remote.coinLedger || [], coinLedger);
+          // Bu callback yalnızca familyCode/cloudEnabled/networkEpoch değişince yeniden
+          // kurulur (effect deps'e bakın), bu yüzden `tasks`/`shop`/`bonuses`/`coinLedger`
+          // React state değişkenleri burada donmuş kalır. Onaylanan bir görev, birleştirme
+          // bu eski kapanışa göre yapılırsa hemen sonra gelen herhangi bir snapshot'ta
+          // "onay bekliyor" durumuna geri düşüyordu. `latestFamilyDataRef` her render'da
+          // güncellendiği için (bkz. `world` için zaten yapılan aynı düzeltme) güncel
+          // veriyi okumak üzere onu kullanıyoruz.
+          const localData = latestFamilyDataRef.current;
+          const syncedLedger = mergeById(remote.coinLedger || [], localData?.coinLedger || coinLedger);
           const syncedUser: UserProfile = {
             ...INITIAL_USER,
             ...remote.user,
@@ -323,8 +331,8 @@ export default function App() {
           const worldChanged = JSON.stringify(mergedWorld) !== JSON.stringify(remote.world || []);
 
           setUser(syncedUser); setParentConfig(remote.parentConfig);
-          setTasks(mergeById(remote.tasks || [], tasks));
-          setShop(mergeById(syncedShop, shop)); setWorld(syncedWorld); setBonuses(mergeById(remote.bonuses || [], bonuses));
+          setTasks(mergeById(remote.tasks || [], localData?.tasks || tasks));
+          setShop(mergeById(syncedShop, localData?.shop || shop)); setWorld(syncedWorld); setBonuses(mergeById(remote.bonuses || [], localData?.bonuses || bonuses));
           setCoinLedger(syncedLedger);
           const remoteMessages = remote.voiceMessages || [];
           const localMessages = voiceMessagesRef.current;
@@ -481,7 +489,7 @@ export default function App() {
         coins: calculateLedgerBalance(syncedLedger, remote.user.coins),
       });
       setCoinLedger(syncedLedger);
-      setParentConfig(remote.parentConfig); setTasks(remote.tasks); setShop(mergeShopItemsWithCatalog(remote.shop));
+      setParentConfig(remote.parentConfig); setTasks(mergeById(remote.tasks || [], tasks)); setShop(mergeShopItemsWithCatalog(remote.shop));
       setWorld(syncedWorld); setBonuses(mergeById(remote.bonuses || [], bonuses)); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
       setActiveChildDevice(remote.activeChildDevice ?? null);
       window.setTimeout(() => { remoteUpdateRef.current = false; }, 600);
