@@ -29,19 +29,32 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 // --- /GEÇİCİ TEŞHİS BANDI ---
 
-const updateSW = registerSW({ immediate: true });
-
-// workbox-window'un isUpdate/isExternal sezgisi bazı senaryolarda güncellemeyi
-// kaçırabiliyor (bkz. vite-plugin-pwa#789); native controllerchange olayı daha
-// güvenilir bir yedek — yeni SW kontrolü devraldığı an sayfayı yeniler.
-navigator.serviceWorker?.addEventListener('controllerchange', () => {
-  window.location.reload();
+// registerType: 'autoUpdate' zaten yeni sürüm aktifleştiğinde otomatik reload
+// yapıyor (vite-plugin-pwa'nın kendi register.js'i, activated olayında
+// window.location.reload() çağırıyor) — ayrıca bir controllerchange dinleyicisi
+// eklemek bunu tekrarlayıp reload'u kullanıcının parmağı ekrandayken
+// tetikleyebiliyordu. onNeedReload ile bu reload'u devralıp, kullanıcı birkaç
+// saniyedir etkileşimde değilse (dokunuş/tuş yok) uyguluyoruz.
+let lastInteractionAt = Date.now();
+const markInteraction = () => { lastInteractionAt = Date.now(); };
+(['pointerdown', 'touchstart', 'keydown'] as const).forEach((eventName) => {
+  window.addEventListener(eventName, markInteraction, { passive: true });
 });
 
-// Sekme kapatılıp açılmasa bile periyodik olarak yeni sürüm var mı diye kontrol et.
-setInterval(() => {
-  updateSW();
-}, 60 * 1000);
+const IDLE_MS_BEFORE_RELOAD = 4000;
+
+function reloadWhenIdle() {
+  if (Date.now() - lastInteractionAt >= IDLE_MS_BEFORE_RELOAD) {
+    window.location.reload();
+  } else {
+    window.setTimeout(reloadWhenIdle, 1000);
+  }
+}
+
+registerSW({
+  immediate: true,
+  onNeedReload: reloadWhenIdle,
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
