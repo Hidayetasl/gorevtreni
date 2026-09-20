@@ -135,17 +135,19 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Voice Messages Button */}
+            {/* Voice Messages Button — sade, temiz buton (dokunma sorunu teşhisi için gradient/animasyon kaldırıldı) */}
             {onOpenVoiceModal && (
               <button
-                onClick={onOpenVoiceModal}
-                className={`app-header-action app-header-action--message ${unreadVoiceCount > 0 ? 'app-header-action--message-unread' : ''} bg-gradient-to-r from-blue-500 to-blue-700 hover:brightness-110 border border-blue-200 text-white h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl flex items-center gap-1.5 transition-all active:scale-95 shadow-md relative font-game text-xs font-bold`}
+                type="button"
+                onClick={() => onOpenVoiceModal()}
+                style={{ backgroundColor: '#1d4ed8', color: '#fff', border: '1px solid #93c5fd' }}
+                className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl flex items-center gap-1.5 relative font-game text-xs font-bold"
                 title="Sesli Mesaj Kutusu"
               >
                 <span className="text-base" aria-hidden="true">🎙️</span>
-                <span className="app-header-action-label">Mesaj</span>
+                <span>Mesaj</span>
                 {unreadVoiceCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full border border-white/80 animate-pulse">
+                  <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full border border-white/80">
                     {unreadVoiceCount}
                   </span>
                 )}

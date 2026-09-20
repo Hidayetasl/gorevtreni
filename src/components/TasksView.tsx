@@ -47,27 +47,32 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
 
         {/* Secondary actions only; the Header already owns the message inbox. */}
+        {/* Sade, temiz butonlar (dokunma sorunu teşhisi için gradient/animasyon kaldırıldı) */}
         <div className="tasks-quick-actions flex flex-wrap items-center justify-end gap-1.5">
           {onOpenVoiceModal && (
             <button
+              type="button"
               onClick={() => onOpenVoiceModal('record')}
-              className="tasks-action-button bg-blue-600 text-white px-3 py-2 rounded-2xl shadow-lg flex items-center gap-1 text-sm font-bold font-game transition-all active:scale-95"
+              style={{ backgroundColor: '#2563eb', color: '#fff' }}
+              className="px-3 py-2 rounded-2xl flex items-center gap-1 text-sm font-bold font-game"
               aria-label="Sesli mesaj gönder"
               title="Sesli mesaj gönder"
             >
               <Mic className="h-4 w-4" aria-hidden="true" />
-              <span className="tasks-action-label">Gönder</span>
+              <span>Gönder</span>
             </button>
           )}
           {onOpenJournal && (
             <button
+              type="button"
               onClick={() => onOpenJournal('inbox')}
-              className="tasks-action-button bg-blue-600 text-white px-3 py-2 rounded-2xl shadow-lg text-sm font-bold font-game transition-all active:scale-95"
+              style={{ backgroundColor: '#2563eb', color: '#fff' }}
+              className="px-3 py-2 rounded-2xl text-sm font-bold font-game"
               aria-label="Günlüğümü aç"
               title="Günlüğümü aç"
             >
               <BookOpen className="h-4 w-4" aria-hidden="true" />
-              <span className="tasks-action-label">Günlük</span>
+              <span>Günlük</span>
             </button>
           )}
 

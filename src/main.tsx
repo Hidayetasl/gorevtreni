@@ -5,28 +5,38 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
 // --- GEÇİCİ TEŞHİS BANDI (sorun bulunca kaldırılacak) ---
-function showErrorBanner(message: string) {
-  let banner = document.getElementById('debug-error-banner');
+declare global {
+  interface Window {
+    __debugLog?: (message: string) => void;
+  }
+}
+
+function showDebugBanner(message: string, isError: boolean) {
+  let banner = document.getElementById('debug-log-banner');
   if (!banner) {
     banner = document.createElement('div');
-    banner.id = 'debug-error-banner';
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#dc2626;color:#fff;padding:10px;font-family:monospace;font-size:11px;white-space:pre-wrap;max-height:60vh;overflow:auto;';
+    banner.id = 'debug-log-banner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:rgba(15,23,42,0.94);color:#a7f3d0;padding:8px;font-family:monospace;font-size:10px;white-space:pre-wrap;max-height:50vh;overflow:auto;';
     document.body.appendChild(banner);
   }
   const line = document.createElement('div');
-  line.style.cssText = 'border-top:1px solid rgba(255,255,255,0.35);padding-top:6px;margin-top:6px;';
-  line.textContent = message;
+  line.style.cssText = `border-top:1px solid rgba(255,255,255,0.2);padding-top:5px;margin-top:5px;${isError ? 'color:#fca5a5;font-weight:bold;' : ''}`;
+  line.textContent = `${new Date().toLocaleTimeString('tr-TR')} — ${message}`;
   banner.prepend(line);
 }
 
+window.__debugLog = (message: string) => showDebugBanner(message, false);
+
 window.addEventListener('error', (event) => {
-  showErrorBanner(`HATA: ${event.message}\n${event.filename}:${event.lineno}:${event.colno}\n${event.error?.stack ?? ''}`);
+  showDebugBanner(`HATA: ${event.message}\n${event.filename}:${event.lineno}:${event.colno}\n${event.error?.stack ?? ''}`, true);
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   const reason: any = event.reason;
-  showErrorBanner(`PROMISE REDDİ: ${reason?.message ?? reason}\n${reason?.stack ?? ''}`);
+  showDebugBanner(`PROMISE REDDİ: ${reason?.message ?? reason}\n${reason?.stack ?? ''}`, true);
 });
+
+window.__debugLog(`main.tsx yüklendi — bundle: ${document.querySelector('script[type="module"]')?.getAttribute('src') ?? '?'}`);
 // --- /GEÇİCİ TEŞHİS BANDI ---
 
 // registerType: 'autoUpdate' zaten yeni sürüm aktifleştiğinde otomatik reload

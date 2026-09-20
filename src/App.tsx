@@ -868,12 +868,14 @@ export default function App() {
   };
 
   const openVoiceModal = (initialTab: 'inbox' | 'record' = 'inbox') => {
+    window.__debugLog?.(`openVoiceModal çağrıldı (${initialTab})`);
     setVoiceModalInitialTab(initialTab);
     setIsJournalMode(false);
     setIsVoiceModalOpen(true);
   };
 
   const openJournal = (initialTab: 'inbox' | 'record' = 'inbox') => {
+    window.__debugLog?.(`openJournal çağrıldı (${initialTab})`);
     setVoiceModalInitialTab(initialTab);
     setIsJournalMode(true);
     setIsVoiceModalOpen(true);
