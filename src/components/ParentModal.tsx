@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo, ActivityLogEntry, VoiceMessage } from '../types';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
-import { extractYoutubeId, hashParentPin } from '../utils/storage';
+import { extractYoutubeId, hashParentPin, isWeakParentPin, needsNewParentPin } from '../utils/storage';
+
+/** PIN girildikten sonra panel bu süre boyunca yeniden PIN sormadan açılır. */
+const PARENT_UNLOCK_MS = 5 * 60 * 1000;
 import { getFamilyInviteLink } from '../utils/cloudSync';
 import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw, History, LogIn, ShoppingBag, BookOpen } from 'lucide-react';
@@ -76,6 +79,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   weeklyStats = [],
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const unlockedAtRef = useRef(0);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
@@ -147,7 +151,24 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [joiningCode, setJoiningCode] = useState('');
   const [syncMessage, setSyncMessage] = useState('');
 
+  const [editingPinAgain, setEditingPinAgain] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
+
+  // Panel kapanıp tekrar açıldığında, son PIN girişinin üzerinden 5 dakika
+  // geçtiyse yeniden kilitlenir; açık unutulan panel Rüzgar'a kalmaz.
+  useEffect(() => {
+    if (isOpen && Date.now() - unlockedAtRef.current > PARENT_UNLOCK_MS) {
+      setIsAuthenticated(false);
+      setPinInput('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const unlock = () => {
+    unlockedAtRef.current = Date.now();
+    setIsAuthenticated(true);
+  };
 
   const handlePinKeyPress = (num: string) => {
     playPopSound(soundEnabled);
@@ -158,15 +179,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
       setPinMessage('PIN 4 rakam olmalı.');
 
       if (newPin.length === 4) {
-        if (!parentConfig.pinHash) {
-          onUpdateParentConfig({ ...parentConfig, pinHash: hashParentPin(newPin) });
+        // PIN yalnızca giriş ekranında, hesap şifresiyle giriş yapmış yetişkin
+        // tarafından belirlenir. Panelde "ilk yazılan PIN kaydedilir" yolu yoktur.
+        if (parentConfig.pinHash && hashParentPin(newPin) === parentConfig.pinHash) {
           setPinInput('');
-          setIsAuthenticated(true);
-          setPinMessage('');
-          speakText('Ebeveyn PIN kodu belirlendi', speechEnabled);
-        } else if (hashParentPin(newPin) === parentConfig.pinHash) {
-          setPinInput('');
-          setIsAuthenticated(true);
+          unlock();
           setPinMessage('');
         } else {
           setPinError(true);
@@ -253,7 +270,20 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const handleSaveSettings = () => {
     onUpdateUserProfile({ ...userProfile, name: editingChildName.trim() || 'Rüzgar' });
     const nextPin = editingPin.trim();
-    if (nextPin && /^\d{4}$/.test(nextPin)) onUpdateParentConfig({ ...parentConfig, pinHash: hashParentPin(nextPin) });
+    if (nextPin) {
+      if (!/^\d{4}$/.test(nextPin) || nextPin !== editingPinAgain) {
+        setSettingsMessage('Yeni PIN iki alanda da aynı 4 rakam olmalı.');
+        return;
+      }
+      if (isWeakParentPin(nextPin) || needsNewParentPin(hashParentPin(nextPin))) {
+        setSettingsMessage('Bu PIN kolay tahmin edilir. Başka 4 rakam seçin.');
+        return;
+      }
+      onUpdateParentConfig({ ...parentConfig, pinHash: hashParentPin(nextPin) });
+      setEditingPin('');
+      setEditingPinAgain('');
+    }
+    setSettingsMessage(nextPin ? 'Ayarlar ve yeni PIN kaydedildi. PIN ailedeki tüm cihazlarda geçerli.' : 'Ayarlar kaydedildi.');
     speakText('Ayarlar kaydedildi', speechEnabled);
   };
 
@@ -326,9 +356,9 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 🔑
               </div>
               <h3 className="font-game text-gray-800 text-lg font-bold">
-                {parentConfig.pinHash ? 'Ebeveyn PIN Kodunu Girin' : '4 Haneli Ebeveyn PIN’ini Belirleyin'}
+                {parentConfig.pinHash ? 'Ebeveyn PIN Kodunu Girin' : 'Aile PIN’i henüz yüklenmedi'}
               </h3>
-              <p className="text-xs text-gray-500 font-bold">{parentConfig.pinHash ? 'Onay, bonus ve ebeveyn alanı için aynı PIN kullanılır.' : 'Bu PIN bu cihazdaki tüm ebeveyn işlemlerinde kullanılacak.'}</p>
+              <p className="text-xs text-gray-500 font-bold">{parentConfig.pinHash ? 'Onay, bonus ve ebeveyn alanı için ailedeki tüm cihazlarda aynı PIN kullanılır.' : 'İnternet bağlantısını kontrol edin. Aile PIN’i buluttan gelince panel açılır.'}</p>
             </div>
 
             {/* PIN Dots Display */}
@@ -1008,18 +1038,37 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-gray-600 block mb-1">Ebeveyn PIN Kodu (4 Hane)</label>
+                    <label htmlFor="editing-pin" className="text-xs font-bold text-gray-600 block mb-1">Yeni aile PIN’i (4 hane)</label>
                     <input
-                      type="text"
+                      id="editing-pin"
+                      type="password"
+                      autoComplete="new-password"
                       maxLength={4}
                       value={editingPin}
                       inputMode="numeric"
                       pattern="[0-9]*"
                       placeholder="Değiştirmek için 4 rakam yazın"
-                      onChange={(e) => setEditingPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={(e) => { setEditingPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold font-game"
                     />
                   </div>
+                  {editingPin && (
+                    <div>
+                      <label htmlFor="editing-pin-again" className="text-xs font-bold text-gray-600 block mb-1">Yeni PIN tekrarı</label>
+                      <input
+                        id="editing-pin-again"
+                        type="password"
+                        autoComplete="new-password"
+                        maxLength={4}
+                        value={editingPinAgain}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="Yeni PIN’i tekrar yazın"
+                        onChange={(e) => { setEditingPinAgain(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }}
+                        className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold font-game"
+                      />
+                    </div>
+                  )}
 
                   <button
                     onClick={handleSaveSettings}
@@ -1027,6 +1076,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   >
                     Ayarları Kaydet 💾
                   </button>
+                  {settingsMessage && <p role="status" className="text-xs text-gray-500 font-bold">{settingsMessage}</p>}
                 </div>
 
                 <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-3 space-y-2">

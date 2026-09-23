@@ -1,0 +1,62 @@
+/* Yetişkin giriş kapısı. Proje Tailwind'i derlemediği (index.css hazır çıktı)
+   için bu ekran kendi sade stillerini taşır. Renkler yeni tasarım sistemiyle aynı. */
+.ag {
+  --ag-ink: #16323a;
+  --ag-ink-2: #56737a;
+  --ag-line: #cfdadb;
+  --ag-accent: #0e6e6b;
+  --ag-accent-d: #0b5754;
+  --ag-accent-s: #ddf0ee;
+  --ag-good: #067647;
+  --ag-good-s: #e3f5ea;
+  --ag-crit: #b42318;
+  --ag-crit-s: #fdecea;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: linear-gradient(180deg, #eaf5f7 0%, #d7eef1 100%);
+  color: var(--ag-ink);
+  font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (min-height: 700px) { .ag { align-items: center; } }
+.ag *, .ag *::before, .ag *::after { box-sizing: border-box; }
+.ag-wrap { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+.ag-brand { display: flex; align-items: center; gap: 12px; }
+.ag-logo { width: 52px; height: 52px; border-radius: 16px; background: #fff; display: grid; place-items: center; font-size: 28px; box-shadow: 0 2px 0 #cfe3e6; }
+.ag-brand small { display: block; font-weight: 800; font-size: 12px; letter-spacing: .14em; color: var(--ag-accent); }
+.ag-brand b { display: block; font-size: 22px; font-weight: 900; }
+.ag-tag { margin-left: auto; background: #fef3d7; color: #7a4a00; border-radius: 99px; padding: 4px 12px; font-size: 13px; font-weight: 800; }
+.ag-card { background: #fff; border-radius: 26px; padding: 22px 20px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 3px 0 #cfe3e6, 0 18px 40px -28px rgba(14, 50, 58, .45); }
+.ag-card h1 { margin: 0; font-size: 25px; line-height: 1.2; font-weight: 900; text-wrap: balance; }
+.ag-card p { margin: 0; }
+.ag-sub { color: var(--ag-ink-2); font-size: 16px; line-height: 1.45; }
+.ag-field { display: flex; flex-direction: column; gap: 6px; }
+.ag-field label { font-size: 15px; font-weight: 800; }
+.ag-input { width: 100%; min-height: 52px; border-radius: 16px; border: 1.5px solid var(--ag-line); background: #fff; padding: 0 16px; font: 600 17px/1 inherit; font-family: inherit; color: var(--ag-ink); outline: none; }
+.ag-input:focus { border-color: var(--ag-accent); box-shadow: 0 0 0 4px rgba(14, 110, 107, .15); }
+.ag-input.pin { letter-spacing: .5em; font-size: 22px; text-align: center; }
+.ag-pw { position: relative; }
+.ag-pw .ag-input { padding-right: 56px; }
+.ag-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border: 0; border-radius: 12px; background: none; color: var(--ag-ink-2); cursor: pointer; font-size: 14px; font-weight: 800; }
+.ag-btn { min-height: 56px; width: 100%; border: 0; border-radius: 18px; background: var(--ag-accent); color: #fff; font: 800 18px/1 inherit; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 0 var(--ag-accent-d); }
+.ag-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--ag-accent-d); }
+.ag-btn:disabled { opacity: .6; cursor: default; }
+.ag-btn.ghost { background: #eef3f4; color: var(--ag-ink); box-shadow: none; }
+.ag-btn.line { background: #fff; color: var(--ag-accent); border: 2px solid var(--ag-accent); box-shadow: none; }
+.ag-link { align-self: center; min-height: 48px; padding: 0 12px; border: 0; background: none; color: var(--ag-accent); font: 800 16px inherit; font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.ag-msg { border-radius: 16px; padding: 12px 14px; font-size: 15px; font-weight: 700; line-height: 1.4; }
+.ag-msg.err { background: var(--ag-crit-s); color: var(--ag-crit); }
+.ag-msg.ok { background: var(--ag-good-s); color: var(--ag-good); }
+.ag-note { font-size: 14px; color: var(--ag-ink-2); line-height: 1.45; }
+.ag-row { display: flex; gap: 10px; }
+.ag-row > * { flex: 1; }
+.ag-center { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 0; text-align: center; color: var(--ag-ink-2); font-weight: 700; }
+.ag-spin { width: 36px; height: 36px; border-radius: 50%; border: 4px solid var(--ag-accent-s); border-top-color: var(--ag-accent); animation: ag-spin .8s linear infinite; }
+@keyframes ag-spin { to { transform: rotate(360deg); } }
+.ag-box { background: #f4f8f8; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ag-code { font-family: ui-monospace, Menlo, monospace; font-weight: 800; font-size: 18px; letter-spacing: .12em; text-align: center; word-break: break-all; }
+@media (prefers-reduced-motion: reduce) { .ag-spin { animation: none; } }

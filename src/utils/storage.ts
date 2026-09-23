@@ -263,6 +263,22 @@ export function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
+/**
+ * Eski sürümlerde herkesin bildiği sabit PIN'ler vardı (baba 0123, anne 1234,
+ * anneanne 2345, dede 3456). Aile PIN'i bunlardan biriyse yenisi istenir.
+ */
+export function needsNewParentPin(pinHash?: string) {
+  return !pinHash || ['1234', '0123', '2345', '3456'].some((pin) => hashParentPin(pin) === pinHash);
+}
+
+/** Tekrarlı veya ardışık (1111, 1234, 9876) PIN'ler kolay tahmin edilir. */
+export function isWeakParentPin(pin: string) {
+  if (/^(\d)\1{3}$/.test(pin)) return true;
+  const digits = pin.split('').map(Number);
+  const steps = digits.slice(1).map((digit, index) => digit - digits[index]);
+  return steps.every((step) => step === 1) || steps.every((step) => step === -1);
+}
+
 /** Web Crypto olmayan yerel ağ adreslerinde de çalışan, yalnızca yerel PIN özeti. */
 export function hashParentPin(pin: string): string {
   let hash = 2166136261;

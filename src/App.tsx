@@ -50,7 +50,7 @@ import { ParentModal } from './components/ParentModal';
 import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
-import { SimpleAccessGate } from './components/SimpleAccessGate';
+import { AuthGate } from './components/AuthGate';
 import { acceptFamilyInvite, createFamilyCode, familyExists, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
@@ -183,6 +183,8 @@ export default function App() {
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
   const [activeChildDevice, setActiveChildDevice] = useState<ActiveChildDevice | null | undefined>(undefined);
   const [adultUser, setAdultUser] = useState<{ uid: string; name: AdultName } | null>(null);
+  // Firebase oturumu diskten geri yüklenene kadar giriş ekranını gösterme.
+  const [authChecked, setAuthChecked] = useState(!isCloudConfigured);
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [networkEpoch, setNetworkEpoch] = useState(0);
@@ -208,8 +210,9 @@ export default function App() {
       }
       const adultName = getAdultName(firebaseUser);
       setAdultUser(adultName && firebaseUser ? { uid: firebaseUser.uid, name: adultName } : null);
+      setAuthChecked(true);
     }, () => {
-      if (!cancelled) setAdultUser(null);
+      if (!cancelled) { setAdultUser(null); setAuthChecked(true); }
     });
     return () => { cancelled = true; unsubscribe(); };
   }, []);
@@ -528,8 +531,6 @@ export default function App() {
       : null;
     setActiveChildDevice(nextValue);
   };
-
-  const handleOpenAdultLogin = () => setHasGameAccess(false);
 
   const handleSwitchAccount = async () => {
     if (isCloudConfigured) {
@@ -901,30 +902,35 @@ export default function App() {
   const unreadVoiceCount = voiceMessages.filter((m) => m.isNew).length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
-  if (!hasGameAccess) {
-    // Giriş kodu artık doğrudan aile kodu: doğru kod hem oyunu açar hem bu
-    // cihazı aynı aile verisine bağlar, ayrı bir "eşleşme" adımına gerek kalmaz.
+  if (isCloudConfigured && !authChecked) {
+    return <main className="min-h-screen bg-[#EAF5F7]" aria-busy="true" />;
+  }
+
+  // Cihaz yalnızca izinli bir yetişkin hesabıyla açıkken ve aileye bağlıyken
+  // oyunu gösterir. Eski anonim "çocuk olarak devam" cihazları bir kez giriş ister.
+  if (isCloudConfigured && !(hasGameAccess && adultUser && familyCode)) {
     return (
-        <SimpleAccessGate
-          onUnlock={(code, familyData) => {
-            if (code) setFamilyCode(code);
-            if (familyData) {
-              const syncedLedger = familyData.coinLedger || [];
-              setUser({ ...INITIAL_USER, ...familyData.user, coins: calculateLedgerBalance(syncedLedger, familyData.user.coins) });
-              setParentConfig(familyData.parentConfig || INITIAL_PARENT);
-              setTasks(familyData.tasks || INITIAL_TASKS);
-              setShop(mergeShopItemsWithCatalog(familyData.shop || INITIAL_SHOP));
-              setWorld(familyData.world || INITIAL_WORLD);
-              setBonuses(familyData.bonuses || INITIAL_BONUSES);
-              setVoiceMessages(familyData.voiceMessages || INITIAL_VOICE_MESSAGES);
-              setVideos(familyData.videos || INITIAL_VIDEOS);
-              setActivityLog(familyData.activityLog || []);
-              setCoinLedger(syncedLedger);
-              setActiveChildDevice(familyData.activeChildDevice ?? null);
-            }
-            setHasGameAccess(true);
-          }}
-        />
+      <AuthGate
+        getLocalFamilyData={currentFamilyData}
+        onReady={(code, familyData) => {
+          saveFamilyCode(code);
+          setFamilyCode(code);
+          localStorage.setItem('ruzgar_game_access_v1', 'open');
+          const syncedLedger = familyData.coinLedger || [];
+          setUser({ ...INITIAL_USER, ...familyData.user, coins: calculateLedgerBalance(syncedLedger, familyData.user.coins) });
+          setParentConfig(familyData.parentConfig || INITIAL_PARENT);
+          setTasks(familyData.tasks || INITIAL_TASKS);
+          setShop(mergeShopItemsWithCatalog(familyData.shop || INITIAL_SHOP));
+          setWorld(familyData.world || INITIAL_WORLD);
+          setBonuses(familyData.bonuses || INITIAL_BONUSES);
+          setVoiceMessages(familyData.voiceMessages || INITIAL_VOICE_MESSAGES);
+          setVideos(familyData.videos || INITIAL_VIDEOS);
+          setActivityLog(familyData.activityLog || []);
+          setCoinLedger(syncedLedger);
+          setActiveChildDevice(familyData.activeChildDevice ?? null);
+          setHasGameAccess(true);
+        }}
+      />
     );
   }
 
@@ -963,7 +969,6 @@ export default function App() {
           onManualSync={handleManualSync}
           isSyncing={isManualSyncing}
           adultName={adultUser?.name}
-          onOpenAdultLogin={adultUser ? undefined : handleOpenAdultLogin}
           onSwitchAccount={adultUser ? handleSwitchAccount : undefined}
         />
 

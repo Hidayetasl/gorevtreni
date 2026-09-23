@@ -1,7 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
-import { arrayUnion, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { connectAuthEmulator, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
+import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeVideosById } from './videoOrder';
 
@@ -11,13 +11,28 @@ const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || (
 );
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'] as const;
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
-};
+// Yerel geliştirmede Firebase emülatörleri kullanılır; canlı projeye hiçbir
+// istek gitmez. "demo-" ile başlayan proje kimliği emülatör dışına çıkamaz.
+export const usesEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
+
+const firebaseConfig = usesEmulators
+  ? {
+      apiKey: 'demo-key',
+      authDomain: 'demo-gorevtreni.firebaseapp.com',
+      projectId: 'demo-gorevtreni',
+      storageBucket: 'demo-gorevtreni.appspot.com',
+      appId: '1:000000000000:web:demo',
+    }
+  : {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+      appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+    };
+
+// Emülatörde izinli yetişkin hesapları sabit test e-postalarıdır.
+const testEmail = (name: string) => (usesEmulators ? `${name}@test.com` : '');
 
 export type FamilyData = {
   user: UserProfile;
@@ -40,17 +55,17 @@ export type FamilyData = {
 const adultAccountConfig: Array<{ name: AdultName; email: string; uid: string }> = [
   {
     name: 'Baba',
-    email: (import.meta.env.VITE_FIREBASE_BABA_EMAIL || '').trim().toLowerCase(),
+    email: (import.meta.env.VITE_FIREBASE_BABA_EMAIL || testEmail('baba')).trim().toLowerCase(),
     uid: (import.meta.env.VITE_FIREBASE_BABA_UID || '').trim(),
   },
   {
     name: 'Anne',
-    email: (import.meta.env.VITE_FIREBASE_ANNE_EMAIL || '').trim().toLowerCase(),
+    email: (import.meta.env.VITE_FIREBASE_ANNE_EMAIL || testEmail('anne')).trim().toLowerCase(),
     uid: (import.meta.env.VITE_FIREBASE_ANNE_UID || '').trim(),
   },
   {
     name: 'Anneanne',
-    email: (import.meta.env.VITE_FIREBASE_ANNEANNE_EMAIL || '').trim().toLowerCase(),
+    email: (import.meta.env.VITE_FIREBASE_ANNEANNE_EMAIL || testEmail('anneanne')).trim().toLowerCase(),
     uid: (import.meta.env.VITE_FIREBASE_ANNEANNE_UID || '').trim(),
   },
 ];
@@ -105,10 +120,27 @@ export async function signOutAdult() {
   await signOut(firebaseAuth());
 }
 
-export async function ensureAnonymousAuth() {
-  const auth = firebaseAuth();
-  if (!auth.currentUser) await signInAnonymously(auth);
-  return auth.currentUser;
+export async function resetAdultPassword(email: string) {
+  await sendPasswordResetEmail(firebaseAuth(), email.trim());
+}
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  'auth/invalid-email': 'E-posta adresi geçerli görünmüyor.',
+  'auth/missing-password': 'Şifre yazın.',
+  'auth/invalid-credential': 'E-posta veya şifre hatalı.',
+  'auth/invalid-login-credentials': 'E-posta veya şifre hatalı.',
+  'auth/wrong-password': 'E-posta veya şifre hatalı.',
+  'auth/user-not-found': 'E-posta veya şifre hatalı.',
+  'auth/too-many-requests': 'Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin.',
+  'auth/network-request-failed': 'İnternet bağlantısı yok. Bağlantıyı kontrol edip tekrar deneyin.',
+};
+
+/** Firebase hata kodlarını ebeveynin anlayacağı Türkçe cümlelere çevirir. */
+export function describeAuthError(error: unknown) {
+  const code = (error as { code?: string })?.code || '';
+  if (AUTH_ERROR_MESSAGES[code]) return AUTH_ERROR_MESSAGES[code];
+  if (code === 'permission-denied') return 'Bu aileye erişim izni yok. Aileden yeni bir davet bağlantısı isteyin.';
+  return error instanceof Error ? error.message : 'Bir sorun oluştu. Tekrar deneyin.';
 }
 
 let services: ReturnType<typeof createServices> | null = null;
@@ -117,13 +149,33 @@ function createServices() {
   const db = initializeFirestore(app, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
-  return { auth: getAuth(app), db, storage: getStorage(app) };
+  const auth = getAuth(app);
+  const storage = getStorage(app);
+  if (usesEmulators) {
+    const host = window.location.hostname;
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, host, 8080);
+    connectStorageEmulator(storage, host, 9199);
+    // Yalnızca yerel testte: çok cihazlı senaryolarda bir cihazı çevrimdışı
+    // bırakıp geri bağlamak için. Canlı derlemede bu kanca hiç oluşmaz.
+    (window as unknown as { __gtTest?: object }).__gtTest = {
+      offline: () => disableNetwork(db),
+      online: async () => { await enableNetwork(db); window.dispatchEvent(new Event('online')); },
+    };
+  }
+  return { auth, db, storage };
 }
 
+/**
+ * Aile verisine yalnızca izinli yetişkin hesabıyla giriş yapılmış cihazlar
+ * erişir. Anonim oturum kullanılmaz; çocuk, yetişkinin açtığı cihazda oynar.
+ */
 async function getServices() {
   if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
   services ??= createServices();
-  await ensureAnonymousAuth();
+  await services.auth.authStateReady();
+  const user = services.auth.currentUser;
+  if (!user || user.isAnonymous) throw new Error('Oturum kapalı. Lütfen yetişkin hesabıyla tekrar giriş yapın.');
   return services;
 }
 
@@ -169,6 +221,36 @@ function familyRef(code: string) {
 
 function familyInviteRef(code: string) {
   return doc(services!.db, 'familyInvites', code);
+}
+
+function adultProfileRef(uid: string) {
+  return doc(services!.db, 'users', uid);
+}
+
+/** Hesabın bağlı olduğu aile kodu; yeni bir cihazda kod yazmadan aileyi bulmak için. */
+export async function getAdultFamilyCode() {
+  const { auth } = await getServices();
+  const snapshot = await getDoc(adultProfileRef(auth.currentUser!.uid));
+  return snapshot.exists() ? String(snapshot.data().familyCode || '') : '';
+}
+
+async function rememberAdultFamily(code: string) {
+  const { auth } = await getServices();
+  await setDoc(adultProfileRef(auth.currentUser!.uid), { familyCode: code, updatedAt: Date.now() }, { merge: true });
+}
+
+/** Aile PIN'i tüm cihazlarda ortaktır; yalnızca giriş yapmış yetişkin değiştirir. */
+export async function setFamilyPinHash(code: string, pinHash: string) {
+  await getServices();
+  await updateDoc(familyRef(code), { 'parentConfig.pinHash': pinHash, updatedAt: Date.now() });
+}
+
+/** İlk yetişkin, bu cihazdaki oyun verisiyle yeni bir aile kaydı açar. */
+export async function createFamily(data: FamilyData) {
+  const code = createFamilyCode();
+  await uploadFamilyData(code, data);
+  await rememberAdultFamily(code);
+  return code;
 }
 
 async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
@@ -293,10 +375,12 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
     ownerUid = remoteData.ownerUid || uid;
     createdAt = remoteData.createdAt || createdAt;
     const memberUids = [...new Set([...(Array.isArray(remoteData.memberUids) ? remoteData.memberUids : []), uid])];
-    const { pinHash: _localPinHash, ...sharedParentConfig } = data.parentConfig;
+    // Aile PIN'i ortak tutulur. PIN'i olmayan (eski/yeni) bir cihazın yazması
+    // buluttaki PIN'i asla silmez; PIN yalnızca açıkça değiştirilince güncellenir.
+    const remotePinHash = (remoteData.parentConfig as ParentConfig | undefined)?.pinHash;
     const payload = removeUndefinedFields({
       ...data,
-      parentConfig: sharedParentConfig,
+      parentConfig: { ...data.parentConfig, pinHash: data.parentConfig.pinHash || remotePinHash },
       tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks),
       shop: mergeById((remoteData.shop || []) as ShopItem[], data.shop),
       bonuses: mergeById((remoteData.bonuses || []) as BonusCard[], data.bonuses),
@@ -335,13 +419,20 @@ export async function acceptFamilyInvite(code: string) {
   if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
   const invite = await getDoc(familyInviteRef(normalized));
   if (!invite.exists() || invite.data().inviteEnabled !== true) throw new Error('Davet bağlantısı geçersiz veya kapatılmış.');
-  const familySnapshot = await getDoc(familyRef(normalized));
-  if (!familySnapshot.exists()) throw new Error('Bu aile kaydı bulunamadı.');
-  const existingMembers = familySnapshot.data().memberUids;
-  // Zaten üye olan cihazlarda tekrar yazma yapma; Firestore kuralı yalnızca
-  // yeni bir UID eklendiğinde bu güncellemeye izin verir.
-  if (Array.isArray(existingMembers) && existingMembers.includes(uid)) return true;
-  await updateDoc(familyRef(normalized), { memberUids: arrayUnion(uid), updatedAt: Date.now() });
+  // Üye olmayan hesap aile kaydını okuyamaz (kural gereği). Bu yüzden önce
+  // okumayı deneriz: okunabiliyorsa zaten üyedir; okunamıyorsa kendini ekler.
+  // Eskiden okuma katılımdan önce yapıldığı için yeni cihazlar hiç katılamıyordu.
+  let alreadyMember = false;
+  try {
+    const familySnapshot = await getDoc(familyRef(normalized));
+    if (!familySnapshot.exists()) throw new Error('Bu aile kaydı bulunamadı.');
+    const existingMembers = familySnapshot.data().memberUids;
+    alreadyMember = familySnapshot.data().ownerUid === uid || (Array.isArray(existingMembers) && existingMembers.includes(uid));
+  } catch (error) {
+    if ((error as { code?: string })?.code !== 'permission-denied') throw error;
+  }
+  if (!alreadyMember) await updateDoc(familyRef(normalized), { memberUids: arrayUnion(uid), updatedAt: Date.now() });
+  await rememberAdultFamily(normalized);
   return true;
 }
 
