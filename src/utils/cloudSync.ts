@@ -116,6 +116,11 @@ export async function signInAdult(email: string, password: string) {
   return credentials.user;
 }
 
+/** Şu an giriş yapmış hesabın kimliği (yoksa boş). */
+export function getCurrentUid() {
+  return isCloudConfigured ? firebaseAuth().currentUser?.uid || '' : '';
+}
+
 export async function signOutAdult() {
   await signOut(firebaseAuth());
 }
@@ -156,11 +161,16 @@ function createServices() {
     connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, 8080);
     connectStorageEmulator(storage, host, 9199);
-    // Yalnızca yerel testte: çok cihazlı senaryolarda bir cihazı çevrimdışı
-    // bırakıp geri bağlamak için. Canlı derlemede bu kanca hiç oluşmaz.
+    // Yalnızca yerel testte (canlı derlemede hiç oluşmaz): bir cihazın gerçek bir
+    // kesinti yaşamasını taklit eder. Canlı dinleme kapanır, tüm ağ istekleri
+    // (Firestore yazma çağrıları dahil) reddedilir ve tarayıcı çevrimdışı görünür.
+    let offline = false;
+    const realFetch = window.fetch.bind(window);
+    window.fetch = (...args: Parameters<typeof fetch>) => (offline ? Promise.reject(new TypeError('Failed to fetch')) : realFetch(...args));
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => !offline });
     (window as unknown as { __gtTest?: object }).__gtTest = {
-      offline: () => disableNetwork(db),
-      online: async () => { await enableNetwork(db); window.dispatchEvent(new Event('online')); },
+      offline: async () => { offline = true; await disableNetwork(db); window.dispatchEvent(new Event('offline')); },
+      online: async () => { offline = false; await enableNetwork(db); window.dispatchEvent(new Event('online')); },
     };
   }
   return { auth, db, storage };
@@ -322,9 +332,15 @@ export function mergeById<T extends { id: string; updatedAt?: string; deletedAt?
   return [...entries.values()].filter((entry) => includeDeleted || !entry.deletedAt);
 }
 
-function mergeCoinLedger(remote: CoinLedgerEntry[] = [], local: CoinLedgerEntry[] = []) {
+/**
+ * Puan hareketleri değişmez kayıtlardır. Aynı kimlikte iki kayıt varsa buluttaki
+ * kazanır; böylece bir cihazın kendi "başlangıç bakiyesi" kopyası ailenin
+ * bakiyesini asla ezemez. Yalnızca bulutta olmayan yeni hareketler eklenir.
+ */
+export function mergeCoinLedger(remote: CoinLedgerEntry[] = [], local: CoinLedgerEntry[] = []) {
   const entries = new Map<string, CoinLedgerEntry>();
-  for (const entry of [...remote, ...local]) entries.set(entry.id, entry);
+  for (const entry of local) entries.set(entry.id, entry);
+  for (const entry of remote) entries.set(entry.id, entry);
   return [...entries.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
@@ -381,7 +397,8 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
     const payload = removeUndefinedFields({
       ...data,
       parentConfig: { ...data.parentConfig, pinHash: data.parentConfig.pinHash || remotePinHash },
-      tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks),
+      // Silinen görevlerin "silindi" işareti de saklanır; yoksa başka bir cihaz görevi geri getirir.
+      tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks, true),
       shop: mergeById((remoteData.shop || []) as ShopItem[], data.shop),
       bonuses: mergeById((remoteData.bonuses || []) as BonusCard[], data.bonuses),
       world: mergeById((remoteData.world || []) as PlacedWorldItem[], data.world, true),
@@ -403,6 +420,10 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
     transaction.set(reference, payload, { merge: false });
   });
 
+  // Davet kaydını yalnızca aile sahibi yazabilir (kural gereği). Eskiden her
+  // üye bunu denediği için sahibi olmayan cihazların her yüklemesi, aile
+  // verisi yazıldığı halde "başarısız" sayılıyor ve durum "Çevrimdışı" kalıyordu.
+  if (ownerUid !== uid) return;
   await setDoc(familyInviteRef(normalized), removeUndefinedFields({
     familyCode: normalized,
     ownerUid,
