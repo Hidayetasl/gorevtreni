@@ -25,7 +25,7 @@ yeni sürüm aynı aile kaydını okur (bkz. "Veri" bölümü).
   - [ ] `VITE_FIREBASE_ANNE_EMAIL`, `VITE_FIREBASE_ANNE_UID`
   - [ ] `VITE_FIREBASE_ANNEANNE_EMAIL`, `VITE_FIREBASE_ANNEANNE_UID`
   - [ ] Mevcut Firebase ayarları duruyor: `VITE_FIREBASE_API_KEY`, `..._AUTH_DOMAIN`, `..._PROJECT_ID`, `..._STORAGE_BUCKET`, `..._APP_ID`
-- [ ] Yerelde son kontrol: `npm run lint && npm run test:progress && npm run test:sync && npm run build`
+- [ ] Yerelde son kontrol: `npm run lint && npm run test:progress && npm run test:sync && npm run test:password && npm run build`
 - [ ] (İsteğe bağlı) Canlı verinin salt okunur kopyasıyla yerel deneme
 
 ## 2. Yayın (aynı oturumda, arka arkaya)
@@ -38,7 +38,7 @@ yeni sürüm aynı aile kaydını okur (bkz. "Veri" bölümü).
 ## 3. Yayından hemen sonra (her yetişkin cihazında bir kez)
 
 1. [ ] Siteyi aç (ana ekrandaki uygulama 1–2 açılışta kendiliğinden yenilenir; olmazsa tarayıcıda sayfayı yenile)
-2. [ ] E-posta + şifreyle giriş
+2. [ ] E-posta + şifreyle giriş (Firebase'de verilen geçici şifre zayıfsa uygulama hemen **yeni şifre** ister: en az 8 karakter, harf + rakam)
 3. [ ] "Aileye bağlan" ekranında **mevcut aile kodunu** yaz (yeni aile oluşturma!)
 4. [ ] Aile PIN'i istenirse yeni ve kolay tahmin edilmeyen 4 rakam belirle (tüm cihazlarda ortak)
 5. [ ] Kontrol: puan, görevler, Dünya/kasaba yerleşimi, mağaza satın almaları, sesli mesajlar, günlükler

@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { connectAuthEmulator, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { connectAuthEmulator, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type User } from 'firebase/auth';
 import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
@@ -131,9 +131,18 @@ export async function resetAdultPassword(email: string) {
   await sendPasswordResetEmail(firebaseAuth(), email.trim());
 }
 
+/** Giriş yapmış yetişkinin şifresini değiştirir (girişten hemen sonra çağrılmalı). */
+export async function changeAdultPassword(newPassword: string) {
+  const user = firebaseAuth().currentUser;
+  if (!user) throw new Error('Oturum bulunamadı. Yeniden giriş yapın.');
+  await updatePassword(user, newPassword);
+}
+
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-email': 'E-posta adresi geçerli görünmüyor.',
   'auth/missing-password': 'Şifre yazın.',
+  'auth/requires-recent-login': 'Güvenlik için yeniden giriş yapmanız gerekiyor.',
+  'auth/weak-password': 'Bu şifre çok zayıf. En az 8 karakter, harf ve rakam kullanın.',
   'auth/invalid-credential': 'E-posta veya şifre hatalı.',
   'auth/invalid-login-credentials': 'E-posta veya şifre hatalı.',
   'auth/wrong-password': 'E-posta veya şifre hatalı.',

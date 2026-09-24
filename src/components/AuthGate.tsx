@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import './AuthGate.css';
 import {
   acceptFamilyInvite,
+  changeAdultPassword,
   createFamily,
   describeAuthError,
   getAdultFamilyCode,
@@ -20,6 +21,14 @@ import {
   type FamilyData,
 } from '../utils/cloudSync';
 import { hashParentPin, isWeakParentPin, needsNewParentPin } from '../utils/storage';
+import { isWeakAccountPassword, newPasswordProblem } from '../utils/passwordPolicy';
+
+/** Zayıf şifreyle giriş yapan hesabın UID'si; şifre değişene kadar aileye bağlanılmaz. */
+const MUST_CHANGE_PASSWORD_KEY = 'ruzgar_must_change_password_v1';
+/** Yerel testte test hesaplarının şifresi zorunlu değişmesin; "?sifre-testi" ile denenebilir. */
+const enforcePasswordChange = () => !usesEmulators || new URLSearchParams(window.location.search).has('sifre-testi');
+const readMustChange = () => { try { return localStorage.getItem(MUST_CHANGE_PASSWORD_KEY) || ''; } catch { return ''; } };
+const writeMustChange = (uid: string) => { try { if (uid) localStorage.setItem(MUST_CHANGE_PASSWORD_KEY, uid); else localStorage.removeItem(MUST_CHANGE_PASSWORD_KEY); } catch { /* yoksay */ } };
 
 interface AuthGateProps {
   /** Bu cihazdaki oyun verisi; yeni aile kurulurken buluta ilk kopya olarak gider. */
@@ -27,7 +36,7 @@ interface AuthGateProps {
   onReady: (familyCode: string, familyData: FamilyData) => void;
 }
 
-type Phase = 'checking' | 'login' | 'resolving' | 'no-family' | 'pin' | 'created' | 'error';
+type Phase = 'checking' | 'login' | 'new-password' | 'resolving' | 'no-family' | 'pin' | 'created' | 'error';
 
 /** Davet alanına tam bağlantı da yapıştırılabilir; içinden aile kodu çıkarılır. */
 function parseInvite(value: string) {
@@ -49,6 +58,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordAgain, setNewPasswordAgain] = useState('');
+  // Eski (zayıf) şifre yalnızca "yeni şifre eskisiyle aynı olmasın" kontrolü için bellekte tutulur.
+  const oldPasswordRef = useRef('');
   const [pin, setPin] = useState('');
   const [pinAgain, setPinAgain] = useState('');
   const [pinMode, setPinMode] = useState<'create' | 'claim'>('create');
@@ -104,7 +117,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
   useEffect(() => subscribeToAuth((user) => {
     setAuthUser(user);
     if (manualFlowRef.current) return;
-    if (user && getAdultName(user)) { void resolveFamily(); return; }
+    if (user && getAdultName(user)) {
+      // Zayıf şifreyle girilmiş ve henüz değiştirilmemiş: önce yeni şifre.
+      if (readMustChange() === user.uid) { setPhase('new-password'); return; }
+      void resolveFamily();
+      return;
+    }
     // Eski sürümde "çocuk olarak devam" anonim oturum açıyordu. Bu cihaz artık
     // bir kez yetişkin hesabıyla açılmalı.
     if (user) void signOutAdult();
@@ -125,10 +143,41 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
     void run(async () => {
       manualFlowRef.current = true;
       try {
-        await signInAdult(email, password);
+        const user = await signInAdult(email, password);
+        if (enforcePasswordChange() && isWeakAccountPassword(password, email)) {
+          writeMustChange(user.uid);
+          oldPasswordRef.current = password;
+          setPassword('');
+          setPhase('new-password');
+          return;
+        }
         setPassword('');
         await resolveFamily();
       } finally { manualFlowRef.current = false; }
+    });
+  };
+
+  const handleNewPassword = (event: React.FormEvent) => {
+    event.preventDefault();
+    const problem = newPasswordProblem(newPassword, newPasswordAgain, authUser?.email || email, oldPasswordRef.current);
+    if (problem) { setError(problem); return; }
+    void run(async () => {
+      try {
+        await changeAdultPassword(newPassword);
+      } catch (reason) {
+        // Girişin üzerinden uzun süre geçtiyse Firebase yeniden giriş ister.
+        if ((reason as { code?: string })?.code === 'auth/requires-recent-login') {
+          await signOutAdult();
+          setPhase('login');
+        }
+        throw reason;
+      }
+      writeMustChange('');
+      oldPasswordRef.current = '';
+      setNewPassword('');
+      setNewPasswordAgain('');
+      setNotice('Şifreniz değişti. Diğer cihazlarda da yeni şifreyle girin.');
+      await resolveFamily();
     });
   };
 
@@ -212,6 +261,30 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
               {notice && <p className="ag-msg ok" role="status">{notice}</p>}
               <button type="submit" className="ag-btn" disabled={busy}>{busy ? 'Giriş yapılıyor…' : 'Giriş yap'}</button>
               <button type="button" className="ag-link" onClick={handleReset} disabled={busy}>Şifremi unuttum</button>
+            </form>
+          )}
+
+          {phase === 'new-password' && (
+            <form onSubmit={handleNewPassword} noValidate style={{ display: 'contents' }}>
+              <h1>Yeni şifrenizi belirleyin</h1>
+              <p className="ag-sub">
+                {authUser?.email ? `${authUser.email} için` : 'Bu hesap için'} verilen şifre kolay tahmin edilir. Sesli mesajlar ve günlükler bu hesapla korunur; devam etmeden önce size özel yeni bir şifre belirleyin.
+              </p>
+              <div className="ag-field">
+                <label htmlFor="ag-newpw">Yeni şifre</label>
+                <div className="ag-pw">
+                  <input id="ag-newpw" className="ag-input" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={newPassword} onChange={(event) => { setNewPassword(event.target.value); setError(''); }} placeholder="En az 8 karakter, harf ve rakam" />
+                  <button type="button" className="ag-eye" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}>{showPassword ? 'Gizle' : 'Göster'}</button>
+                </div>
+              </div>
+              <div className="ag-field">
+                <label htmlFor="ag-newpw2">Yeni şifre tekrar</label>
+                <input id="ag-newpw2" className="ag-input" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={newPasswordAgain} onChange={(event) => { setNewPasswordAgain(event.target.value); setError(''); }} placeholder="Aynı şifre" />
+              </div>
+              <p className="ag-note">En az 8 karakter; içinde harf ve rakam olsun. 123456, isim veya e-posta adınız gibi kolay şifreler kabul edilmez.</p>
+              {errorBox}
+              <button type="submit" className="ag-btn" disabled={busy}>{busy ? 'Kaydediliyor…' : 'Şifremi değiştir ve devam et'}</button>
+              <button type="button" className="ag-link" onClick={() => { writeMustChange(''); handleSignOut(); }}>Farklı hesapla gir</button>
             </form>
           )}
 
