@@ -31,9 +31,12 @@ function stationForNow(): TimeOfDay {
   return 'evening';
 }
 
+/** Şeffaf arka planlı görev çizimleri daireye kesilmeden sığdırılır; fotoğraflar kaplar. */
+const isArt = (url?: string) => Boolean(url && /gorev-[a-z-]+.*\.webp/.test(url));
+
 function TaskPicture({ task, className }: { task: RoutineTask; className: string }) {
   return (
-    <span className={className} aria-hidden="true">
+    <span className={`${className} ${isArt(task.imageUrl) ? 'art' : ''}`} aria-hidden="true">
       {task.imageUrl ? <img src={task.imageUrl} alt="" /> : task.icon}
     </span>
   );
@@ -202,7 +205,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
                 <span className="gt-label">SIRADAKİ</span>
                 {upcoming.map((task) => (
                   <button key={task.id} type="button" className="gt-nx" onClick={() => { setFocusId(task.id); scrollTopRef.current?.scrollIntoView({ behavior: 'smooth' }); }}>
-                    {task.imageUrl ? <img src={task.imageUrl} alt="" /> : <span className="emo" aria-hidden="true">{task.icon}</span>}
+                    {task.imageUrl ? <img className={isArt(task.imageUrl) ? 'art' : ''} src={task.imageUrl} alt="" /> : <span className="emo" aria-hidden="true">{task.icon}</span>}
                     <span className="t">{task.title}</span>
                     <span className="arr" aria-hidden="true">›</span>
                   </button>

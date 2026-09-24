@@ -1013,7 +1013,14 @@ export default function App() {
   };
 
   // Silinmiş olarak işaretlenen görevler eşitleme için listede kalır ama hiçbir ekranda görünmez.
-  const liveTasks = tasks.filter((task) => !task.deletedAt);
+  // Rutin görevlerin resmi her zaman bu sürümün şablonundan gelir: eşitlemeyle
+  // eski bir resim adresi gelse bile ekranda güncel çizim görünür (kayda yazılmaz).
+  const liveTasks = tasks
+    .filter((task) => !task.deletedAt)
+    .map((task) => {
+      const templateImage = routineTaskTemplates.get(task.id)?.imageUrl;
+      return templateImage && templateImage !== task.imageUrl ? { ...task, imageUrl: templateImage } : task;
+    });
   const dailyProgress = buildDailyProgress(liveTasks, activityLog);
   const calculatedStreak = calculateCurrentStreak(dailyProgress);
   const weeklyStats = weeklyCompletion(dailyProgress);

@@ -1,12 +1,15 @@
 import { RoutineTask, ShopItem, PlacedWorldItem, UserProfile, ParentConfig, BonusCard, VoiceMessage, StoryVideo, ActivityLogEntry } from '../types';
-import taskBrushTeethImg from '../assets/images/ruzgar-disfircalama.jpg';
 import type { CoinLedgerEntry } from '../types';
-import taskTidyToysImg from '../assets/images/ruzgar-oyuncak.jpg';
-import taskEatMealImg from '../assets/images/ruzgar-yemek.jpg';
-import taskWashHandsImg from '../assets/images/ruzgar-elyikama.jpg';
+// Görev resimleri: aynı Rüzgar karakteriyle çizilmiş, arka planı şeffaf görseller.
+import taskMorningTeethImg from '../assets/images/gorev-sabah-dis.webp';
+import taskEveningTeethImg from '../assets/images/gorev-aksam-dis.webp';
+import taskMakeBedImg from '../assets/images/gorev-yatak.webp';
+import taskTidyToysImg from '../assets/images/gorev-oyuncak.webp';
+import taskEatMealImg from '../assets/images/gorev-yemek.webp';
+import taskWashHandsImg from '../assets/images/gorev-el-yikama.webp';
+import taskToiletFlushImg from '../assets/images/gorev-tuvalet.webp';
+import taskSleepBedImg from '../assets/images/gorev-uyku.webp';
 import taskDeskStudyImg from '../assets/images/ruzgar-gunluk.jpg';
-import taskSleepBedImg from '../assets/images/ruzgar-uyku.jpg';
-import taskToiletFlushImg from '../assets/images/ruzgar-tuvalet.jpg';
 
 const STORAGE_KEYS = {
   TASKS: 'ruzgar_tasks_v4',
@@ -60,7 +63,7 @@ export const INITIAL_TASKS: RoutineTask[] = [
     title: 'Sabah Dişlerimi Fırçaladım',
     description: 'Sabah uyanınca en az 2 dakika diş fırçalama',
     icon: '🪥',
-    imageUrl: taskBrushTeethImg,
+    imageUrl: taskMorningTeethImg,
     rewardCoins: 2,
     timeOfDay: 'morning',
     status: 'todo',
@@ -70,7 +73,7 @@ export const INITIAL_TASKS: RoutineTask[] = [
     title: 'Yatağımı Topladım',
     description: 'Sabah uyanıp yatağımı düzenledim',
     icon: '🛏️',
-    imageUrl: taskSleepBedImg,
+    imageUrl: taskMakeBedImg,
     rewardCoins: 2,
     timeOfDay: 'morning',
     status: 'todo',
@@ -114,7 +117,7 @@ export const INITIAL_TASKS: RoutineTask[] = [
     title: 'Gece Dişlerimi Fırçaladım',
     description: 'Yatmadan önce en az 2 dakika diş fırçalama',
     icon: '🪥',
-    imageUrl: taskBrushTeethImg,
+    imageUrl: taskEveningTeethImg,
     rewardCoins: 2,
     timeOfDay: 'evening',
     status: 'todo',

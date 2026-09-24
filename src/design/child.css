@@ -89,6 +89,8 @@
 .gt-label { font-weight: 900; font-size: 13px; letter-spacing: .14em; color: var(--gt-turkuaz-d); }
 .gt-illu { width: 148px; height: 148px; flex: none; border-radius: 50%; overflow: hidden; border: 6px solid #fff; box-shadow: 0 0 0 4px #9fd5dc; background: var(--gt-turkuaz-s); display: grid; place-items: center; font-size: 64px; }
 .gt-illu img { width: 100%; height: 100%; object-fit: cover; }
+.gt-illu.art { background: #fff; }
+.gt-illu.art img { object-fit: contain; padding: 6px; transform: translateY(4px); }
 .gt-now h2 { margin: 0; font: 900 24px/1.15 var(--gt-font); text-align: center; text-wrap: balance; color: var(--gt-ink); }
 .gt-big { width: 100%; min-height: 76px; border-radius: 24px; background: var(--gt-yesil) !important; color: #fff !important; font: 900 24px/1 var(--gt-font) !important; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 6px 0 var(--gt-yesil-d); transition: transform .08s, box-shadow .08s; }
 .gt-big:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--gt-yesil-d); }
@@ -107,6 +109,7 @@
 .gt-next { margin: 18px 16px 0; display: flex; flex-direction: column; gap: 10px; }
 .gt-next .gt-label { color: var(--gt-ink-2); }
 .gt-nx { display: flex; align-items: center; gap: 12px; background: #fff !important; border-radius: 18px; padding: 8px 14px 8px 8px; min-height: 64px; font-weight: 800; font-size: 18px; text-align: left; box-shadow: 0 2px 0 var(--gt-line); color: var(--gt-ink) !important; }
+.gt-nx img.art { object-fit: contain; background: #fff; padding: 2px; }
 .gt-nx img, .gt-nx .emo { width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex: none; display: grid; place-items: center; font-size: 28px; background: var(--gt-turkuaz-s); }
 .gt-nx span.t { flex: 1; }
 .gt-nx .arr { flex: none; color: #9db3b8; font-size: 22px; }
@@ -119,6 +122,8 @@
 .gt-tc { background: #fff; border-radius: 22px; padding: 14px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; box-shadow: 0 2px 0 var(--gt-line); }
 .gt-tc .pic { width: 84px; height: 84px; border-radius: 50%; overflow: hidden; border: 3px solid #fff; box-shadow: 0 0 0 3px #cfe3e6; display: grid; place-items: center; font-size: 40px; background: var(--gt-turkuaz-s); }
 .gt-tc .pic img { width: 100%; height: 100%; object-fit: cover; }
+.gt-tc .pic.art { background: #fff; }
+.gt-tc .pic.art img { object-fit: contain; padding: 4px; }
 .gt-tc.done .pic { box-shadow: 0 0 0 3px var(--gt-yesil); }
 .gt-tc.pending .pic { box-shadow: 0 0 0 3px var(--gt-turuncu); }
 .gt-tc .tm { font-weight: 900; font-size: 12px; letter-spacing: .1em; color: var(--gt-ink-2); }
