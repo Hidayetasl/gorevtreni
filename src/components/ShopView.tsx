@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { ShopItem, ShopCategory, UserProfile } from '../types';
-import { playCoinSound, playFanfare, speakText } from '../utils/audio';
+import { playCoinSound, playFanfare, playPopSound, speakText } from '../utils/audio';
 import { mergeShopItemsWithCatalog } from '../utils/storage';
 import confetti from 'canvas-confetti';
-import { ShoppingBag, Check, Sparkles, Gift } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
 
 interface ShopViewProps {
@@ -13,9 +13,28 @@ interface ShopViewProps {
   onSetActiveTrain: (icon: string) => void;
   soundEnabled: boolean;
   speechEnabled: boolean;
-  onOpenGiftModal: (item: ShopItem) => void;
 }
 
+const CATEGORIES: Array<{ id: ShopCategory; label: string; detail: string; icon: string }> = [
+  { id: 'rewards', label: 'Gerçek ödüller', detail: 'Büyüğünle birlikte al', icon: '🎁' },
+  { id: 'trains', label: 'Trenler', detail: 'Yeni lokomotifler', icon: '🚂' },
+  { id: 'wagons', label: 'Vagonlar', detail: 'Trenine vagon ekle', icon: '🚃' },
+  { id: 'tracks', label: 'Raylar', detail: 'Köprü, viraj, tünel', icon: '🛤️' },
+  { id: 'scenery', label: 'Kasaba', detail: 'Ev, ağaç, park', icon: '🏡' },
+];
+
+function ItemPicture({ item, className }: { item: ShopItem; className: string }) {
+  return (
+    <span className={className} aria-hidden="true">
+      {SCENERY_IMAGES[item.id] ? <img src={SCENERY_IMAGES[item.id]} alt="" draggable={false} /> : item.icon}
+    </span>
+  );
+}
+
+/**
+ * Mağaza: önce kategori kartları, bir kategoriye girince yalnızca onun ürünleri.
+ * Yanlışlıkla puan harcanmasın diye her alışveriş "Alalım mı?" sorusuyla onaylanır.
+ */
 export const ShopView: React.FC<ShopViewProps> = ({
   shopItems,
   user,
@@ -23,214 +42,154 @@ export const ShopView: React.FC<ShopViewProps> = ({
   onSetActiveTrain,
   soundEnabled,
   speechEnabled,
-  onOpenGiftModal,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<ShopCategory>('tracks');
+  const [category, setCategory] = useState<ShopCategory | null>(null);
+  const [confirming, setConfirming] = useState<ShopItem | null>(null);
+  const [bought, setBought] = useState<ShopItem | null>(null);
 
   const catalogItems = mergeShopItemsWithCatalog(shopItems);
-  const filteredItems = catalogItems.filter((item) => item.category === activeCategory);
+  const current = CATEGORIES.find((cat) => cat.id === category);
+  const items = catalogItems.filter((item) => item.category === category);
 
-  const handleBuy = (item: ShopItem) => {
+  const openCategory = (next: ShopCategory | null) => {
+    playPopSound(soundEnabled);
+    setCategory(next);
+    window.scrollTo({ top: 0 });
+  };
+
+  const askToBuy = (item: ShopItem) => {
     if (user.coins < item.price) {
-      speakText('Yeterli tren paran yok Rüzgar, görev yaparak kazanabilirsin!', speechEnabled);
+      speakText(`${item.price - user.coins} puan daha lazım. Görev yaparak kazanabilirsin!`, speechEnabled);
       return;
     }
+    playPopSound(soundEnabled);
+    speakText(`${item.name}, ${item.price} puan. Alalım mı?`, speechEnabled);
+    setConfirming(item);
+  };
 
+  const confirmBuy = () => {
+    const item = confirming;
+    setConfirming(null);
+    if (!item || user.coins < item.price) return;
     playCoinSound(soundEnabled);
     playFanfare(soundEnabled);
-
-    confetti({
-      particleCount: 70,
-      spread: 80,
-      origin: { y: 0.6 },
-    });
-
+    confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 }, colors: ['#16A34A', '#0E9AA7', '#F59E0B', '#2563EB', '#7C3AED'] });
     onBuyItem(item.id, item.price);
-    onOpenGiftModal(item);
+    setBought(item);
+    speakText(item.type === 'real_reward' ? 'Harika! Bir büyüğüne göster, ödülünü birlikte alın.' : `Harika! ${item.name} artık senin.`, speechEnabled);
+  };
+
+  const afterBuyText = (item: ShopItem) => {
+    if (item.type === 'real_reward') return 'Bir büyüğüne göster, ödülünü birlikte alın!';
+    if (item.type === 'train') return 'Dünya’da Hangar’dan bu treni sürebilirsin.';
+    if (item.type === 'wagon' || item.category === 'wagons') return 'Dünya’da Hangar’dan trenine bağlayabilirsin.';
+    return 'Dünya’da Kasabayı kur bölümünden yerleştirebilirsin.';
   };
 
   return (
-    <div className="space-y-4 pb-28">
-      {/* View Header matching Screenshot 2 */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div>
-          <div className="text-[11px] font-black text-sky-700 uppercase tracking-widest">
-            PARÇA AL
+    <div className="gt-shop">
+      {current ? (
+        <div className="gt-head gt-subhead">
+          <button type="button" className="gt-back" onClick={() => openCategory(null)} aria-label="Mağaza menüsüne geri dön">
+            <span className="ar" aria-hidden="true"><ArrowLeft strokeWidth={3.5} /></span>Geri
+          </button>
+          <h1>{current.icon} {current.label}</h1>
+        </div>
+      ) : (
+        <>
+          <div className="gt-head">
+            <h1>Mağaza</h1>
           </div>
-          <h2 className="font-game text-2xl sm:text-3xl font-black text-slate-900">
-            Mağaza
-          </h2>
+          <p className="gt-menu-hint">Ne almak istersin?</p>
+        </>
+      )}
+
+      {!current && (
+        <div className="gt-menu shop" aria-label="Mağaza bölümleri">
+          {CATEGORIES.map((cat) => {
+            const inCat = catalogItems.filter((item) => item.category === cat.id);
+            const owned = inCat.filter((item) => item.unlocked).length;
+            const sample = inCat.find((item) => SCENERY_IMAGES[item.id]);
+            return (
+              <button key={cat.id} type="button" className={`gt-menu-card s-${cat.id}`} onClick={() => openCategory(cat.id)}>
+                <span className="e" aria-hidden="true">
+                  {cat.id !== 'rewards' && sample ? <img className="gt-menu-img" src={SCENERY_IMAGES[sample.id]} alt="" draggable={false} /> : cat.icon}
+                </span>
+                <span className="t">
+                  {cat.label}
+                  <small>{cat.id === 'rewards' ? cat.detail : `${owned} / ${inCat.length} sende`}</small>
+                </span>
+              </button>
+            );
+          })}
         </div>
+      )}
 
-        {/* Bakiye Badge */}
-        <div className="bg-[#091720] border-2 border-amber-500/80 px-4 py-1.5 rounded-full shadow-inner flex items-center gap-2">
-          <span className="text-amber-400 font-bold text-xs sm:text-sm font-game">
-            Bakiye: {user.coins}
-          </span>
-          <span className="text-base sm:text-lg">🪙</span>
-        </div>
-      </div>
-
-      {/* Shop Category Tabs */}
-      <div className="relative flex items-center gap-2 overflow-x-auto pb-1 pr-5 no-scrollbar after:pointer-events-none after:absolute after:right-0 after:top-0 after:h-full after:w-8 after:bg-gradient-to-l after:from-[#102733] after:to-transparent sm:after:hidden">
-        <button
-          onClick={() => setActiveCategory('tracks')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
-            activeCategory === 'tracks'
-              ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
-              : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
-          }`}
-        >
-          <span>🛤️ Raylar</span>
-        </button>
-
-        <button
-          onClick={() => setActiveCategory('trains')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
-            activeCategory === 'trains'
-              ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
-              : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
-          }`}
-        >
-          <span>🚂 Trenler</span>
-        </button>
-
-        <button
-          onClick={() => setActiveCategory('wagons')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
-            activeCategory === 'wagons'
-              ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
-              : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
-          }`}
-        >
-          <span>🚃 Vagonlar</span>
-        </button>
-
-        <button
-          onClick={() => setActiveCategory('scenery')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
-            activeCategory === 'scenery'
-              ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
-              : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
-          }`}
-        >
-          <span>🏙️ Kent & Dekorasyon</span>
-        </button>
-
-        <button
-          onClick={() => setActiveCategory('rewards')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-game text-xs sm:text-sm font-bold border transition-all whitespace-nowrap ${
-            activeCategory === 'rewards'
-              ? 'bg-[#2263df] text-white border-blue-400 shadow-md'
-              : 'bg-[#16303d] text-slate-300 border-slate-700/60 hover:bg-[#1e4252]'
-          }`}
-        >
-          <span>🎁 Gerçek Ödüller</span>
-        </button>
-      </div>
-
-      {/* Shop Items Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-        {filteredItems.map((item) => {
-          const canAfford = user.coins >= item.price;
-          const isTrainActive = item.type === 'train' && user.activeTrainIcon === item.icon;
-
-          return (
-            <div
-              key={item.id}
-              className={`rounded-3xl p-4 bg-[#15303e] border-2 border-slate-600 transition-all flex flex-col justify-between shadow-lg hover:border-sky-400 text-white ${
-                item.unlocked
-                  ? 'border-emerald-500/50 bg-[#12313b]'
-                  : canAfford
-                  ? 'border-amber-500/40'
-                  : 'opacity-85'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-[#254b5e] to-[#0a1820] border-2 border-sky-400/70 flex items-center justify-center text-4xl sm:text-5xl shadow-lg relative game-icon overflow-hidden">
-                  {SCENERY_IMAGES[item.id] ? (
-                    <img src={SCENERY_IMAGES[item.id]} alt={item.name} className="w-full h-full object-contain p-1" draggable={false} />
-                  ) : (
-                    item.icon
-                  )}
-                  {item.category === 'rewards' && (
-                    <div className="absolute -top-1.5 -left-1.5 bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md border border-white shadow">
-                      ÖDÜL
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col items-end gap-1">
-                  <div className="bg-gradient-to-r from-amber-950/90 via-[#18291f] to-amber-950/90 border-2 border-amber-400 px-3 py-1 rounded-2xl shadow-lg flex items-center gap-1">
-                    <span className="text-base sm:text-xl font-black font-game text-amber-300 drop-shadow-md">{item.price}</span>
-                    <span className="text-base">🪙</span>
-                  </div>
-                  {item.unlocked && <span className="text-[10px] text-emerald-300 font-bold">✓ Envanterde</span>}
-                </div>
-              </div>
-
-              <div className="my-3">
-                <div className="flex items-center justify-between gap-1">
-                  <h3 className="font-game text-white text-base sm:text-lg font-black">
-                    {item.name}
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-100 font-medium mt-1 line-clamp-2 leading-relaxed">
-                  {item.description}
-                </p>
-              </div>
-
-              <div className="mt-2 pt-2 border-t border-slate-800">
+      {current && (
+        <div className="gt-shop-grid">
+          {items.map((item) => {
+            const missing = Math.max(0, item.price - user.coins);
+            const isTrainActive = item.type === 'train' && user.activeTrainIcon === item.icon;
+            return (
+              <div key={item.id} className={`gt-sitem ${item.unlocked ? 'owned' : ''}`}>
+                <ItemPicture item={item} className="pic" />
+                <b className="nm">{item.name}</b>
+                <span className="ds">{item.description}</span>
+                {!item.unlocked && (
+                  <span className="pr"><span className="gt-coin-dot small" aria-hidden="true" />{item.price}</span>
+                )}
                 {item.unlocked ? (
                   item.type === 'train' ? (
-                    <button
-                      onClick={() => onSetActiveTrain(item.icon)}
-                      className={`w-full py-2.5 rounded-2xl font-game text-xs font-bold border transition-all ${
-                        isTrainActive
-                          ? 'bg-emerald-600 text-white border-emerald-400 cursor-default shadow'
-                          : 'bg-[#2263df] hover:bg-[#1d57c7] text-white border-blue-400 shadow-md'
-                      }`}
-                    >
-                      {isTrainActive ? 'Kullanımda 🚂' : 'Bu Treni Seç 🚂'}
+                    <button type="button" className={`gt-sbuy ${isTrainActive ? 'have' : 'use'}`} onClick={() => onSetActiveTrain(item.icon)} disabled={isTrainActive}>
+                      {isTrainActive ? <><Check aria-hidden="true" />Sürüyorsun</> : 'Bunu sür'}
                     </button>
                   ) : (
-                    <div className="bg-emerald-900/40 text-emerald-300 rounded-2xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1 border border-emerald-600/50">
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      <span>Envanterinde Mevcut ✅</span>
-                    </div>
+                    <span className="gt-sbuy have"><Check aria-hidden="true" />Sende var</span>
                   )
-                ) : (
-                  <button
-                    onClick={() => handleBuy(item)}
-                    disabled={!canAfford}
-                    className={`w-full py-3 rounded-2xl font-game text-sm font-black uppercase tracking-wider transition-all border active:translate-y-0.5 shadow-lg flex items-center justify-center gap-2 ${
-                      canAfford
-                        ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-amber-950 border-amber-200 hover:brightness-110'
-                        : 'bg-slate-800/90 text-slate-400 border-slate-700 cursor-not-allowed'
-                    }`}
-                  >
-                    {canAfford ? (
-                      <>
-                        <span>Satın Al 🛒</span>
-                        <span className="bg-amber-950/20 px-2 py-0.5 rounded-lg border border-amber-800/30 text-amber-950 text-base font-black">
-                          {item.price} 🪙
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Eksik Bakiye 🔒</span>
-                        <span className="text-amber-400/90 font-black text-xs">
-                          ({item.price} 🪙)
-                        </span>
-                      </>
-                    )}
+                ) : missing > 0 ? (
+                  <button type="button" className="gt-sbuy wait" onClick={() => askToBuy(item)}>
+                    {missing} puan daha
                   </button>
+                ) : (
+                  <button type="button" className="gt-sbuy" onClick={() => askToBuy(item)}>Al</button>
                 )}
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {confirming && (
+        <div className="gt-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="shop-confirm-title">
+          <div className="gt-sheet-bg" onClick={() => setConfirming(null)} aria-hidden="true" />
+          <div className="gt-sheet">
+            <ItemPicture item={confirming} className="gt-sheet-pic" />
+            <h2 id="shop-confirm-title">{confirming.name}</h2>
+            <p className="gt-sheet-price">
+              <span className="gt-coin-dot" aria-hidden="true" /><b>{confirming.price}</b> puan
+              <small>Sonra {user.coins - confirming.price} puanın kalır</small>
+            </p>
+            <p className="gt-q">Alalım mı?</p>
+            <div className="gt-pair">
+              <button type="button" className="gt-ghost" onClick={() => setConfirming(null)}>Vazgeç</button>
+              <button type="button" className="gt-big" onClick={confirmBuy}><Check aria-hidden="true" strokeWidth={3} />Evet, al</button>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {bought && (
+        <div className="gt-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="shop-bought-title">
+          <div className="gt-sheet-bg" onClick={() => setBought(null)} aria-hidden="true" />
+          <div className="gt-sheet">
+            <span className="gt-sheet-tag">🎉 Yeni!</span>
+            <ItemPicture item={bought} className="gt-sheet-pic" />
+            <h2 id="shop-bought-title">{bought.name} artık senin!</h2>
+            <p className="gt-hint">{afterBuyText(bought)}</p>
+            <button type="button" className="gt-big turkuaz" onClick={() => setBought(null)}>Harika!</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -45,7 +45,6 @@ import { VideosView } from './components/VideosView';
 import { LearnView } from './components/LearnView';
 import { ParentModal } from './components/ParentModal';
 import { BonusModal } from './components/BonusModal';
-import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
@@ -308,7 +307,6 @@ export default function App() {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [voiceModalInitialTab, setVoiceModalInitialTab] = useState<'inbox' | 'record'>('inbox');
   const [isJournalMode, setIsJournalMode] = useState(false);
-  const [purchasedItemModal, setPurchasedItemModal] = useState<ShopItem | null>(null);
 
   // Sync to LocalStorage
   useEffect(() => saveStoredUser(user), [user]);
@@ -1113,10 +1111,6 @@ export default function App() {
             />
           )}
 
-          {/* Bu sekmeler sırayla yeni tasarıma geçecek; şimdilik mevcut görünümleri. */}
-          {(activeTab === 'shop' || activeTab === 'videos') && (
-          <div className="app-main p-2 sm:p-3">
-
           {activeTab === 'shop' && (
             <ShopView
               shopItems={shop}
@@ -1125,9 +1119,12 @@ export default function App() {
               onSetActiveTrain={handleSetActiveTrain}
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
-              onOpenGiftModal={(item) => setPurchasedItemModal(item)}
             />
           )}
+
+          {/* İzle sekmesi sıradaki; şimdilik mevcut görünümü. */}
+          {activeTab === 'videos' && (
+          <div className="app-main p-2 sm:p-3">
 
           {activeTab === 'videos' && (
             <VideosView
@@ -1211,14 +1208,6 @@ export default function App() {
           />
         )}
 
-        {/* Purchased Item Gift Modal */}
-        {purchasedItemModal && (
-          <RewardClaimModal
-            item={purchasedItemModal}
-            onClose={() => setPurchasedItemModal(null)}
-            speechEnabled={user.speechEnabled}
-          />
-        )}
       </div>
     </ChildShell>
   );
