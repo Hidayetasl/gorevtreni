@@ -66,7 +66,7 @@ export interface VoiceMessage {
 
 export interface CoinLedgerEntry {
   id: string;
-  type: 'initial' | 'task_reward' | 'bonus_reward' | 'purchase' | 'reset';
+  type: 'initial' | 'task_reward' | 'bonus_reward' | 'learn_reward' | 'purchase' | 'reset';
   coinDelta: number;
   referenceId?: string;
   balanceAfter?: number;
@@ -84,6 +84,12 @@ export interface UserProfile {
   activeTrainIcon: string;
   /** Ebeveynin açtığı Heceleme oyunu seviyeleri (1=2 heceli, 2=3 heceli, 3=4 heceli). */
   syllableGameLevels?: number[];
+  /** Öğren: bugün verilen doğru cevap sayısı (her 10 doğru = 1 puan). */
+  learnAnswersToday?: number;
+  /** Öğren: bugün kazanılan puan sayısı. */
+  learnCoinsToday?: number;
+  /** Öğren sayaçlarının ait olduğu yerel gün (YYYY-AA-GG). */
+  learnDateKey?: string;
   /** Ortak aile verisinde başlangıç seviyesinin bir kez uygulanmasını sağlar. */
   progressVersion?: string;
   /** Rutin görevlerin en son hangi yerel takvim gününde açıldığını tutar. */

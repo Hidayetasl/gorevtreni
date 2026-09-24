@@ -8,6 +8,11 @@ interface LearnViewProps {
   speechEnabled: boolean;
   /** Ebeveynin ayarladığı açık Heceleme seviyeleri (1=2 heceli, 2=3 heceli, 3=4 heceli). */
   syllableGameLevels?: number[];
+  /** Doğru cevapta çağrılır; App her 10 doğruda 1 puan verir. */
+  onCorrectAnswer?: () => void;
+  /** Sonraki puana doğru giden sayaç (0..answersPerCoin-1). */
+  answersTowardNextCoin?: number;
+  answersPerCoin?: number;
 }
 
 type WordEntry = { word: string; emoji: string };
@@ -275,7 +280,20 @@ function readDailyLearningCount() {
   }
 }
 
-export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels }) => {
+export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnabled, syllableGameLevels, onCorrectAnswer, answersTowardNextCoin = 0, answersPerCoin = 10 }) => {
+  // Sayaç 9'dan 0'a döndüğünde bir puan kazanılmıştır: kısa bir kutlama göster.
+  const [coinToast, setCoinToast] = useState(false);
+  const previousTowardRef = useRef(answersTowardNextCoin);
+  React.useEffect(() => {
+    if (previousTowardRef.current === answersPerCoin - 1 && answersTowardNextCoin === 0) {
+      setCoinToast(true);
+      speakText('Harika! On doğru cevap, bir puan kazandın!', speechEnabled, 0.85);
+      const timer = window.setTimeout(() => setCoinToast(false), 2600);
+      previousTowardRef.current = answersTowardNextCoin;
+      return () => window.clearTimeout(timer);
+    }
+    previousTowardRef.current = answersTowardNextCoin;
+  }, [answersTowardNextCoin, answersPerCoin, speechEnabled]);
   const [mode, setMode] = useState<Mode>('kesfet');
   const [dailyLearnCount, setDailyLearnCount] = useState(readDailyLearningCount);
 
@@ -411,6 +429,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       playCoinSound(soundEnabled);
       setQuizFeedback('correct');
       setQuizCorrectCount((count) => count + 1);
+      onCorrectAnswer?.();
         const wasNewQuizLetter = !discovered.has(quizTarget.entry.letter);
         if (wasNewQuizLetter) registerLearningAction();
         setDiscovered((prev) => {
@@ -490,6 +509,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
         playCoinSound(soundEnabled);
         confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
         setWordCompleteCount((count) => count + 1);
+        onCorrectAnswer?.();
         registerLearningAction();
 
         const currentLevelIndex = allowedLevels.indexOf(activeHeceLevel);
@@ -580,6 +600,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       registerLearningAction();
       setEnglishFeedback('correct');
       setEnglishCorrectCount((count) => count + 1);
+      onCorrectAnswer?.();
       speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
       if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
       // Çocuk doğru cevabı rahatça görebilsin diye yeni kelimeye geçmeden önce biraz beklenir.
@@ -612,6 +633,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
         speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
         setEnglishMicState('correct');
         setEnglishCorrectCount((count) => count + 1);
+        onCorrectAnswer?.();
         if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
         englishAdvanceTimeoutRef.current = window.setTimeout(() => nextEnglishRepeatWord(englishCategory), 1800);
       } else {
@@ -681,9 +703,13 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       <div className="gt-head">
         <h1>Öğren</h1>
         <span className="gt-goal" aria-label={`Bugünkü hedef ${dailyLearnCount} / ${DAILY_LEARNING_GOAL} keşif`}>
-          <span aria-hidden="true">⭐</span><b>{dailyLearnCount}/{DAILY_LEARNING_GOAL}</b> bugün
+          <span aria-hidden="true">⭐</span><b>{dailyLearnCount}/{DAILY_LEARNING_GOAL}</b>
+        </span>
+        <span className="gt-goal coin" aria-label={`Her ${answersPerCoin} doğru cevapta 1 puan. Şu an ${answersTowardNextCoin}`}>
+          <span className="gt-coin-dot small" aria-hidden="true" /><b>{answersTowardNextCoin}/{answersPerCoin}</b>
         </span>
       </div>
+      {coinToast && <div className="gt-toast" role="status">🎉 {answersPerCoin} doğru cevap! +1 puan kazandın.</div>}
 
       <div className="gt-modes" role="tablist" aria-label="Öğrenme oyunları">
         {LEARNING_WAGONS.map((wagon) => (

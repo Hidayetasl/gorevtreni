@@ -144,6 +144,8 @@
 .gt-head h1 { margin: 0; flex: 1; font: 900 28px/1.1 var(--gt-font); color: var(--gt-ink); }
 .gt-goal { display: flex; align-items: center; gap: 8px; background: var(--gt-turuncu-s); color: #7a4a00; border-radius: 16px; padding: 8px 12px; font: 800 14px/1.2 var(--gt-font); }
 .gt-goal b { font-size: 18px; }
+.gt-goal.coin { background: #fff; color: var(--gt-ink); box-shadow: 0 2px 0 var(--gt-line); }
+.gt-coin-dot.small { width: 20px; height: 20px; }
 .gt-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 16px 0; }
 .gt-mode { position: relative; background: #fff !important; border-radius: 20px; min-height: 76px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 0 var(--gt-line); font-weight: 900; font-size: 15px; line-height: 1.15; text-align: center; color: var(--gt-ink) !important; }
 .gt-mode .e { font-size: 30px; line-height: 1; }

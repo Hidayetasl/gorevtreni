@@ -27,7 +27,7 @@ interface RoutineTask {
 
 interface CoinLedgerEntry {
   id: string;
-  type: 'initial' | 'task_reward' | 'bonus_reward' | 'purchase' | 'reset';
+  type: 'initial' | 'task_reward' | 'bonus_reward' | 'learn_reward' | 'purchase' | 'reset';
   coinDelta: number;
   balanceAfter?: number;
   createdAt: string;
@@ -75,6 +75,7 @@ const COIN_TYPE_LABELS: Record<CoinLedgerEntry['type'], string> = {
   initial: 'Başlangıç',
   task_reward: 'Görev ödülü',
   bonus_reward: 'Bonus ödülü',
+  learn_reward: 'Öğren ödülü (10 doğru)',
   purchase: 'Mağaza alışverişi',
   reset: 'Sıfırlama',
 };

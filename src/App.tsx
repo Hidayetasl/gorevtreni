@@ -130,6 +130,8 @@ function mergeKeptLocal<T extends { id: string }>(remote: T[] = [], merged: T[] 
 const OPENING_LEDGER_ID = 'migration-opening-balance-v1';
 const OPENING_LEDGER_TIME = '1970-01-01T00:00:00.000Z';
 const VERIFIED_UID_KEY = 'ruzgar_verified_adult_uid_v1';
+// Öğren: ana kazanç yolu rutin görevler kalsın diye puan birikimli verilir.
+const LEARN_ANSWERS_PER_COIN = 10;
 
 function calculateLedgerBalance(ledger: CoinLedgerEntry[], fallback: number) {
   if (ledger.length === 0) return fallback;
@@ -847,6 +849,28 @@ export default function App() {
     appendCoinLedger({ id: `bonus-reward-${bonusId}`, type: 'bonus_reward', coinDelta: bonus.coins, referenceId: bonusId });
   };
 
+  // Öğren sekmesinde her doğru cevapta çağrılır; her 10 doğruda 1 puan verir.
+  // Hareket kimliği gün + o günkü puan sırasıdır: iki cihaz aynı anda 10.
+  // doğruya ulaşsa bile puan bir kez sayılır.
+  const handleLearnCorrect = () => {
+    const todayKey = getLocalDateKey();
+    const isToday = user.learnDateKey === todayKey;
+    const answers = (isToday ? user.learnAnswersToday ?? 0 : 0) + 1;
+    const coinsToday = isToday ? user.learnCoinsToday ?? 0 : 0;
+    const earnsCoin = answers % LEARN_ANSWERS_PER_COIN === 0;
+    setUser((prev) => ({
+      ...prev,
+      coins: prev.coins + (earnsCoin ? 1 : 0),
+      learnDateKey: todayKey,
+      learnAnswersToday: answers,
+      learnCoinsToday: coinsToday + (earnsCoin ? 1 : 0),
+    }));
+    if (earnsCoin) {
+      appendCoinLedger({ id: `learn-reward-${todayKey}-${coinsToday + 1}`, type: 'learn_reward', coinDelta: 1 });
+    }
+  };
+  const learnAnswersToday = user.learnDateKey === getLocalDateKey() ? user.learnAnswersToday ?? 0 : 0;
+
   const handleToggleSound = () => {
     setUser((prev) => ({
       ...prev,
@@ -1069,6 +1093,9 @@ export default function App() {
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
               syllableGameLevels={user.syllableGameLevels}
+              onCorrectAnswer={handleLearnCorrect}
+              answersTowardNextCoin={learnAnswersToday % LEARN_ANSWERS_PER_COIN}
+              answersPerCoin={LEARN_ANSWERS_PER_COIN}
             />
           )}
 
