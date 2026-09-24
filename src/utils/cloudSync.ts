@@ -351,6 +351,22 @@ export function mergeShopUnlocks(remote: ShopItem[] = [], local: ShopItem[] = []
 }
 
 /**
+ * Puan defterinde parası ödenmiş (`purchase-<ürün>`) ama kilitli görünen ürünleri
+ * açar. Eski sürümdeki eşitleme hatası yüzünden kaybolmuş satın almalar, canlı
+ * veriye geçildiğinde böylece kendiliğinden geri gelir. Değişiklik yoksa aynı
+ * diziyi döndürür.
+ */
+export function unlockPaidItems(shop: ShopItem[], ledger: CoinLedgerEntry[] = []): ShopItem[] {
+  const paid = new Set(
+    ledger
+      .filter((entry) => entry.type === 'purchase' && entry.coinDelta < 0)
+      .map((entry) => entry.referenceId || entry.id.replace(/^purchase-/, '')),
+  );
+  if (!shop.some((item) => !item.unlocked && paid.has(item.id))) return shop;
+  return shop.map((item) => (!item.unlocked && paid.has(item.id) ? { ...item, unlocked: true } : item));
+}
+
+/**
  * Puan hareketleri değişmez kayıtlardır. Aynı kimlikte iki kayıt varsa buluttaki
  * kazanır; böylece bir cihazın kendi "başlangıç bakiyesi" kopyası ailenin
  * bakiyesini asla ezemez. Yalnızca bulutta olmayan yeni hareketler eklenir.

@@ -49,7 +49,7 @@ import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
-import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
 import { validateYoutubeVideo } from './utils/youtubeValidation';
@@ -398,7 +398,7 @@ export default function App() {
           const worldChanged = stableStringify(mergedWorld) !== stableStringify(remote.world || []);
 
           const syncedTasks = mergeById(remote.tasks || [], localData?.tasks || tasks, true);
-          const mergedShop = mergeShopUnlocks(syncedShop, localData?.shop || shop);
+          const mergedShop = unlockPaidItems(mergeShopUnlocks(syncedShop, localData?.shop || shop), syncedLedger);
           const syncedBonuses = mergeById(remote.bonuses || [], localData?.bonuses || bonuses);
           setUser(syncedUser); setParentConfig(syncedParentConfig);
           setTasks(syncedTasks);
@@ -595,7 +595,7 @@ export default function App() {
         coins: calculateLedgerBalance(syncedLedger, remote.user.coins),
       });
       setCoinLedger(syncedLedger);
-      setParentConfig(remote.parentConfig); setTasks(mergeById(remote.tasks || [], tasks, true)); setShop((current) => mergeShopUnlocks(mergeShopItemsWithCatalog(remote.shop), current));
+      setParentConfig(remote.parentConfig); setTasks(mergeById(remote.tasks || [], tasks, true)); setShop((current) => unlockPaidItems(mergeShopUnlocks(mergeShopItemsWithCatalog(remote.shop), current), syncedLedger));
       setWorld(syncedWorld); setBonuses(mergeById(remote.bonuses || [], bonuses)); setVoiceMessages(combinedMessages); setVideos(combinedVideos); setActivityLog(combinedActivityLog);
       setActiveChildDevice(remote.activeChildDevice ?? null);
       syncReadyRef.current = true;
@@ -1055,7 +1055,7 @@ export default function App() {
           setUser({ ...INITIAL_USER, ...familyData.user, coins: calculateLedgerBalance(syncedLedger, familyData.user.coins) });
           setParentConfig(familyData.parentConfig || INITIAL_PARENT);
           setTasks(familyData.tasks || INITIAL_TASKS);
-          setShop(mergeShopItemsWithCatalog(familyData.shop || INITIAL_SHOP));
+          setShop(unlockPaidItems(mergeShopItemsWithCatalog(familyData.shop || INITIAL_SHOP), syncedLedger));
           setWorld(familyData.world || INITIAL_WORLD);
           setBonuses(familyData.bonuses || INITIAL_BONUSES);
           setVoiceMessages(familyData.voiceMessages || INITIAL_VOICE_MESSAGES);
