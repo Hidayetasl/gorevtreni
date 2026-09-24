@@ -332,8 +332,8 @@
 .gt-wmissions { display: none !important; }
 .gt-wmissions.open { display: flex !important; position: fixed; left: 16px; right: 16px; top: calc(140px + env(safe-area-inset-top, 0px)); z-index: 60; box-shadow: 0 10px 30px rgba(0, 0, 0, .2) !important; }
 .gt .gt-wc > .gt-wmis-backdrop, .gt-wmis-backdrop { position: fixed; inset: 0; z-index: 59; background: rgba(22, 50, 58, .35) !important; border: 0 !important; box-shadow: none !important; border-radius: 0; }
-.world-ride-canvas-shell { --gt-rail-lift: 7px; }
-@media (min-width: 640px) { .world-ride-canvas-shell { --gt-rail-lift: 10px; } }
+.world-ride-canvas-shell { --gt-rail-lift: 22px; }
+@media (min-width: 640px) { .world-ride-canvas-shell { --gt-rail-lift: 28px; } }
 /* Tam ekranda kumanda paneli alttan açılan sayfa olur. */
 .gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { background: var(--gt-sky) !important; }
 .gt .world-ride-layout.is-fullscreen .world-ride-canvas-shell { border: 0 !important; }
