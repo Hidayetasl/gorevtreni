@@ -333,6 +333,24 @@ export function mergeById<T extends { id: string; updatedAt?: string; deletedAt?
 }
 
 /**
+ * Mağaza ürünleri: satın alma geri alınmaz. Bir ürün bulutta ya da bu cihazda
+ * "alındı" ise alınmış sayılır; eski bir cihazın kopyası (ya da zaman damgası
+ * kaybolmuş bir kayıt) satın alınmış bir ürünü asla yeniden kilitleyemez.
+ */
+export function mergeShopUnlocks(remote: ShopItem[] = [], local: ShopItem[] = []): ShopItem[] {
+  const localById = new Map(local.map((item) => [item.id, item]));
+  const result = remote.map((item) => {
+    const mine = localById.get(item.id);
+    if (!mine) return item;
+    localById.delete(item.id);
+    const unlocked = Boolean(item.unlocked || mine.unlocked);
+    const updatedAt = [item.updatedAt, mine.updatedAt].filter(Boolean).sort().pop();
+    return { ...item, unlocked, ...(updatedAt ? { updatedAt } : {}) };
+  });
+  return [...result, ...localById.values()];
+}
+
+/**
  * Puan hareketleri değişmez kayıtlardır. Aynı kimlikte iki kayıt varsa buluttaki
  * kazanır; böylece bir cihazın kendi "başlangıç bakiyesi" kopyası ailenin
  * bakiyesini asla ezemez. Yalnızca bulutta olmayan yeni hareketler eklenir.
@@ -399,7 +417,7 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
       parentConfig: { ...data.parentConfig, pinHash: data.parentConfig.pinHash || remotePinHash },
       // Silinen görevlerin "silindi" işareti de saklanır; yoksa başka bir cihaz görevi geri getirir.
       tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks, true),
-      shop: mergeById((remoteData.shop || []) as ShopItem[], data.shop),
+      shop: mergeShopUnlocks((remoteData.shop || []) as ShopItem[], data.shop),
       bonuses: mergeById((remoteData.bonuses || []) as BonusCard[], data.bonuses),
       world: mergeById((remoteData.world || []) as PlacedWorldItem[], data.world, true),
       voiceMessages: mergeVoiceMessages((remoteData.voiceMessages || []) as VoiceMessage[], localMessages),

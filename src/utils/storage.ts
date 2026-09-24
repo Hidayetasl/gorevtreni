@@ -306,8 +306,10 @@ export const saveStoredTasks = (tasks: RoutineTask[]) => saveToStorage(STORAGE_K
 export const mergeShopItemsWithCatalog = (stored: ShopItem[] = INITIAL_SHOP): ShopItem[] => {
   return INITIAL_SHOP.map((initial) => {
     const existing = stored.find((s) => s.id === initial.id);
+    // Katalog (ad, fiyat, açıklama) bu sürümden gelir; satın alma bilgisi ve
+    // zaman damgası kayıttan korunur ki eşitleme hangi kopyanın yeni olduğunu bilsin.
     return existing
-      ? { ...initial, unlocked: existing.unlocked || initial.unlocked }
+      ? { ...initial, unlocked: existing.unlocked || initial.unlocked, ...(existing.updatedAt ? { updatedAt: existing.updatedAt } : {}) }
       : initial;
   });
 };
