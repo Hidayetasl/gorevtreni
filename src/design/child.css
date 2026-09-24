@@ -224,20 +224,20 @@
 .gt-tr { font: 800 17px var(--gt-font); color: var(--gt-ink-2); margin-top: -8px; }
 
 /* ---------- Dünya ---------- */
-.gt-world { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
-.gt-world > .gt-head { padding: 14px 0 0; max-width: none; margin: 0; }
+.gt-world { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+.gt-world > .gt-head { padding: 6px 0 0; max-width: none; margin: 0; }
 .gt-world > .gt-head h1 { text-align: left; }
 .gt-wtop { display: flex; flex-direction: column; gap: 8px; }
 .gt-wtop .gt-seg { background: #fff; box-shadow: 0 2px 0 var(--gt-line); }
 .gt-wtop .gt-seg button.on { background: var(--gt-turkuaz) !important; color: #fff !important; box-shadow: none; }
-.gt-wmsg { margin: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 16px; background: #fff; box-shadow: 0 2px 0 var(--gt-line); font: 800 15px/1.3 var(--gt-font); color: var(--gt-ink); }
-.gt-world .world-ride-layout > :not(:last-child) { margin-bottom: 12px; }
+.gt-wmsg { margin: 0; min-height: 40px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 14px; background: #fff; box-shadow: 0 2px 0 var(--gt-line); font: 800 14px/1.25 var(--gt-font); color: var(--gt-ink); }
+.gt-world .world-ride-layout > :not(:last-child) { margin-bottom: 8px; }
 .gt-world .world-ride-canvas-shell { border-radius: 24px !important; border: 4px solid #fff !important; box-shadow: 0 3px 0 var(--gt-line) !important; }
-.gt .gt-wc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.gt .gt-wc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .gt .gt-wc > * { min-width: 0; }
-.gt .gt-wc > .gt-wpanel, .gt .gt-wpanel { background: #fff !important; border: 0 !important; border-radius: 24px; box-shadow: 0 3px 0 var(--gt-line) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; color: var(--gt-ink) !important; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.gt .gt-wc > .gt-wpanel, .gt .gt-wpanel { background: #fff !important; border: 0 !important; border-radius: 24px; box-shadow: 0 3px 0 var(--gt-line) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; color: var(--gt-ink) !important; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .gt-wbtns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.gt-wbtn { min-height: 76px; border-radius: 20px; background: var(--gt-sky) !important; color: var(--gt-ink) !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 900 15px/1.1 var(--gt-font) !important; box-shadow: 0 3px 0 var(--gt-line); transition: transform .12s; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.gt-wbtn { min-height: 68px; border-radius: 20px; background: var(--gt-sky) !important; color: var(--gt-ink) !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 900 15px/1.1 var(--gt-font) !important; box-shadow: 0 3px 0 var(--gt-line); transition: transform .12s; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .gt-wbtn:active { transform: scale(.96); }
 .gt-wbtn svg { width: 30px; height: 30px; }
 .gt-wbtn .e { font-size: 30px; line-height: 1; }
@@ -284,28 +284,42 @@
 .gt .gt-whorn:active { transform: scale(.92); }
 .gt-wpanel .gt-cats { flex-wrap: wrap; overflow: visible; }
 .gt-world .gt-menu, .gt-world .gt-menu-hint { margin-left: 0; margin-right: 0; }
-.gt-menu.world .gt-menu-card:first-child { grid-column: 1 / -1; flex-direction: row; gap: 16px; min-height: 120px; }
+.gt-menu.world .gt-menu-card:first-child { grid-column: 1 / -1; flex-direction: row; gap: 16px; min-height: 88px; }
+.gt-menu.world { gap: 10px; margin-top: 8px; }
+.gt-menu.world .gt-menu-card { min-height: 112px; padding: 8px; gap: 4px; }
+/* Telefonda sahne ve kapak ekran yüksekliğine göre ayarlanır: kumanda ve menü kartları alt menünün üstünde kalır. */
+@container gt (max-width: 719px) {
+  .gt-world .world-ride-layout:not(.is-fullscreen) .world-ride-canvas-shell { aspect-ratio: auto !important; height: clamp(170px, calc(100dvh - 452px), 280px); }
+  .gt-wcover { aspect-ratio: auto; height: clamp(150px, calc(100dvh - 472px), 240px); }
+}
+.gt-world .gt-menu-hint { margin-top: 0; }
+.gt-wmenu { display: flex; flex-direction: column; gap: 8px; }
 .gt-menu.world .gt-menu-card:first-child .t { text-align: left; }
 .gt-menu-card.w-ride { box-shadow: inset 0 -6px 0 var(--gt-mavi-s), 0 3px 0 var(--gt-line); }
 .gt-menu-card.w-builder { box-shadow: inset 0 -6px 0 var(--gt-yesil-s), 0 3px 0 var(--gt-line); }
 .gt-menu-card.w-garage { box-shadow: inset 0 -6px 0 var(--gt-turuncu-s), 0 3px 0 var(--gt-line); }
-.gt-world .gt-subhead { padding-top: 14px; }
+.gt-world .gt-subhead { padding-top: 6px; flex-wrap: nowrap; gap: 8px; }
+.gt-world .gt-subhead h1 { order: 0; flex: 1; font-size: 21px; min-width: 0; }
+.gt-world .gt-back { min-height: 52px; padding: 0 14px 0 4px; font-size: 16px !important; }
+.gt-world .gt-back .ar { width: 42px; height: 42px; }
+.gt-world .gt-back .ar svg { width: 26px; height: 26px; }
+.gt-world .world-ride-canvas-shell { min-height: 0 !important; }
 .gt-menu-img { display: inline-block; height: 64px; width: auto; }
 .gt-wtitle .gt-menu-img { height: 32px; vertical-align: -5px; }
 .gt-hangar { display: inline-block; width: 70px; height: 70px; }
 .gt-wtitle .gt-hangar { width: 34px; height: 34px; vertical-align: -6px; }
 .gt-wcover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 24px; border: 4px solid #fff; box-shadow: 0 3px 0 var(--gt-line); }
 .gt-wbtn { background: #f1f5f7 !important; color: var(--gt-ink-2) !important; gap: 2px; padding: 6px 2px; }
-.gt-wbtn .pic { position: relative; width: 100%; height: 50px; display: grid; place-items: center; }
-.gt-wbtn .pic img { max-width: 92%; max-height: 50px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(22, 50, 58, .18)); }
+.gt-wbtn .pic { position: relative; width: 100%; height: 40px; display: grid; place-items: center; }
+.gt-wbtn .pic img { max-width: 92%; max-height: 40px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(22, 50, 58, .18)); }
 .gt-wbtn.mavi { background: var(--gt-mavi) !important; color: #fff !important; box-shadow: 0 4px 0 var(--gt-mavi-d); }
 .gt-wbtn.dur { background: #fff !important; color: var(--gt-mavi-d) !important; box-shadow: inset 0 0 0 3px var(--gt-mavi), 0 3px 0 var(--gt-line); }
 .gt-wbtn .badge { position: absolute; right: 4px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: var(--gt-mavi); color: #fff; display: grid; place-items: center; box-shadow: 0 0 0 2px #fff; }
 .gt-wbtn .badge svg { width: 13px; height: 13px; }
 .gt-wbtn.on-sari { background: #fff6cf !important; color: #7a4a00 !important; }
 .gt-wbtn.on-mor { background: var(--gt-mor-s) !important; }
-.gt-speed button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 76px; padding: 4px 2px; }
-.gt-speed button img { height: 40px; max-width: 90%; object-fit: contain; }
+.gt-speed button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 60px; padding: 2px; }
+.gt-speed button img { height: 32px; max-width: 90%; object-fit: contain; }
 .gt-speed button.on { box-shadow: inset 0 0 0 3px var(--gt-turkuaz) !important; background: var(--gt-turkuaz-s) !important; }
 .gt .gt-whorn img { width: 44px; height: 44px; object-fit: contain; }
 /* Tam ekranda kumanda paneli alttan açılan sayfa olur. */
@@ -394,7 +408,9 @@
   .gt-wbtn { min-height: 96px; font-size: 17px !important; }
   .gt-wbtn .pic { height: 60px; }
   .gt-wbtn .pic img { max-height: 60px; }
-  .gt-wcover { max-height: 320px; aspect-ratio: auto; height: 320px; }
+  .gt-world .gt-subhead { padding-top: 20px; }
+  .gt-world .gt-subhead h1 { font-size: 28px; }
+  .gt-wmenu { gap: 16px; }
   .gt-wtools.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .gt-wgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .gt .world-ride-layout.is-fullscreen .gt-wc { grid-template-columns: minmax(0, 1fr); }
@@ -407,6 +423,14 @@
   .gt-all { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-head, .gt-modes, .gt-lcard, .gt-menu, .gt-menu-hint { max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-world { max-width: 1180px; margin-left: auto; margin-right: auto; width: 100%; }
+  .gt-wmenu { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .gt-wmenu-side { display: flex; flex-direction: column; gap: 10px; }
+  .gt-wmenu .gt-menu.world { grid-template-columns: 1fr; margin-top: 0; gap: 12px; }
+  .gt-wmenu .gt-menu.world .gt-menu-card, .gt-wmenu .gt-menu.world .gt-menu-card:first-child { flex-direction: row; justify-content: flex-start; min-height: 0; height: auto; padding: 14px 18px; gap: 16px; }
+  .gt-wmenu .gt-menu.world .gt-menu-card .t { text-align: left; }
+  .gt-wmenu .gt-menu-img { height: 60px; }
+  .gt-wmenu .gt-menu-card .gt-hangar { width: 64px; height: 64px; }
+  .gt-wmenu .gt-menu-card .e { font-size: 52px; }
   .gt-world .world-ride-layout:not(.is-fullscreen) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
   .gt-world .world-ride-layout:not(.is-fullscreen) > * { margin-bottom: 0 !important; }
   .gt-world .world-ride-layout:not(.is-fullscreen) .world-ride-canvas-shell { position: sticky; top: 16px; }

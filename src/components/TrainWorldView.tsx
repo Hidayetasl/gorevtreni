@@ -857,15 +857,19 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
           <div className="gt-head">
             <h1>Tren Dünyası</h1>
           </div>
-          <img className="gt-wcover" src={dunyamKapak} alt="Sincap Köy İstasyonu: trende el sallayan küçük kaptan" draggable={false} />
-          <p className="gt-menu-hint">Ne yapmak istersin?</p>
-          <div className="gt-menu world" aria-label="Dünya bölümleri">
-            {WORLD_SECTIONS.map((section) => (
-              <button key={section.id} type="button" className={`gt-menu-card w-${section.id}`} onClick={() => openSection(section.id)}>
-                <span className="e" aria-hidden="true">{section.icon}</span>
-                <span className="t">{section.label}<small>{section.id === 'ride' ? `⭐ ${cockpitProgress.score} / 25 kaptan yıldızı` : section.detail}</small></span>
-              </button>
-            ))}
+          <div className="gt-wmenu">
+            <img className="gt-wcover" src={dunyamKapak} alt="Sincap Köy İstasyonu: trende el sallayan küçük kaptan" draggable={false} />
+            <div className="gt-wmenu-side">
+              <p className="gt-menu-hint">Ne yapmak istersin?</p>
+              <div className="gt-menu world" aria-label="Dünya bölümleri">
+                {WORLD_SECTIONS.map((section) => (
+                  <button key={section.id} type="button" className={`gt-menu-card w-${section.id}`} onClick={() => openSection(section.id)}>
+                    <span className="e" aria-hidden="true">{section.icon}</span>
+                    <span className="t">{section.label}<small>{section.id === 'ride' ? `⭐ ${cockpitProgress.score} / 25 kaptan yıldızı` : section.detail}</small></span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </>
       ) : (
