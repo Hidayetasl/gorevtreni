@@ -68,6 +68,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
   const [pendingCode, setPendingCode] = useState('');
   const [manualInvite, setManualInvite] = useState('');
   const [createdCode, setCreatedCode] = useState('');
+  const [confirmNewFamily, setConfirmNewFamily] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -291,14 +292,25 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
           {phase === 'no-family' && (
             <>
               <h1>Aileye bağlanın</h1>
-              <p className="ag-sub">{authUser?.email} hesabı henüz bir aileye bağlı değil.</p>
-              <button type="button" className="ag-btn" onClick={() => { setError(''); setPinMode('create'); setPhase('pin'); }}>Yeni aile kur</button>
+              <p className="ag-sub">{authUser?.email} hesabı henüz bir aileye bağlı değil. Rüzgar’ın mevcut puanları, kasabası ve günlükleri için ailenizin kodunu yazın.</p>
+              {/* Mevcut aileye katılmak ana yol: yanlışlıkla boş yeni aile kurulmasın. */}
               <form onSubmit={handleManualInvite} className="ag-box" noValidate>
-                <label htmlFor="ag-invite" style={{ fontWeight: 800 }}>Davet bağlantım var</label>
-                <input id="ag-invite" className="ag-input" value={manualInvite} onChange={(event) => setManualInvite(event.target.value)} placeholder="Bağlantıyı veya aile kodunu yapıştırın" />
-                <button type="submit" className="ag-btn line" disabled={busy}>Aileye katıl</button>
+                <label htmlFor="ag-invite" style={{ fontWeight: 800 }}>Aile kodu veya davet bağlantısı</label>
+                <input id="ag-invite" className="ag-input" value={manualInvite} onChange={(event) => setManualInvite(event.target.value)} placeholder="Örn. ABCD1234EFGH" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
+                <button type="submit" className="ag-btn" disabled={busy}>{busy ? 'Bağlanıyor…' : 'Aileye katıl'}</button>
               </form>
               {errorBox}
+              {confirmNewFamily ? (
+                <div className="ag-box">
+                  <p className="ag-note" style={{ margin: 0 }}><b>Emin misiniz?</b> Yeni aile boş başlar; mevcut puanlar, kasaba ve günlükler orada görünmez. Aileniz zaten varsa yukarıya aile kodunu yazın.</p>
+                  <div className="ag-row">
+                    <button type="button" className="ag-btn ghost" onClick={() => setConfirmNewFamily(false)}>Vazgeç</button>
+                    <button type="button" className="ag-btn line" onClick={() => { setError(''); setConfirmNewFamily(false); setPinMode('create'); setPhase('pin'); }}>Yeni aile kur</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="ag-link" onClick={() => setConfirmNewFamily(true)}>İlk kurulum: yeni aile oluştur</button>
+              )}
               <button type="button" className="ag-link" onClick={handleSignOut}>Farklı hesapla gir</button>
             </>
           )}
