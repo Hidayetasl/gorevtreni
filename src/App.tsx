@@ -1064,6 +1064,14 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'learn' && (
+            <LearnView
+              soundEnabled={user.soundEnabled}
+              speechEnabled={user.speechEnabled}
+              syllableGameLevels={user.syllableGameLevels}
+            />
+          )}
+
           {/* Bu sekmeler sırayla yeni tasarıma geçecek; şimdilik mevcut görünümleri. */}
           <div className="app-main p-2 sm:p-3">
 
@@ -1101,13 +1109,6 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'learn' && (
-            <LearnView
-              soundEnabled={user.soundEnabled}
-              speechEnabled={user.speechEnabled}
-              syllableGameLevels={user.syllableGameLevels}
-            />
-          )}
           </div>
 
         {/* Parent Engine Room Modal */}

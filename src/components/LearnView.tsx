@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
-import { ArrowRight, BookOpen, CheckCircle2, Volume2, Sparkles, RotateCcw, Mic, PartyPopper } from 'lucide-react';
+import { Volume2, RotateCcw, Mic } from 'lucide-react';
 
 interface LearnViewProps {
   soundEnabled: boolean;
@@ -420,7 +420,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
         });
       speakText(`Doğru! ${quizTarget.word.word}, ${quizTarget.entry.letter[0]} ile başlar.`, speechEnabled, 0.75);
       if (quizAdvanceTimeoutRef.current) window.clearTimeout(quizAdvanceTimeoutRef.current);
-      quizAdvanceTimeoutRef.current = window.setTimeout(nextQuizTarget, 1800);
+      quizAdvanceTimeoutRef.current = window.setTimeout(nextQuizTarget, 2600);
     } else {
       playPopSound(soundEnabled);
       setQuizFeedback('wrong');
@@ -582,7 +582,8 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       setEnglishCorrectCount((count) => count + 1);
       speakText('Great job!', speechEnabled, 0.85, 'en-US', 1.05);
       if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-      englishAdvanceTimeoutRef.current = window.setTimeout(() => nextEnglishFindRound(englishCategory), 1600);
+      // Çocuk doğru cevabı rahatça görebilsin diye yeni kelimeye geçmeden önce biraz beklenir.
+      englishAdvanceTimeoutRef.current = window.setTimeout(() => nextEnglishFindRound(englishCategory), 2600);
     } else {
       playPopSound(soundEnabled);
       setEnglishFeedback('wrong');
@@ -661,498 +662,192 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
   // çare olarak ipucu gösteriliyor.
   const showHint = quizWrongTries >= 3;
 
+  const modeDone: Record<Mode, boolean> = {
+    kesfet: discovered.size > 0,
+    bul: quizCorrectCount > 0,
+    hece: wordCompleteCount > 0,
+    ingilizce: englishCorrectCount > 0,
+  };
+  const micMessage = (state: typeof micState, successText: string) => {
+    if (state === 'correct') return <p className="gt-result good" role="status">{successText}</p>;
+    if (state === 'no-match') return <p className="gt-result again" role="status">Seni tam duyamadım, tekrar dener misin?</p>;
+    if (state === 'denied') return <p className="gt-result info" role="status">Mikrofon izni gerekiyor. Bir büyüğünden izin vermesini iste.</p>;
+    if (state === 'error') return <p className="gt-result info" role="status">Bir sorun oldu, tekrar dener misin?</p>;
+    return null;
+  };
+
   return (
-    <div className="space-y-4 pb-28">
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div>
-          <div className="text-[11px] font-black text-sky-400 uppercase tracking-widest">
-            {mode === 'ingilizce' ? 'İNGİLİZCE TRENİ' : 'HARF TRENİ'}
-          </div>
-          <h2 className="font-game text-2xl sm:text-3xl font-black text-white flex items-center gap-2">
-            <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 text-sky-300" />
-            <span>{mode === 'kesfet' ? 'Sesleri Keşfet' : mode === 'bul' ? 'Hangi Harf?' : mode === 'hece' ? 'Heceleri Birleştir' : 'İngilizce Öğren'}</span>
-          </h2>
-        </div>
-        <div className="rounded-2xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-right">
-          <div className="text-[10px] font-bold text-sky-300 uppercase tracking-wide">
-            {mode === 'kesfet' ? 'Keşfedilen' : mode === 'bul' ? 'Doğru' : mode === 'hece' ? 'Tamamlanan' : 'Doğru'}
-          </div>
-          <div className="font-game text-lg font-black text-white">
-            {mode === 'kesfet' ? `${discovered.size} / ${LETTER_ENTRIES.length}` : mode === 'bul' ? quizCorrectCount : mode === 'hece' ? wordCompleteCount : englishCorrectCount}
-          </div>
-        </div>
+    <div>
+      <div className="gt-head">
+        <h1>Öğren</h1>
+        <span className="gt-goal" aria-label={`Bugünkü hedef ${dailyLearnCount} / ${DAILY_LEARNING_GOAL} keşif`}>
+          <span aria-hidden="true">⭐</span><b>{dailyLearnCount}/{DAILY_LEARNING_GOAL}</b> bugün
+        </span>
       </div>
 
-      <section className="rounded-2xl border-2 border-violet-400/60 bg-gradient-to-r from-violet-950/70 via-sky-950/70 to-emerald-950/70 p-3 shadow-lg" aria-labelledby="learning-roadmap-title">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-200">ÖĞRENME YOLCULUĞUM</div>
-            <h3 id="learning-roadmap-title" className="font-game text-base sm:text-lg font-black text-white">Bugün {DAILY_LEARNING_GOAL} küçük keşif yap</h3>
-          </div>
-          <div className="text-right">
-            <div className="font-game text-lg font-black text-amber-300">{dailyLearnCount}/{DAILY_LEARNING_GOAL}</div>
-            <div className="text-[10px] font-bold text-slate-300">bugünkü hedef</div>
-          </div>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800/80" aria-label={`Bugünkü öğrenme hedefi ${dailyLearnCount}/${DAILY_LEARNING_GOAL}`}>
-          <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-emerald-400" style={{ width: `${Math.min(100, (dailyLearnCount / DAILY_LEARNING_GOAL) * 100)}%` }} />
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-1.5 sm:gap-2">
-          {LEARNING_WAGONS.map((wagon, index) => {
-            const isActive = mode === wagon.id;
-            const isDone = wagon.id === 'kesfet' ? discovered.size > 0 : wagon.id === 'bul' ? quizCorrectCount > 0 : wagon.id === 'hece' ? wordCompleteCount > 0 : englishCorrectCount > 0;
-            return (
-              <button
-                key={wagon.id}
-                type="button"
-                onClick={() => handleModeChange(wagon.id)}
-                className={`min-h-[76px] rounded-xl border-2 px-1.5 py-2 text-center ${isActive ? 'border-amber-300 bg-amber-400/20 text-white' : 'border-slate-700/80 bg-slate-950/30 text-slate-300'}`}
-                aria-current={isActive ? 'step' : undefined}
-              >
-                <div className="flex items-center justify-center gap-1 text-xl"><span aria-hidden="true">{wagon.icon}</span>{isDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" aria-label="Tamamlandı" />}</div>
-                <div className="mt-1 font-game text-[10px] sm:text-xs font-black leading-tight">{index + 1}. {wagon.label}</div>
-                <div className="mt-0.5 text-[9px] font-semibold leading-tight text-slate-400">{wagon.detail}</div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Mod Seçici */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <button
-          type="button"
-          onClick={() => handleModeChange('kesfet')}
-          className={`py-2.5 rounded-2xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-            mode === 'kesfet'
-              ? 'bg-sky-500 border-sky-300 text-white shadow-md'
-              : 'bg-[#173340] border-sky-800/60 text-slate-300'
-          }`}
-        >
-          🔤 Keşfet
-        </button>
-        <button
-          type="button"
-          onClick={() => handleModeChange('bul')}
-          className={`py-2.5 rounded-2xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-            mode === 'bul'
-              ? 'bg-emerald-500 border-emerald-300 text-white shadow-md'
-              : 'bg-[#173340] border-sky-800/60 text-slate-300'
-          }`}
-        >
-          🧠 Bul
-        </button>
-        <button
-          type="button"
-          onClick={() => handleModeChange('hece')}
-          className={`py-2.5 rounded-2xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-            mode === 'hece'
-              ? 'bg-purple-500 border-purple-300 text-white shadow-md'
-              : 'bg-[#173340] border-sky-800/60 text-slate-300'
-          }`}
-        >
-          🎈 Heceler
-        </button>
-        <button
-          type="button"
-          onClick={() => handleModeChange('ingilizce')}
-          className={`py-2.5 rounded-2xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-            mode === 'ingilizce'
-              ? 'bg-rose-500 border-rose-300 text-white shadow-md'
-              : 'bg-[#173340] border-sky-800/60 text-slate-300'
-          }`}
-        >
-          🌍 İngilizce
-        </button>
+      <div className="gt-modes" role="tablist" aria-label="Öğrenme oyunları">
+        {LEARNING_WAGONS.map((wagon) => (
+          <button
+            key={wagon.id}
+            type="button"
+            role="tab"
+            aria-selected={mode === wagon.id}
+            className={`gt-mode ${mode === wagon.id ? 'on' : ''}`}
+            onClick={() => handleModeChange(wagon.id)}
+          >
+            <span className="e" aria-hidden="true">{wagon.icon}</span>
+            <span className="t">{wagon.label}<small>{wagon.detail}</small></span>
+            {modeDone[wagon.id] && <span className="ok" aria-label="Bugün oynandı">✓</span>}
+          </button>
+        ))}
       </div>
 
       {mode === 'kesfet' && (
-        <>
-          <div className="rounded-2xl bg-sky-950/40 border border-sky-800/50 px-4 py-3 flex items-center gap-2.5">
-            <Volume2 className="w-5 h-5 text-sky-300 flex-shrink-0" />
-            <p className="text-xs sm:text-sm font-semibold text-sky-100 leading-relaxed">
-              Bir harfe dokun, sesini ve o sesle başlayan kelimeyi dinle!
-            </p>
-          </div>
-
-          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 sm:gap-3">
+        <section className="gt-lcard" aria-label="Sesleri keşfet">
+          <p className="gt-hint">Bir harfe dokun, sesini ve o sesle başlayan kelimeyi dinle.</p>
+          <span className="gt-count">Keşfedilen: {discovered.size} / {LETTER_ENTRIES.length}</span>
+          <div className="gt-letters">
             {LETTER_ENTRIES.map((entry) => {
               const primary = entry.words[0];
-              const isActive = activeLetter === entry.letter;
-              const isDiscovered = discovered.has(entry.letter);
               return (
                 <button
                   key={entry.letter}
                   type="button"
                   onClick={() => handleLetterTap(entry)}
                   title={entry.note ? `${primary.word} (${entry.note})` : primary.word}
-                  className={`relative flex flex-col items-center justify-center gap-1 rounded-2xl border-2 py-3 px-1.5 shadow-md transition-all duration-200 active:scale-90 ${
-                    isActive
-                      ? 'scale-110 border-amber-300 bg-amber-400 text-yellow-950 shadow-amber-500/40'
-                      : isDiscovered
-                      ? 'border-emerald-400/70 bg-emerald-900/40 text-emerald-100 hover:brightness-110'
-                      : 'border-sky-700/60 bg-[#173340] text-slate-100 hover:bg-[#1f4253]'
-                  }`}
+                  className={`gt-letter ${activeLetter === entry.letter ? 'on' : discovered.has(entry.letter) ? 'seen' : ''}`}
                 >
-                  <span className="font-game text-xl sm:text-2xl font-black leading-none">{entry.letter}</span>
-                  <span className="text-lg sm:text-xl leading-none">{primary.emoji}</span>
-                  <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide truncate max-w-full">
-                    {primary.word}
-                  </span>
+                  <span className="l">{entry.letter}</span>
+                  <span className="em" aria-hidden="true">{primary.emoji}</span>
+                  <span className="w">{primary.word}</span>
                 </button>
               );
             })}
           </div>
-        </>
+        </section>
       )}
 
       {mode === 'bul' && (
-        <>
-          <div className="rounded-2xl bg-emerald-950/40 border border-emerald-800/50 px-4 py-3 flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-emerald-300 flex-shrink-0" />
-            <p className="text-xs sm:text-sm font-semibold text-emerald-100 leading-relaxed">
-              Resme bak, "Söyle" butonuna dokun ve adını yüksek sesle söyle, sonra hangi harfle başladığını alfabeden bul!
-            </p>
-          </div>
-
-          {/* Hedef resim */}
-          <div
-            className={`rounded-3xl border-2 py-8 flex flex-col items-center justify-center gap-2 transition-colors duration-300 ${
-              quizFeedback === 'correct'
-                ? 'border-emerald-300 bg-emerald-500/20'
-                : quizFeedback === 'wrong'
-                ? 'border-rose-400 bg-rose-500/10 animate-shake'
-                : 'border-sky-800/60 bg-[#0f2a35]'
-            }`}
-          >
-            <span className="text-6xl sm:text-7xl">{quizTarget.word.emoji}</span>
-
-            {micSupported ? (
-              <button
-                type="button"
-                onClick={handleSpeakWord}
-                disabled={micState === 'listening'}
-                className={`flex items-center gap-1.5 rounded-xl border px-4 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
-                  micState === 'listening'
-                    ? 'bg-rose-600/80 border-rose-400 text-white animate-pulse'
-                    : micState === 'correct'
-                    ? 'bg-emerald-600 border-emerald-300 text-white'
-                    : 'bg-emerald-900/50 border-emerald-700/60 text-emerald-200'
-                }`}
-              >
-                <Mic className="w-3.5 h-3.5" />
-                {micState === 'listening' ? 'Dinliyorum…' : 'Söyle'}
+        <section className="gt-lcard" aria-label="Hangi harf">
+          <span className={`gt-picture ${quizFeedback === 'correct' ? 'good' : quizFeedback === 'wrong' ? 'again' : ''}`} role="img" aria-label="Bu resmin adı ne?">{quizTarget.word.emoji}</span>
+          <p className="gt-hint">Resmin adını yüksek sesle söyle, sonra hangi harfle başladığını bul.</p>
+          <div className="gt-pair">
+            {micSupported && (
+              <button type="button" className={`gt-mid ${micState === 'listening' ? 'listening' : 'turkuaz'}`} onClick={handleSpeakWord} disabled={micState === 'listening'}>
+                <Mic aria-hidden="true" />{micState === 'listening' ? 'Dinliyorum…' : 'Söyle'}
               </button>
-            ) : (
-              <span className="text-[10px] font-semibold text-slate-400">
-                Bu cihazda ses tanıma yok — yine de yüksek sesle söyle!
-              </span>
             )}
-
-            {micState === 'correct' && (
-              <span className="text-xs font-bold text-emerald-300">Harika söyledin! 🎉</span>
-            )}
-            {micState === 'no-match' && (
-              <span className="text-xs font-bold text-amber-300">Seni tam duyamadım, tekrar dener misin?</span>
-            )}
-            {micState === 'denied' && (
-              <span className="text-xs font-bold text-rose-300">Mikrofon izni gerekiyor</span>
-            )}
-            {micState === 'error' && (
-              <span className="text-xs font-bold text-rose-300">Bir sorun oldu, tekrar dener misin?</span>
-            )}
-
-            {quizFeedback === 'correct' && (
-              <span className="font-game text-lg font-black text-emerald-200">
-                Doğru! {quizTarget.word.word} → {quizTarget.entry.letter[0]}
-              </span>
-            )}
-            {showHint && quizFeedback !== 'correct' && (
-              <span className="font-game text-sm font-black text-amber-300">
-                İpucu: {quizTarget.word.word[0]} ile başlıyor…
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (quizAdvanceTimeoutRef.current) window.clearTimeout(quizAdvanceTimeoutRef.current);
-                nextQuizTarget();
-              }}
-              className="mt-1 flex items-center gap-1 rounded-xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-[11px] font-bold text-sky-200"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Başka resim
+            <button type="button" className="gt-ghost" style={{ flex: 1 }} onClick={() => { if (quizAdvanceTimeoutRef.current) window.clearTimeout(quizAdvanceTimeoutRef.current); nextQuizTarget(); }}>
+              <RotateCcw aria-hidden="true" />Başka resim
             </button>
           </div>
-
-          {/* Alfabe seçim tuşları — sadece harf, kelime/emoji yok ki cevabı ele vermesin */}
-          <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+          {!micSupported && <p className="gt-result info">Bu cihazda ses tanıma yok. Yine de yüksek sesle söyle!</p>}
+          {micMessage(micState, 'Harika söyledin! 🎉 Hadi harfi bul.')}
+          {quizFeedback === 'correct' && <p className="gt-result good" role="status">✓ Doğru! {quizTarget.word.word}, “{quizTarget.entry.letter[0]}” ile başlar.</p>}
+          {quizFeedback === 'wrong' && <p className="gt-result again" role="status">Olmadı. Aynı harfle başlayan başka bir resim geliyor.</p>}
+          {showHint && quizFeedback !== 'correct' && <p className="gt-result info">İpucu: {quizTarget.word.word[0]} ile başlıyor…</p>}
+          <p className="gt-q">Hangi harfle başlıyor?</p>
+          {/* Sadece harfler; kelime ve resim yok ki cevabı ele vermesin. */}
+          <div className="gt-letters compact">
             {LETTER_ENTRIES.map((entry) => (
-              <button
-                key={entry.letter}
-                type="button"
-                onClick={() => handleQuizGuess(entry)}
-                disabled={quizFeedback === 'correct'}
-                className="rounded-xl border-2 border-sky-700/60 bg-[#173340] py-2.5 font-game text-sm sm:text-base font-black text-slate-100 transition-all active:scale-90 hover:bg-[#1f4253] disabled:opacity-40"
-              >
-                {entry.letter}
+              <button key={entry.letter} type="button" className={`gt-letter ${quizFeedback === 'correct' && entry.letter === quizTarget.entry.letter ? 'ok' : ''}`} onClick={() => handleQuizGuess(entry)} disabled={quizFeedback === 'correct'}>
+                <span className="l">{entry.letter}</span>
               </button>
             ))}
           </div>
-        </>
+        </section>
       )}
 
       {mode === 'hece' && (
-        <>
-          <div className="rounded-2xl bg-purple-950/40 border border-purple-800/50 px-4 py-3 flex items-center gap-2.5">
-            <PartyPopper className="w-5 h-5 text-purple-300 flex-shrink-0" />
-            <p className="text-xs sm:text-sm font-semibold text-purple-100 leading-relaxed">
-              Heceleri sırayla dokun, resmin adını tamamla! Karışık balonların içinde doğru heceler saklı.
-            </p>
-          </div>
-
-          {/* Seviye göstergesi — ebeveyn ayarında açık olan seviyeler arasında ilerleme */}
-          <div className="flex items-center justify-between rounded-2xl bg-purple-900/40 border border-purple-700/50 px-3.5 py-2">
-            <span className="font-game text-xs sm:text-sm font-black text-purple-100">
-              Seviye {activeHeceLevel} · {activeHeceLevel + 1} Heceli
-            </span>
-            {allowedLevels[allowedLevels.length - 1] !== activeHeceLevel ? (
-              <span className="text-[10px] sm:text-xs font-bold text-purple-300">
-                Sonraki seviye: {Math.min(heceLevelProgress, LEVEL_UP_THRESHOLD)}/{LEVEL_UP_THRESHOLD}
+        <section className="gt-lcard" aria-label="Heceleri birleştir">
+          <span className="gt-lvl">
+            SEVİYE {activeHeceLevel} · {activeHeceLevel + 1} HECELİ
+            {allowedLevels[allowedLevels.length - 1] !== activeHeceLevel
+              ? ` · sonraki seviye ${Math.min(heceLevelProgress, LEVEL_UP_THRESHOLD)}/${LEVEL_UP_THRESHOLD}`
+              : ' · en üst seviye 🏆'}
+          </span>
+          <span className="gt-picture" role="img" aria-label="Bu resmin adını hecelerle tamamla">{syllableRound.target.emoji}</span>
+          <div className="gt-slots" aria-label="Seçilen heceler">
+            {syllableRound.target.syllables.map((syllable, index) => (
+              <span key={`${syllable}-${index}`} className={index < selectedSyllables.length ? 'f' : ''}>
+                {index < selectedSyllables.length ? selectedSyllables[index] : ''}
               </span>
-            ) : (
-              <span className="text-[10px] sm:text-xs font-bold text-purple-300">En üst açık seviye 🏆</span>
-            )}
+            ))}
           </div>
-
-          {/* Hedef resim + tamamlanan hece dizisi */}
-          <div className="rounded-3xl border-2 border-purple-800/60 bg-[#1a0f2e] py-6 flex flex-col items-center justify-center gap-3">
-            <span className="text-6xl sm:text-7xl">{syllableRound.target.emoji}</span>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {syllableRound.target.syllables.map((syllable, index) => {
-                const isFilled = index < selectedSyllables.length;
-                return (
-                  <span
-                    key={`${syllable}-${index}`}
-                    className={`min-w-[2.5rem] sm:min-w-[3.5rem] rounded-xl border-2 px-2 py-1.5 text-center font-game text-base sm:text-xl font-black transition-all ${
-                      isFilled
-                        ? 'border-emerald-300 bg-emerald-500/30 text-emerald-100'
-                        : 'border-dashed border-purple-600/60 text-purple-500'
-                    }`}
-                  >
-                    {isFilled ? selectedSyllables[index] : '—'}
-                  </span>
-                );
-              })}
-            </div>
-            {selectedSyllables.length === syllableRound.target.syllables.length && (
-              <span className="font-game text-lg font-black text-emerald-200">
-                🎉 {syllableRound.target.word}!
-              </span>
-            )}
-          </div>
-
-          {/* Karışık hece balonları */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3">
-            {syllableRound.pool.map((tile, index) => {
-              const palette = ['bg-sky-600 border-sky-300', 'bg-rose-600 border-rose-300', 'bg-amber-500 border-amber-200', 'bg-emerald-600 border-emerald-300', 'bg-purple-600 border-purple-300', 'bg-teal-600 border-teal-300'];
-              const colorClass = palette[index % palette.length];
-              const isWrong = wrongTileId === tile.id;
-              return (
-                <button
-                  key={tile.id}
-                  type="button"
-                  onClick={() => handleTileTap(tile)}
-                  className={`relative rounded-full border-2 py-4 font-game text-base sm:text-lg font-black text-white shadow-md transition-all active:scale-90 ${colorClass} ${
-                    isWrong ? 'animate-shake' : 'hover:brightness-110'
-                  }`}
-                >
-                  {tile.text}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (syllableAdvanceTimeoutRef.current) window.clearTimeout(syllableAdvanceTimeoutRef.current);
-              nextSyllableRound(activeHeceLevel);
-            }}
-            className="flex items-center gap-1 rounded-xl bg-purple-900/60 border border-purple-700/60 px-3 py-1.5 text-[11px] font-bold text-purple-200"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Başka kelime
-          </button>
-        </>
-      )}
-
-      {mode === 'ingilizce' && (
-        <>
-          <div className="rounded-2xl bg-rose-950/40 border border-rose-800/50 px-4 py-3 flex items-center gap-2.5">
-            <Volume2 className="w-5 h-5 text-rose-300 flex-shrink-0" />
-            <p className="text-xs sm:text-sm font-semibold text-rose-100 leading-relaxed">
-              Sesi dinle, resmi öğren! "Dinle &amp; Bul" ile doğru resmi seç, "Tekrar Et" ile kelimeyi kendin söyle.
-            </p>
-          </div>
-
-          {/* Kategori seçici */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {ENGLISH_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleEnglishCategoryChange(cat.id)}
-                className={`flex-shrink-0 flex items-center gap-1 rounded-xl border-2 px-3 py-1.5 font-game text-[11px] sm:text-xs font-black transition-all active:scale-95 ${
-                  englishCategory === cat.id
-                    ? 'bg-rose-500 border-rose-300 text-white'
-                    : 'bg-[#173340] border-sky-800/60 text-slate-300'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
+          {selectedSyllables.length === syllableRound.target.syllables.length ? (
+            <p className="gt-result good" role="status">🎉 {syllableRound.target.word}! Heceleri doğru sıraladın.</p>
+          ) : (
+            <p className="gt-q">Heceleri sırayla dokun</p>
+          )}
+          <div className="gt-balloons">
+            {syllableRound.pool.map((tile) => (
+              <button key={tile.id} type="button" className={`gt-balloon ${wrongTileId === tile.id ? 'wig' : ''}`} onClick={() => handleTileTap(tile)}>
+                {tile.text}
               </button>
             ))}
           </div>
+          <button type="button" className="gt-ghost" onClick={() => { if (syllableAdvanceTimeoutRef.current) window.clearTimeout(syllableAdvanceTimeoutRef.current); nextSyllableRound(activeHeceLevel); }}>
+            <RotateCcw aria-hidden="true" />Başka kelime
+          </button>
+        </section>
+      )}
 
-          {/* Oyun tipi seçici */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleEnglishGameTypeChange('find')}
-              className={`py-2 rounded-xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-                englishGameType === 'find'
-                  ? 'bg-amber-500 border-amber-300 text-white shadow-md'
-                  : 'bg-[#173340] border-sky-800/60 text-slate-300'
-              }`}
-            >
-              👂 Dinle &amp; Bul
-            </button>
-            <button
-              type="button"
-              onClick={() => handleEnglishGameTypeChange('repeat')}
-              className={`py-2 rounded-xl font-game text-[11px] sm:text-sm font-black border-2 transition-all active:scale-95 ${
-                englishGameType === 'repeat'
-                  ? 'bg-amber-500 border-amber-300 text-white shadow-md'
-                  : 'bg-[#173340] border-sky-800/60 text-slate-300'
-              }`}
-            >
-              🗣️ Tekrar Et
-            </button>
+      {mode === 'ingilizce' && (
+        <section className="gt-lcard" aria-label="İngilizce">
+          <div className="gt-cats" role="tablist" aria-label="Kategoriler">
+            {ENGLISH_CATEGORIES.map((cat) => (
+              <button key={cat.id} type="button" role="tab" aria-selected={englishCategory === cat.id} className={`gt-cat ${englishCategory === cat.id ? 'on' : ''}`} onClick={() => handleEnglishCategoryChange(cat.id)}>
+                <span aria-hidden="true">{cat.icon}</span>{cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="gt-seg" role="tablist" aria-label="Oyun türü">
+            <button type="button" role="tab" aria-selected={englishGameType === 'find'} className={englishGameType === 'find' ? 'on' : ''} onClick={() => handleEnglishGameTypeChange('find')}>👂 Dinle ve bul</button>
+            <button type="button" role="tab" aria-selected={englishGameType === 'repeat'} className={englishGameType === 'repeat' ? 'on' : ''} onClick={() => handleEnglishGameTypeChange('repeat')}>🗣️ Tekrar et</button>
           </div>
 
           {englishGameType === 'find' && (
             <>
-              <div
-                className={`rounded-3xl border-2 py-6 flex flex-col items-center justify-center gap-2 transition-colors duration-300 ${
-                  englishFeedback === 'correct'
-                    ? 'border-emerald-300 bg-emerald-500/20'
-                    : englishFeedback === 'wrong'
-                    ? 'border-rose-400 bg-rose-500/10 animate-shake'
-                    : 'border-sky-800/60 bg-[#0f2a35]'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={handleEnglishSpeakTarget}
-                  className="flex items-center gap-1.5 rounded-xl border bg-rose-900/50 border-rose-700/60 px-4 py-1.5 text-[11px] font-bold text-rose-200 active:scale-95"
-                >
-                  <Volume2 className="w-3.5 h-3.5" /> Dinle
-                </button>
-                {englishFeedback === 'correct' && (
-                  <span className="font-game text-lg font-black text-emerald-200">
-                    {englishRound.target.emoji} {englishRound.target.word} ({englishRound.target.tr})
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              <button type="button" className="gt-big mavi" onClick={handleEnglishSpeakTarget}>
+                <Volume2 aria-hidden="true" />Dinle
+              </button>
+              <p className="gt-q">Duyduğun kelimenin resmine dokun</p>
+              {englishFeedback === 'correct' && <p className="gt-result good" role="status">✓ {englishRound.target.emoji} {englishRound.target.word} = {englishRound.target.tr}</p>}
+              {englishFeedback === 'wrong' && <p className="gt-result again" role="status">Olmadı, bir daha dinle.</p>}
+              <div className="gt-choices">
                 {englishRound.choices.map((choice) => (
-                  <button
-                    key={choice.word}
-                    type="button"
-                    onClick={() => handleEnglishChoiceTap(choice)}
-                    disabled={englishFeedback === 'correct'}
-                    className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-sky-700/60 bg-[#173340] py-5 shadow-md transition-all active:scale-90 hover:bg-[#1f4253] disabled:opacity-40"
-                  >
-                    <span className="text-4xl sm:text-5xl">{choice.emoji}</span>
+                  <button key={choice.word} type="button" className={`gt-choice ${englishFeedback === 'correct' && choice.word === englishRound.target.word ? 'ok' : ''}`} onClick={() => handleEnglishChoiceTap(choice)} disabled={englishFeedback === 'correct'} aria-label={`Seçenek ${choice.tr}`}>
+                    {choice.emoji}
                   </button>
                 ))}
               </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-                  nextEnglishFindRound(englishCategory);
-                }}
-                className="flex items-center gap-1 rounded-xl bg-rose-900/60 border border-rose-700/60 px-3 py-1.5 text-[11px] font-bold text-rose-200"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Başka kelime
+              <button type="button" className="gt-ghost" onClick={() => { if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current); nextEnglishFindRound(englishCategory); }}>
+                <RotateCcw aria-hidden="true" />Başka kelime
               </button>
             </>
           )}
 
           {englishGameType === 'repeat' && (
-            <div className="rounded-3xl border-2 border-sky-800/60 bg-[#0f2a35] py-8 flex flex-col items-center justify-center gap-2.5">
-              <span className="text-6xl sm:text-7xl">{englishRepeatWord.emoji}</span>
-              <span className="font-game text-xl sm:text-2xl font-black text-white">{englishRepeatWord.word}</span>
-              <span className="text-xs font-semibold text-slate-400">{englishRepeatWord.tr}</span>
-
-              <button
-                type="button"
-                onClick={handleEnglishSpeakTarget}
-                className="flex items-center gap-1.5 rounded-xl border bg-rose-900/50 border-rose-700/60 px-4 py-1.5 text-[11px] font-bold text-rose-200 active:scale-95"
-              >
-                <Volume2 className="w-3.5 h-3.5" /> Dinle
+            <>
+              <span className="gt-picture" aria-hidden="true">{englishRepeatWord.emoji}</span>
+              <span className="gt-en" lang="en">{englishRepeatWord.word}</span>
+              <span className="gt-tr">{englishRepeatWord.tr}</span>
+              <div className="gt-pair">
+                <button type="button" className="gt-mid mavi" onClick={handleEnglishSpeakTarget}><Volume2 aria-hidden="true" />Dinle</button>
+                {micSupported && (
+                  <button type="button" className={`gt-mid ${englishMicState === 'listening' ? 'listening' : 'turkuaz'}`} onClick={handleEnglishMicRepeat} disabled={englishMicState === 'listening'}>
+                    <Mic aria-hidden="true" />{englishMicState === 'listening' ? 'Dinliyorum…' : 'Tekrar et'}
+                  </button>
+                )}
+              </div>
+              {!micSupported && <p className="gt-result info">Bu cihazda ses tanıma yok. Yine de yüksek sesle söyle!</p>}
+              {micMessage(englishMicState, 'Great job! 🎉')}
+              <button type="button" className="gt-ghost" onClick={() => { if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current); nextEnglishRepeatWord(englishCategory); }}>
+                <RotateCcw aria-hidden="true" />Başka kelime
               </button>
-
-              {micSupported ? (
-                <button
-                  type="button"
-                  onClick={handleEnglishMicRepeat}
-                  disabled={englishMicState === 'listening'}
-                  className={`flex items-center gap-1.5 rounded-xl border px-4 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
-                    englishMicState === 'listening'
-                      ? 'bg-rose-600/80 border-rose-400 text-white animate-pulse'
-                      : englishMicState === 'correct'
-                      ? 'bg-emerald-600 border-emerald-300 text-white'
-                      : 'bg-emerald-900/50 border-emerald-700/60 text-emerald-200'
-                  }`}
-                >
-                  <Mic className="w-3.5 h-3.5" />
-                  {englishMicState === 'listening' ? 'Dinliyorum…' : 'Tekrar Et'}
-                </button>
-              ) : (
-                <span className="text-[10px] font-semibold text-slate-400">
-                  Bu cihazda ses tanıma yok — yine de yüksek sesle söyle!
-                </span>
-              )}
-
-              {englishMicState === 'correct' && (
-                <span className="text-xs font-bold text-emerald-300">Great job! 🎉</span>
-              )}
-              {englishMicState === 'no-match' && (
-                <span className="text-xs font-bold text-amber-300">Seni tam duyamadım, tekrar dener misin?</span>
-              )}
-              {englishMicState === 'denied' && (
-                <span className="text-xs font-bold text-rose-300">Mikrofon izni gerekiyor</span>
-              )}
-              {englishMicState === 'error' && (
-                <span className="text-xs font-bold text-rose-300">Bir sorun oldu, tekrar dener misin?</span>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
-                  nextEnglishRepeatWord(englishCategory);
-                }}
-                className="mt-1 flex items-center gap-1 rounded-xl bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 text-[11px] font-bold text-sky-200"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Başka kelime
-              </button>
-            </div>
+            </>
           )}
-        </>
+        </section>
       )}
     </div>
   );
