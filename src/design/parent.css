@@ -84,6 +84,11 @@
 .pp-time { flex: none; font-size: 12px; font-weight: 800; color: var(--pp-ink-2); white-space: nowrap; align-self: flex-start; margin-top: 4px; }
 .pp-feed .pp-ic { width: 40px; height: 40px; font-size: 22px; }
 .pp-confirm { display: flex; gap: 6px; }
+/* Onay satırı: ad tam satırda, düğmeler altta (telefonda ad kesilmesin). */
+.pp-item.pend { flex-wrap: wrap; }
+.pp-item.pend .pp-itext { flex-basis: calc(100% - 58px); }
+.pp-item.pend .pp-btn { flex: 1; }
+.pp-item.pend .pp-btn.ok { flex: 1.4; }
 .pp-vitem { flex-wrap: wrap; }
 .pp-thumb { flex: none; width: 88px; aspect-ratio: 16 / 9; border-radius: 10px; object-fit: cover; }
 .pp-vbtns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }

@@ -335,6 +335,16 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Aileye bağlanılamadı.'); }
   };
 
+  // Türkçe iyelik eki isme göre değişir (Baba’nın, Anne’nin); bilinmeyen isimde ünlü uyumuna bakılır.
+  const withGenitive = (name: string) => {
+    const known: Record<string, string> = { Baba: 'Baba’nın', Anne: 'Anne’nin', Anneanne: 'Anneanne’nin' };
+    if (known[name]) return known[name];
+    const vowels = name.toLocaleLowerCase('tr-TR').match(/[aeıioöuü]/g) || [];
+    const last = vowels[vowels.length - 1] || 'e';
+    const suffix = { a: 'ın', ı: 'ın', e: 'in', i: 'in', o: 'un', u: 'un', ö: 'ün', ü: 'ün' }[last] || 'in';
+    const endsWithVowel = /[aeıioöuü]$/i.test(name);
+    return `${name}’${endsWithVowel ? 'n' : ''}${suffix}`;
+  };
   const TIME_LABEL: Record<string, string> = { morning: 'Sabah', afternoon: 'Öğle', evening: 'Akşam' };
   const liveTasks = tasks.filter((t) => !t.deletedAt);
   const SECTIONS: Array<{ id: Section; label: string; detail: string; Icon: typeof Plus; tone: string }> = [
@@ -402,7 +412,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 <div className="pp-row">
                   <div>
                     <p className="pp-label">RÜZGAR ŞU ANDA KİMİN YANINDA?</p>
-                    <p className="pp-big">{deviceControls.isActiveDevice ? `${deviceControls.adultName || 'Bu telefon'}’ın yanında` : deviceControls.activeDeviceLabel ? `${deviceControls.activeDeviceLabel}` : 'Henüz seçilmedi'}</p>
+                    <p className="pp-big">{deviceControls.isActiveDevice ? (deviceControls.adultName ? `${withGenitive(deviceControls.adultName)} yanında` : 'Bu telefonda') : deviceControls.activeDeviceLabel ? `${deviceControls.activeDeviceLabel}` : 'Henüz seçilmedi'}</p>
                   </div>
                   <span className="pp-whoicon" aria-hidden="true">{deviceControls.isActiveDevice ? '🧒' : '📱'}</span>
                 </div>
@@ -425,11 +435,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 <>
                   <ul className="pp-list">
                     {pendingTasks.map((t) => (
-                      <li key={t.id} className="pp-item">
+                      <li key={t.id} className="pp-item pend">
                         <span className="pp-ic" aria-hidden="true">{t.imageUrl ? <img src={t.imageUrl} alt="" /> : t.icon}</span>
                         <span className="pp-itext"><b>{t.title}</b><small>+{t.rewardCoins} puan · {TIME_LABEL[t.timeOfDay] || ''}</small></span>
                         <button type="button" className="pp-btn soft" onClick={() => onRejectTask(t.id)} aria-label={`${t.title}: tekrar yapsın`}>
-                          <RotateCcw aria-hidden="true" />
+                          <RotateCcw aria-hidden="true" />Tekrar yapsın
                         </button>
                         <button type="button" className="pp-btn ok" onClick={() => { onApproveTask(t.id); playCoinSound(soundEnabled); }}>
                           <Check aria-hidden="true" strokeWidth={3} />Onayla
