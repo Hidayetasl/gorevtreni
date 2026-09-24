@@ -285,6 +285,15 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     return () => observer.disconnect();
   }, [viewMode, attachedWagons, user.activeTrainIcon, trainImagesReady]);
   const [interactiveMessage, setInteractiveMessage] = useState<string>('Panda Kaptan tek ray hattında gidip geliyor! 🚂💨');
+  // Durum mesajı sahnenin üstünde birkaç saniyelik bir balon olarak görünür.
+  const [bubbleVisible, setBubbleVisible] = useState(true);
+  useEffect(() => {
+    setBubbleVisible(true);
+    const timer = window.setTimeout(() => setBubbleVisible(false), 4500);
+    return () => window.clearTimeout(timer);
+  }, [interactiveMessage]);
+  // Telefonda kaptan görevleri üstteki yıldız rozetine dokununca açılır.
+  const [showMissions, setShowMissions] = useState(false);
 
   // Check unlocked structures from inventory
   const hasPlacedBridge = worldItems.some((item) => item.itemId === 'track-bridge');
@@ -881,9 +890,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <span className="ar" aria-hidden="true"><ArrowLeft strokeWidth={3.5} /></span>Geri
             </button>
             <h1 className="gt-wtitle">{WORLD_SECTIONS.find((section) => section.id === viewMode)?.icon} {WORLD_SECTIONS.find((section) => section.id === viewMode)?.label}</h1>
-            {viewMode === 'ride' && <span className="gt-goal">⭐ <b>{cockpitProgress.score}/25</b></span>}
+            {viewMode === 'ride' && (
+              <button type="button" className="gt-goal gt-wstarbtn" aria-expanded={showMissions} aria-controls="world-missions" onClick={() => { playPopSound(soundEnabled); setShowMissions((open) => !open); }}>
+                ⭐ <b>{cockpitProgress.score}/25</b>
+              </button>
+            )}
           </div>
-          {viewMode === 'ride' && <p className="gt-wmsg" role="status">{interactiveMessage}</p>}
         </>
       )}
 
@@ -908,6 +920,19 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             >
               {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
             </button>
+            {!isFullScreen && onToggleSound && (
+              <button
+                type="button"
+                onPointerDown={unlockAudioContext}
+                onClick={onToggleSound}
+                className="gt-wfab left gt-phone-only"
+                aria-pressed={soundEnabled}
+                aria-label={soundEnabled ? 'Sesi kapat' : 'Sesi aç'}
+              >
+                {soundEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
+              </button>
+            )}
+            <p className={`gt-wbubble ${bubbleVisible ? 'show' : ''}`} role="status" aria-live="polite">{interactiveMessage}</p>
             {/* Tam ekranda kokpit varsayılan olarak gizli olduğu için, onu açmaya
                 yarayan ayrı bir köşe düğmesi — sadece tam ekran modunda görünür. */}
             {isFullScreen && (
@@ -1380,7 +1405,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <button type="button" className={trainSpeed === 'fast' ? 'on' : ''} aria-pressed={trainSpeed === 'fast'} onClick={() => setTrainSpeed('fast')}><img src={kumandaHizli} alt="" draggable={false} />Hızlı</button>
               </div>
 
-              <div className="gt-wtools">
+              <div className="gt-wtools gt-wide-only">
                 <button type="button" className="gt-ghost" onClick={toggleFullScreen} aria-pressed={isFullScreen}>
                   {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
                   {isFullScreen ? 'Küçült' : 'Tam ekran'}
@@ -1394,7 +1419,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             </section>
 
-            <section className="gt-wpanel" aria-labelledby="cockpit-missions-title">
+            {showMissions && <div className="gt-wmis-backdrop" onClick={() => setShowMissions(false)} aria-hidden="true" />}
+            <section id="world-missions" className={`gt-wpanel gt-wmissions ${showMissions ? 'open' : ''}`} aria-labelledby="cockpit-missions-title">
               <div className="gt-wrow">
                 <span id="cockpit-missions-title" className="gt-label">KAPTAN GÖREVLERİ</span>
                 <span className="gt-wstars">⭐ {cockpitProgress.score} / 25</span>
@@ -1413,6 +1439,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   );
                 })}
               </div>
+              <button type="button" className="gt-ghost gt-phone-only" onClick={() => setShowMissions(false)}>Tamam</button>
             </section>
 
           </div>

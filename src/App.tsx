@@ -1114,6 +1114,7 @@ export default function App() {
           )}
 
           {/* Bu sekmeler sırayla yeni tasarıma geçecek; şimdilik mevcut görünümleri. */}
+          {(activeTab === 'shop' || activeTab === 'videos') && (
           <div className="app-main p-2 sm:p-3">
 
           {activeTab === 'shop' && (
@@ -1137,6 +1138,7 @@ export default function App() {
           )}
 
           </div>
+          )}
 
         {/* Parent Engine Room Modal */}
         <ParentModal

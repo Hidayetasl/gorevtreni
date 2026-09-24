@@ -42,7 +42,7 @@
 .gt *, .gt *::before, .gt *::after { box-sizing: border-box; }
 .gt button { font-family: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 .gt button:focus-visible { outline: 3px solid var(--gt-mavi) !important; outline-offset: 2px; background-color: revert-layer; }
-.gt-main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.gt-main { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 
 /* ---------- üst çubuk ---------- */
 .gt-top { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
@@ -290,7 +290,7 @@
 .gt-menu.world .gt-menu-card { min-height: 112px; padding: 8px; gap: 4px; }
 /* Telefonda sahne ve kapak ekran yüksekliğine göre ayarlanır: kumanda ve menü kartları alt menünün üstünde kalır. */
 @container gt (max-width: 719px) {
-  .gt-world .world-ride-layout:not(.is-fullscreen) .world-ride-canvas-shell { aspect-ratio: auto !important; height: clamp(170px, calc(100dvh - 452px), 280px); }
+  .gt-world .world-ride-layout:not(.is-fullscreen) .world-ride-canvas-shell { aspect-ratio: auto !important; height: clamp(170px, calc(100dvh - 404px), 300px); }
 }
 .gt-world .gt-menu-hint { margin-top: 0; }
 .gt-wmenu { display: flex; flex-direction: column; gap: 8px; }
@@ -320,6 +320,13 @@
 .gt-speed button img { height: 32px; max-width: 90%; object-fit: contain; }
 .gt-speed button.on { box-shadow: inset 0 0 0 3px var(--gt-turkuaz) !important; background: var(--gt-turkuaz-s) !important; }
 .gt .gt-whorn img { width: 44px; height: 44px; object-fit: contain; }
+.gt-wbubble { position: absolute; top: 10px; left: 70px; right: 70px; z-index: 32; margin: 0 auto; width: fit-content; max-width: calc(100% - 140px); padding: 8px 14px; border-radius: 16px; background: rgba(255, 255, 255, .95); color: var(--gt-ink); font: 800 14px/1.25 var(--gt-font); text-align: center; box-shadow: 0 3px 10px rgba(0, 0, 0, .15); opacity: 0; transform: translateY(-6px); transition: opacity .25s, transform .25s; pointer-events: none; }
+.gt-wbubble.show { opacity: 1; transform: none; }
+.gt .gt-wstarbtn { min-height: 52px; border: 0; cursor: pointer; background: var(--gt-turuncu-s); color: #7a4a00; }
+.gt-wide-only { display: none !important; }
+.gt-wmissions { display: none !important; }
+.gt-wmissions.open { display: flex !important; position: fixed; left: 16px; right: 16px; top: calc(140px + env(safe-area-inset-top, 0px)); z-index: 60; box-shadow: 0 10px 30px rgba(0, 0, 0, .2) !important; }
+.gt .gt-wc > .gt-wmis-backdrop, .gt-wmis-backdrop { position: fixed; inset: 0; z-index: 59; background: rgba(22, 50, 58, .35) !important; border: 0 !important; box-shadow: none !important; border-radius: 0; }
 /* Tam ekranda kumanda paneli alttan açılan sayfa olur. */
 .gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { background: var(--gt-sky) !important; }
 .gt .world-ride-layout.is-fullscreen .world-ride-canvas-shell { border: 0 !important; }
@@ -406,6 +413,10 @@
   .gt-wbtns { gap: 12px; }
   .gt-wbtn { min-height: 96px; font-size: 17px !important; }
   .gt-wbtn .pic { height: 60px; }
+  .gt-wide-only { display: grid !important; }
+  .gt-phone-only { display: none !important; }
+  .gt-wmissions, .gt-wmissions.open { display: flex !important; position: static; box-shadow: 0 3px 0 var(--gt-line) !important; }
+  .gt-wmis-backdrop { display: none; }
   .gt-wbtn .pic img { max-height: 60px; }
   .gt-world .gt-subhead { padding-top: 20px; }
   .gt-world .gt-subhead h1 { font-size: 28px; }
