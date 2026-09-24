@@ -4,6 +4,14 @@ import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext } from '../utils/audio';
 import { ArrowLeft, Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 import { HangarIcon } from './child/HangarIcon';
+import dunyamKapak from '../assets/images/dunyam-kapak.webp';
+import kumandaKalk from '../assets/images/kumanda-kalk.webp';
+import kumandaKorna from '../assets/images/kumanda-korna.webp';
+import kumandaIsik from '../assets/images/kumanda-isik.webp';
+import kumandaMotor from '../assets/images/kumanda-motor.webp';
+import kumandaYavas from '../assets/images/kumanda-yavas.webp';
+import kumandaNormal from '../assets/images/kumanda-normal.webp';
+import kumandaHizli from '../assets/images/kumanda-hizli.webp';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -39,7 +47,7 @@ interface TrainWorldViewProps {
 // menu = Dünya'nın giriş ekranı (üç büyük kutu); diğerleri tek başına açılır.
 type ViewMode = 'menu' | 'ride' | 'builder' | 'garage';
 const WORLD_SECTIONS: Array<{ id: Exclude<ViewMode, 'menu'>; label: string; detail: string; icon: React.ReactNode }> = [
-  { id: 'ride', label: 'Treni sür', detail: 'Kumandayı kullan', icon: '🚂' },
+  { id: 'ride', label: 'Treni sür', detail: 'Kumandayı kullan', icon: <img className="gt-menu-img" src={kumandaNormal} alt="" draggable={false} /> },
   { id: 'builder', label: 'Kasabayı kur', detail: 'Parçaları yerleştir', icon: '🗺️' },
   { id: 'garage', label: 'Hangar', detail: 'Satın aldığın her şey', icon: <HangarIcon className="gt-hangar" /> },
 ];
@@ -53,8 +61,8 @@ const COCKPIT_PROGRESS_KEY = 'ruzgar_cockpit_missions_v1';
 const COCKPIT_MISSIONS: Array<{ id: CockpitMissionId; icon: string; title: string; points: number }> = [
   { id: 'start', icon: '▶️', title: 'Treni başlat', points: 5 },
   { id: 'horn', icon: '📣', title: 'Korna çal', points: 5 },
-  { id: 'light', icon: '💡', title: 'Farı yak', points: 5 },
-  { id: 'movement', icon: '🔊', title: 'Hareket sesini aç', points: 5 },
+  { id: 'light', icon: '💡', title: 'Işığı yak', points: 5 },
+  { id: 'movement', icon: '🔊', title: 'Motoru çalıştır', points: 5 },
   { id: 'stop', icon: '⏸️', title: 'Treni durdur', points: 5 },
 ];
 
@@ -849,6 +857,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
           <div className="gt-head">
             <h1>Tren Dünyası</h1>
           </div>
+          <img className="gt-wcover" src={dunyamKapak} alt="Sincap Köy İstasyonu: trende el sallayan küçük kaptan" draggable={false} />
           <p className="gt-menu-hint">Ne yapmak istersin?</p>
           <div className="gt-menu world" aria-label="Dünya bölümleri">
             {WORLD_SECTIONS.map((section) => (
@@ -1294,7 +1303,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 title="Düdük Çal!"
                 aria-label="Düdük çal"
               >
-                <span aria-hidden="true">📯</span>
+                <img src={kumandaKorna} alt="" draggable={false} />
               </button>
             </div>
           </div>
@@ -1316,20 +1325,23 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   type="button"
                   onClick={handleTrainRunToggle}
                   onPointerDown={unlockAudioContext}
-                  className={`gt-wbtn ${isTrainRunning ? 'on-mavi' : 'yesil'}`}
+                  className={`gt-wbtn ${isTrainRunning ? 'dur' : 'mavi'}`}
                   aria-pressed={isTrainRunning}
                 >
-                  {isTrainRunning ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+                  <span className="pic" aria-hidden="true">
+                    <img src={isTrainRunning ? kumandaNormal : kumandaKalk} alt="" draggable={false} />
+                    {isTrainRunning && <span className="badge"><Pause strokeWidth={3} /></span>}
+                  </span>
                   {isTrainRunning ? 'Dur' : 'Kalk'}
                 </button>
                 <button
                   type="button"
                   onClick={handleWhistleBlow}
                   onPointerDown={unlockAudioContext}
-                  className={`gt-wbtn turuncu ${isWhistling ? 'toot' : ''}`}
+                  className={`gt-wbtn ${isWhistling ? 'toot' : ''}`}
                   aria-label={hornEnabled ? 'Korna çal' : 'Korna kapalı'}
                 >
-                  <span className="e" aria-hidden="true">📯</span>
+                  <span className="pic" aria-hidden="true"><img src={kumandaKorna} alt="" draggable={false} /></span>
                   Korna
                 </button>
                 <button
@@ -1338,10 +1350,10 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   onPointerDown={unlockAudioContext}
                   className={`gt-wbtn ${trainLightEnabled ? 'on-sari' : ''}`}
                   aria-pressed={trainLightEnabled}
-                  aria-label={trainLightEnabled ? 'Farı kapat' : 'Farı aç'}
+                  aria-label={trainLightEnabled ? 'Işığı kapat' : 'Işığı aç'}
                 >
-                  <span className="e" aria-hidden="true">💡</span>
-                  Far
+                  <span className="pic" aria-hidden="true"><img src={kumandaIsik} alt="" draggable={false} /></span>
+                  Işık
                 </button>
                 <button
                   type="button"
@@ -1351,15 +1363,15 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   aria-pressed={movementSoundEnabled}
                   aria-label={movementSoundEnabled ? 'Motor sesini kapat' : 'Motor sesini aç'}
                 >
-                  <span className="e" aria-hidden="true">🔊</span>
+                  <span className="pic" aria-hidden="true"><img src={kumandaMotor} alt="" draggable={false} /></span>
                   Motor
                 </button>
               </div>
 
-              <div className="gt-seg" role="group" aria-label="Hız">
-                <button type="button" className={trainSpeed === 'slow' ? 'on' : ''} aria-pressed={trainSpeed === 'slow'} onClick={() => setTrainSpeed('slow')}>🐢 Yavaş</button>
-                <button type="button" className={trainSpeed === 'normal' ? 'on' : ''} aria-pressed={trainSpeed === 'normal'} onClick={() => setTrainSpeed('normal')}>🚂 Normal</button>
-                <button type="button" className={trainSpeed === 'fast' ? 'on' : ''} aria-pressed={trainSpeed === 'fast'} onClick={() => setTrainSpeed('fast')}>🚀 Hızlı</button>
+              <div className="gt-seg gt-speed" role="group" aria-label="Hız">
+                <button type="button" className={trainSpeed === 'slow' ? 'on' : ''} aria-pressed={trainSpeed === 'slow'} onClick={() => setTrainSpeed('slow')}><img src={kumandaYavas} alt="" draggable={false} />Yavaş</button>
+                <button type="button" className={trainSpeed === 'normal' ? 'on' : ''} aria-pressed={trainSpeed === 'normal'} onClick={() => setTrainSpeed('normal')}><img src={kumandaNormal} alt="" draggable={false} />Normal</button>
+                <button type="button" className={trainSpeed === 'fast' ? 'on' : ''} aria-pressed={trainSpeed === 'fast'} onClick={() => setTrainSpeed('fast')}><img src={kumandaHizli} alt="" draggable={false} />Hızlı</button>
               </div>
 
               <div className="gt-wtools">
