@@ -152,12 +152,6 @@
 .gt-goal b { font-size: 18px; }
 .gt-goal.coin { background: #fff; color: var(--gt-ink); box-shadow: 0 2px 0 var(--gt-line); }
 .gt-coin-dot.small { width: 20px; height: 20px; }
-.gt-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 16px 0; }
-.gt-mode { position: relative; background: #fff !important; border-radius: 20px; min-height: 76px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 0 var(--gt-line); font-weight: 900; font-size: 15px; line-height: 1.15; text-align: center; color: var(--gt-ink) !important; }
-.gt-mode .e { font-size: 30px; line-height: 1; }
-.gt-mode small { display: none; font-weight: 700; font-size: 13px; color: var(--gt-ink-2); }
-.gt-mode .ok { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; background: var(--gt-yesil); color: #fff; display: grid; place-items: center; font-size: 13px; }
-.gt-mode.on { background: var(--gt-turkuaz-s) !important; box-shadow: inset 0 0 0 3px var(--gt-turkuaz); }
 .gt-menu-hint { margin: 6px 16px 0; font: 800 17px/1.3 var(--gt-font); color: var(--gt-ink-2); }
 .gt-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 16px 0; }
 .gt-menu-card { position: relative; min-height: 148px; border-radius: 24px; background: #fff !important; color: var(--gt-ink) !important; box-shadow: 0 3px 0 var(--gt-line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 14px 10px; text-align: center; transition: transform .12s; }
@@ -233,10 +227,6 @@
 .gt-world { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
 .gt-world > .gt-head { padding: 6px 0 0; max-width: none; margin: 0; }
 .gt-world > .gt-head h1 { text-align: left; }
-.gt-wtop { display: flex; flex-direction: column; gap: 8px; }
-.gt-wtop .gt-seg { background: #fff; box-shadow: 0 2px 0 var(--gt-line); }
-.gt-wtop .gt-seg button.on { background: var(--gt-turkuaz) !important; color: #fff !important; box-shadow: none; }
-.gt-wmsg { margin: 0; min-height: 40px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 14px; background: #fff; box-shadow: 0 2px 0 var(--gt-line); font: 800 14px/1.25 var(--gt-font); color: var(--gt-ink); }
 .gt-world .world-ride-layout > :not(:last-child) { margin-bottom: 8px; }
 .gt-world .world-ride-canvas-shell { border-radius: 24px !important; border: 4px solid #fff !important; box-shadow: 0 3px 0 var(--gt-line) !important; }
 .gt .gt-wc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
@@ -465,11 +455,6 @@
   .gt-all { margin: 0 28px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .gt-head { padding: 20px 28px 4px; }
   .gt-head h1 { font-size: 32px; }
-  .gt-modes { margin: 12px 28px 0; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .gt-mode { flex-direction: row; justify-content: flex-start; gap: 14px; padding: 14px 18px; min-height: 80px; text-align: left; font-size: 17px; }
-  .gt-mode .e { font-size: 34px; }
-  .gt-mode small { display: block; }
-  .gt-mode span.t { display: flex; flex-direction: column; gap: 2px; }
   .gt-lcard { margin: 16px 28px 0; padding: 24px; }
   .gt-menu-hint { margin: 8px 28px 0; font-size: 19px; }
   .gt-menu { margin: 14px 28px 0; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -490,9 +475,6 @@
   .gt-lcard .gt-result, .gt-lcard .gt-pair, .gt-lcard .gt-seg { max-width: 560px; }
   .gt-world { padding: 0 28px; gap: 16px; }
   .gt-world > .gt-head { padding: 20px 0 0; }
-  .gt-wtop { flex-direction: row; align-items: stretch; }
-  .gt-wtop .gt-seg { width: auto; flex: none; min-width: 360px; }
-  .gt-wtop .gt-wmsg { flex: 1; }
   .gt .gt-wc { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
   .gt .gt-wc > .gt-wpanel:first-child { grid-row: span 2; }
   .gt-wbtns { gap: 12px; }
@@ -531,7 +513,7 @@
   .gt-shop > .gt-head, .gt-shop .gt-subhead { padding-left: 0; padding-right: 0; }
   .gt-vgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-shop-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
-  .gt-head, .gt-modes, .gt-lcard, .gt-menu, .gt-menu-hint { max-width: 1024px; margin-left: auto; margin-right: auto; }
+  .gt-head, .gt-lcard, .gt-menu, .gt-menu-hint { max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-world { max-width: 1180px; margin-left: auto; margin-right: auto; width: 100%; }
   .gt-wmenu { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .gt-wmenu-side { display: flex; flex-direction: column; gap: 10px; }
