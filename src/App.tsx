@@ -478,16 +478,23 @@ export default function App() {
     };
     setActivityLog((prev) => [entry, ...prev].slice(0, 300));
 
-    const updateDuration = () => {
+    // Her kayıt tüm aile belgesini buluta yazar. Uygulamalar arasında hızlı gidip
+    // gelmek (ya da sekmenin sık gizlenip görünmesi) her seferinde yazma
+    // yapmasın: arka plana geçişte en fazla dakikada bir, kapanışta her zaman.
+    let lastRecordedAt = 0;
+    const updateDuration = (force = false) => {
+      if (!force && Date.now() - lastRecordedAt < 60_000) return;
+      lastRecordedAt = Date.now();
       const durationMs = Date.now() - sessionStart;
       setActivityLog((prev) => prev.map((e) => (e.id === id ? { ...e, durationMs } : e)));
     };
+    const handlePageHide = () => updateDuration(true);
     const handleVisibility = () => { if (document.hidden) updateDuration(); };
-    window.addEventListener('pagehide', updateDuration);
+    window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
-      updateDuration();
-      window.removeEventListener('pagehide', updateDuration);
+      updateDuration(true);
+      window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   // Yalnızca ilk yüklemede bir kez çalışsın istiyoruz.
