@@ -1129,19 +1129,12 @@ export default function App() {
             />
           )}
 
-          {/* İzle sekmesi sıradaki; şimdilik mevcut görünümü. */}
-          {activeTab === 'videos' && (
-          <div className="app-main p-2 sm:p-3">
-
           {activeTab === 'videos' && (
             <VideosView
               videos={videos}
               parentConfig={parentConfig}
               onVideoStarted={handleVideoStarted}
             />
-          )}
-
-          </div>
           )}
 
         {/* Parent Engine Room Modal */}

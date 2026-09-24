@@ -400,6 +400,34 @@
 .gt-sheet .gt-pair .gt-big { flex: 1.4; }
 .gt-sheet > .gt-big { width: 100%; }
 
+/* ---------- İzle ---------- */
+.gt-watch-empty { gap: 6px; }
+.gt-watch-emptyimg { width: 120px; height: auto; filter: drop-shadow(0 6px 6px rgba(22, 50, 58, .2)); }
+.gt-vgrid { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 10px 16px 0; }
+.gt-vcard { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 22px; background: #fff !important; color: var(--gt-ink) !important; box-shadow: 0 3px 0 var(--gt-line); text-align: left; }
+.gt-vcard .thumb { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #16323a; }
+.gt-vcard .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.gt-vcard .play { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(255, 255, 255, .92); color: var(--gt-mavi); display: grid; place-items: center; box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+.gt-vcard .play svg { width: 30px; height: 30px; fill: currentColor; transform: translateX(2px); }
+.gt-vcard .dur { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 8px; background: rgba(22, 50, 58, .85); color: #fff; font: 800 13px var(--gt-font); }
+.gt-vcard .tt { font: 900 17px/1.25 var(--gt-font); padding: 0 4px; }
+.gt-vwatch { min-height: 52px; border-radius: 16px; background: var(--gt-mavi); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; font: 900 18px var(--gt-font); box-shadow: 0 3px 0 var(--gt-mavi-d); }
+.gt-vwatch svg { width: 20px; height: 20px; }
+.gt-vsheet-thumb { width: 100%; max-width: 320px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; }
+.gt-tag-ic { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
+.gt-field { width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left; font: 800 15px var(--gt-font); color: var(--gt-ink-2); }
+.gt-field input { min-height: 60px; border-radius: 16px; border: 2px solid var(--gt-line); background: var(--gt-sky); text-align: center; font: 900 28px var(--gt-font); letter-spacing: .4em; color: var(--gt-ink); }
+.gt-field input:focus { outline: 3px solid var(--gt-mavi); outline-offset: 1px; }
+.gt-sheet .gt-big.mavi { background: var(--gt-mavi) !important; box-shadow: 0 6px 0 var(--gt-mavi-d); }
+.gt-player { position: fixed; inset: 0; z-index: 80; background: #0b1a20; display: flex; flex-direction: column; }
+.gt-player-bar { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px; color: #fff; font-family: var(--gt-font); }
+.gt-player-time { flex: none; padding: 8px 12px; border-radius: 14px; background: var(--gt-turuncu-s); color: #7a4a00; font: 900 17px var(--gt-font); font-variant-numeric: tabular-nums; }
+.gt-player-title { flex: 1; min-width: 0; font: 800 16px/1.2 var(--gt-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-player-close { flex: none; width: 56px; height: 56px; border-radius: 18px; background: rgba(255, 255, 255, .14) !important; color: #fff !important; display: grid; place-items: center; }
+.gt-player-close svg { width: 30px; height: 30px; }
+.gt-player-frame { flex: 1; display: grid; place-items: center; padding: 0 0 env(safe-area-inset-bottom, 0px); }
+.gt-player-frame iframe { width: 100%; aspect-ratio: 16 / 9; max-height: 100%; border: 0; background: #000; }
+
 /* ---------- geniş ekran (tablet yatay, masaüstü) ---------- */
 @container gt (min-width: 720px) {
   .gt-main { margin-left: var(--gt-nav-w); padding-bottom: 32px; }
@@ -491,6 +519,8 @@
   .gt-sitem .pic { height: 140px; }
   .gt-sheet-wrap { align-items: center; }
   .gt-sheet { border-radius: 28px; padding: 28px; }
+  .gt-vgrid { margin: 16px 28px 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .gt-player-frame iframe { max-width: min(100%, calc((100dvh - 100px) * 16 / 9)); }
   .gt-toast { left: 50%; right: auto; transform: translateX(-50%); bottom: 28px; min-width: 320px; }
 }
 @container gt (min-width: 1100px) {
@@ -499,6 +529,7 @@
   .gt-all { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-menu.shop { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .gt-shop > .gt-head, .gt-shop .gt-subhead { padding-left: 0; padding-right: 0; }
+  .gt-vgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-shop-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-head, .gt-modes, .gt-lcard, .gt-menu, .gt-menu-hint { max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-world { max-width: 1180px; margin-left: auto; margin-right: auto; width: 100%; }
