@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 // Tasarım: Pastel Tren Rotası — kokpit görevleri beyaz/uyarıcı sarı yüzeylerle, başarılar canlı yeşille görünür.
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext } from '../utils/audio';
-import { Plus, Trash2, Play, Pause, Sparkles, Volume2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
+import { Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -821,76 +821,16 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   );
 
   return (
-    <div className="world-view space-y-2.5 pb-20">
-      {/* Top Header Section */}
-      <div className="world-view-header flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
-        <div>
-          <div className="text-[11px] font-black text-sky-700 uppercase tracking-widest flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-orange-800" />
-            <span>BENİM CANLI TRENİM</span>
-          </div>
-          <h2 className="font-game text-2xl sm:text-3xl font-black text-slate-900">
-            Tren Dünyası
-          </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Çizgi film kalitesinde tren sür ve kendi dünyanı tasarla!
-          </p>
-        </div>
-
-        {/* View Mode Toggle Switcher */}
-        <div className="world-view-mode-switcher flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-          <button
-            onClick={() => setViewMode('ride')}
-            className={`world-mode-button px-3.5 py-2 rounded-xl font-game font-black text-xs sm:text-sm flex items-center gap-1.5 transition-all ${
-              viewMode === 'ride'
-                ? 'bg-[#2b6f91] text-white shadow-md border border-sky-200/70'
-                : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
-            }`}
-          >
-            <span>🚂 Sürüş Modu</span>
-          </button>
-          <button
-            onClick={() => setViewMode('builder')}
-            className={`world-mode-button px-3.5 py-2 rounded-xl font-game font-black text-xs sm:text-sm flex items-center gap-1.5 transition-all ${
-              viewMode === 'builder'
-                ? 'bg-[#2b6f91] text-white shadow-md border border-sky-200/70'
-                : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
-            }`}
-          >
-            <span>🗺️ Harita Çizimi</span>
-          </button>
-        </div>
+    <div className="world-view gt-world">
+      <div className="gt-head">
+        <h1>Tren Dünyası</h1>
       </div>
-
-      {/* Interactive Status & Quick Whistle Bar */}
-      <div className="world-status-bar flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-900 shadow-sm sm:p-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleWhistleBlow}
-            className={`cockpit-status-whistle flex h-11 w-11 items-center justify-center rounded-xl border border-orange-200/60 bg-[#24485a] text-xl text-orange-100 shadow-md transition-transform active:scale-90 ${
-              isWhistling ? 'animate-bounce ring-4 ring-orange-300' : ''
-            }`}
-            title="Düdük Çal! Çuf Çuf!"
-          >
-            📢
-          </button>
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-orange-300 animate-spin" />
-              <span>Canlı Tren Durumu</span>
-            </div>
-            <h3 className="font-game text-xs sm:text-sm font-black text-slate-800">
-              {interactiveMessage}
-            </h3>
-          </div>
+      <div className="gt-wtop">
+        <div className="gt-seg" role="tablist" aria-label="Dünya modu">
+          <button type="button" role="tab" aria-selected={viewMode === 'ride'} className={viewMode === 'ride' ? 'on' : ''} onClick={() => setViewMode('ride')}>🚂 Sür</button>
+          <button type="button" role="tab" aria-selected={viewMode === 'builder'} className={viewMode === 'builder' ? 'on' : ''} onClick={() => setViewMode('builder')}>🗺️ Kasabayı kur</button>
         </div>
-
-        <button
-          onClick={handleWhistleBlow}
-          className="world-status-action flex items-center gap-1.5 rounded-xl border border-sky-200/60 bg-[#2b6f91] px-3 py-2 font-game text-xs font-black text-white shadow-md transition-transform active:scale-95 sm:px-4 sm:text-sm"
-        >
-          <span>DÜDÜK ÇAL 📢</span>
-        </button>
+        {viewMode === 'ride' && <p className="gt-wmsg" role="status">{interactiveMessage}</p>}
       </div>
 
       {/* ===================================================================== */}
@@ -907,12 +847,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             <button
               type="button"
               onClick={toggleFullScreen}
-              className="absolute top-2 right-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/70 bg-black/50 text-lg text-white shadow-lg backdrop-blur-sm transition-transform active:scale-90 sm:h-11 sm:w-11"
+              className="gt-wfab right"
               aria-pressed={isFullScreen}
               aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}
               title={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}
             >
-              {isFullScreen ? '⤢' : '⛶'}
+              {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
             </button>
             {/* Tam ekranda kokpit varsayılan olarak gizli olduğu için, onu açmaya
                 yarayan ayrı bir köşe düğmesi — sadece tam ekran modunda görünür. */}
@@ -920,12 +860,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowCockpitOverlay((current) => !current)}
-                className="absolute top-2 left-2 z-30 flex h-10 items-center gap-1 rounded-full border-2 border-white/70 bg-black/50 px-3 text-sm font-black text-white shadow-lg backdrop-blur-sm transition-transform active:scale-90 sm:h-11"
+                className="gt-wfab left wide"
                 aria-pressed={showCockpitOverlay}
-                aria-label={showCockpitOverlay ? 'Kokpiti kapat' : 'Kokpiti aç'}
-                title={showCockpitOverlay ? 'Kokpiti kapat' : 'Kokpiti aç'}
+                title={showCockpitOverlay ? 'Kumandayı kapat' : 'Kumandayı aç'}
               >
-                🎛️
+                <span aria-hidden="true">🎛️</span>
+                {showCockpitOverlay ? 'Kapat' : 'Kumanda'}
               </button>
             )}
             {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
@@ -1311,11 +1251,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 type="button"
                 onClick={handleWhistleBlow}
                 onPointerDown={unlockAudioContext}
-                className="cockpit-floating-horn w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-[#C9483D] hover:bg-[#B94137] text-white flex items-center justify-center shadow-2xl border-4 border-white active:scale-90 transition-transform ring-4 ring-[#E7B4A8]"
+                className="cockpit-floating-horn gt-whorn"
                 title="Düdük Çal!"
                 aria-label="Düdük çal"
               >
-                <span className="text-2xl sm:text-4xl">📢</span>
+                <span aria-hidden="true">📯</span>
               </button>
             </div>
           </div>
@@ -1329,246 +1269,122 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             />
           )}
 
-          {/* Controls & Customizer Toolbar */}
-          <div className="world-control-sidebar grid grid-cols-1 gap-3 md:grid-cols-2">
-            <section className="cockpit-mission-panel rounded-[1.6rem] border border-[#F3D878] bg-[#FFF9D7] p-3 text-[#4E342E] shadow-lg md:col-span-2" aria-labelledby="cockpit-missions-title">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p id="cockpit-missions-title" className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9A5B00]">Bugünün Kokpit Görevleri</p>
-                  <p className="mt-0.5 text-xs font-bold text-[#5D514D]">Kontrollere dokun, yıldızlarını topla!</p>
-                </div>
-                <div className="shrink-0 rounded-full border border-[#F6B73C] bg-white/85 px-2.5 py-1 text-xs font-black text-[#8A5700]">
-                  {cockpitProgress.score} / 25 puan ⭐
-                </div>
+          {/* Kumanda paneli (tam ekranda 🎛️ ile açılan alt sayfa da budur) */}
+          <div className="world-control-sidebar gt-wc">
+            <section className="gt-wpanel" aria-label="Tren kumandası">
+              <div className="gt-wbtns">
+                <button
+                  type="button"
+                  onClick={handleTrainRunToggle}
+                  onPointerDown={unlockAudioContext}
+                  className={`gt-wbtn ${isTrainRunning ? 'on-mavi' : 'yesil'}`}
+                  aria-pressed={isTrainRunning}
+                >
+                  {isTrainRunning ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+                  {isTrainRunning ? 'Dur' : 'Kalk'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleWhistleBlow}
+                  onPointerDown={unlockAudioContext}
+                  className={`gt-wbtn turuncu ${isWhistling ? 'toot' : ''}`}
+                  aria-label={hornEnabled ? 'Korna çal' : 'Korna kapalı'}
+                >
+                  <span className="e" aria-hidden="true">📯</span>
+                  Korna
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTrainLightToggle}
+                  onPointerDown={unlockAudioContext}
+                  className={`gt-wbtn ${trainLightEnabled ? 'on-sari' : ''}`}
+                  aria-pressed={trainLightEnabled}
+                  aria-label={trainLightEnabled ? 'Farı kapat' : 'Farı aç'}
+                >
+                  <span className="e" aria-hidden="true">💡</span>
+                  Far
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMovementSoundToggle}
+                  onPointerDown={unlockAudioContext}
+                  className={`gt-wbtn ${movementSoundEnabled ? 'on-mor' : ''}`}
+                  aria-pressed={movementSoundEnabled}
+                  aria-label={movementSoundEnabled ? 'Motor sesini kapat' : 'Motor sesini aç'}
+                >
+                  <span className="e" aria-hidden="true">🔊</span>
+                  Motor
+                </button>
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/90 border border-[#F3E5AB]" role="progressbar" aria-label="Günlük kokpit puanı" aria-valuemin={0} aria-valuemax={25} aria-valuenow={cockpitProgress.score}>
-                <div className="h-full rounded-full bg-gradient-to-r from-[#F6B73C] via-[#FF8A65] to-[#4CAF50] transition-[width] duration-200" style={{ width: `${Math.min(100, (cockpitProgress.score / 25) * 100)}%` }} />
+
+              <div className="gt-seg" role="group" aria-label="Hız">
+                <button type="button" className={trainSpeed === 'slow' ? 'on' : ''} aria-pressed={trainSpeed === 'slow'} onClick={() => setTrainSpeed('slow')}>🐢 Yavaş</button>
+                <button type="button" className={trainSpeed === 'normal' ? 'on' : ''} aria-pressed={trainSpeed === 'normal'} onClick={() => setTrainSpeed('normal')}>🚂 Normal</button>
+                <button type="button" className={trainSpeed === 'fast' ? 'on' : ''} aria-pressed={trainSpeed === 'fast'} onClick={() => setTrainSpeed('fast')}>🚀 Hızlı</button>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+
+              <div className="gt-wtools">
+                <button type="button" className="gt-ghost" onClick={toggleFullScreen} aria-pressed={isFullScreen}>
+                  {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+                  {isFullScreen ? 'Küçült' : 'Tam ekran'}
+                </button>
+                {onToggleSound && (
+                  <button type="button" className="gt-ghost" onPointerDown={unlockAudioContext} onClick={onToggleSound} aria-pressed={soundEnabled}>
+                    {soundEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
+                    {soundEnabled ? 'Ses açık' : 'Ses kapalı'}
+                  </button>
+                )}
+              </div>
+            </section>
+
+            <section className="gt-wpanel" aria-labelledby="cockpit-missions-title">
+              <div className="gt-wrow">
+                <span id="cockpit-missions-title" className="gt-label">KAPTAN GÖREVLERİ</span>
+                <span className="gt-wstars">⭐ {cockpitProgress.score} / 25</span>
+              </div>
+              <div className="gt-wbar" role="progressbar" aria-label="Kaptan yıldızları" aria-valuemin={0} aria-valuemax={25} aria-valuenow={cockpitProgress.score}>
+                <i style={{ width: `${Math.min(100, (cockpitProgress.score / 25) * 100)}%` }} />
+              </div>
+              <div className="gt-wmis">
                 {COCKPIT_MISSIONS.map((mission) => {
                   const completed = cockpitProgress.completed.includes(mission.id);
                   return (
-                    <div key={mission.id} className={`flex min-w-0 items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-bold ${completed ? 'border-[#A5D6A7] bg-[#E8F5E9] text-[#2E7D32]' : 'border-[#F3E5AB] bg-white/85 text-[#5D514D]'}`}>
-                      <span aria-hidden="true" className="shrink-0 text-sm">{completed ? '✅' : mission.icon}</span>
-                      <span className="truncate">{mission.title}</span>
-                    </div>
+                    <span key={mission.id} className={completed ? 'ok' : ''}>
+                      <span aria-hidden="true">{completed ? '✓' : mission.icon}</span>
+                      {mission.title}
+                    </span>
                   );
                 })}
               </div>
             </section>
-            <div className="world-utility-controls grid grid-cols-4 gap-2 rounded-[2rem] border-4 border-slate-800/80 bg-[#0a1b26] p-2 text-white md:col-span-2">
-              <button
-                type="button"
-                onClick={handleThrottleClick}
-                onPointerDown={unlockAudioContext}
-                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${
-                  isTrainRunning ? 'border-emerald-500/70 bg-emerald-950/35' : 'border-slate-700 bg-slate-900/55'
-                }`}
-                title="Hız kolu: dur, yavaş, normal ve hızlı"
-                aria-label="Treni durdur veya hızını değiştir"
-              >
-                <span className="text-3xl leading-none drop-shadow-md sm:text-4xl">🕹️</span>
-                <span className="cockpit-control-label text-[10px] font-black text-sky-700">Hız / Dur</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleWhistleBlow}
-                onPointerDown={unlockAudioContext}
-                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${hornEnabled ? 'border-amber-300/90 bg-amber-950/45' : 'border-slate-700 bg-slate-900/55'}`}
-                title={hornEnabled ? 'Korna çal — ses açık' : 'Korna kapalı'}
-                aria-label={hornEnabled ? 'Korna çal — ses açık' : 'Korna kapalı'}
-                aria-pressed={hornEnabled}
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-xl shadow-lg sm:h-12 sm:w-12 sm:text-2xl">🎺</span>
-                <span className="cockpit-control-label text-[10px] font-black text-amber-800">Korna</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleTrainLightToggle}
-                onPointerDown={unlockAudioContext}
-                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${
-                  trainLightEnabled ? 'border-sky-400/70 bg-sky-950/35' : 'border-slate-700 bg-slate-900/55'
-                }`}
-                title="Işıkları aç veya kapat"
-                aria-label={trainLightEnabled ? 'Farı kapat' : 'Farı aç'}
-                aria-pressed={trainLightEnabled}
-              >
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg sm:h-10 sm:w-10 sm:text-xl ${trainLightEnabled ? 'bg-sky-500' : 'bg-slate-700'}`}>💡</span>
-                <span className="cockpit-control-label text-[10px] font-black text-sky-700">Far</span>
-                <span className={`h-1.5 w-6 rounded-full ${trainLightEnabled ? 'bg-sky-300' : 'bg-slate-600'}`} />
-              </button>
-              <button
-                type="button"
-                onClick={handleMovementSoundToggle}
-                onPointerDown={unlockAudioContext}
-                className={`cockpit-control-button flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 transition-all active:scale-95 sm:h-16 ${
-                  movementSoundEnabled ? 'border-orange-400/70 bg-orange-950/35' : 'border-slate-700 bg-slate-900/55'
-                }`}
-                title="Hareket sesini aç veya kapat"
-                aria-label={movementSoundEnabled ? 'Hareket sesini kapat' : 'Hareket sesini aç'}
-                aria-pressed={movementSoundEnabled}
-              >
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg sm:h-10 sm:w-10 sm:text-xl ${movementSoundEnabled ? 'bg-orange-500' : 'bg-slate-700'}`}>🔊</span>
-                <span className="cockpit-control-label text-[10px] font-black text-orange-800">Hareket sesi</span>
-                <span className={`h-1.5 w-6 rounded-full ${movementSoundEnabled ? 'bg-orange-300' : 'bg-slate-600'}`} />
-              </button>
-              <div className="cockpit-utility-footer col-span-4 flex items-center justify-between gap-1 border-t border-sky-200/15 pt-1">
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">Tren Kokpiti</span>
-                <div className="flex items-center gap-1">
-                  <button type="button" onClick={toggleFullScreen} className="cockpit-utility-button rounded-lg border border-sky-300/30 bg-[#183b4b] px-2 py-1 text-[11px] font-black text-sky-50 active:scale-95" aria-pressed={isFullScreen} aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}>
-                    {isFullScreen ? '⤢ Çık' : '⛶ Tam Ekran'}
+
+            <section className="gt-wpanel" aria-label="Vagonlar ve manzara">
+              <span className="gt-label">VAGONLAR</span>
+              <div className="gt-cats">
+                {([
+                  ['passenger', '🚃', 'Yolcu'],
+                  ['cargo_coins', '🪙', 'Altın'],
+                  ['cargo_fruits', '🍎', 'Meyve'],
+                  ['cargo_toys', '🧸', 'Oyuncak'],
+                ] as const).map(([type, icon, label]) => (
+                  <button key={type} type="button" className={`gt-cat ${attachedWagons.includes(type) ? 'on' : ''}`} aria-pressed={attachedWagons.includes(type)} onClick={() => toggleWagon(type)}>
+                    <span aria-hidden="true">{icon}</span>{label}
                   </button>
-                  {onToggleSound && (
-                    <button type="button" onPointerDown={unlockAudioContext} onClick={onToggleSound} className="cockpit-utility-button rounded-lg border border-sky-300/30 bg-[#183b4b] px-2 py-1 text-[11px] font-black text-sky-50 active:scale-95" aria-label={soundEnabled ? 'Ana sesi kapat' : 'Ana sesi aç'}>
-                      {soundEnabled ? '🔈 Ses' : '🔇 Sessiz'}
-                    </button>
-                  )}
-                </div>
+                ))}
               </div>
-            </div>
-
-            {/* Speed & Direction Controls */}
-            <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white space-y-2">
-              <div className="text-xs font-bold text-sky-700 flex items-center gap-1.5 uppercase tracking-wider">
-                <FastForward className="w-4 h-4 text-sky-700" />
-                <span>Tren Sürüş Kontrolleri</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleTrainRunToggle}
-                  onPointerDown={unlockAudioContext}
-                  className={`cockpit-secondary-button flex items-center gap-1.5 rounded-xl border px-3 py-2 font-game text-sm font-black text-white shadow-sm transition-transform active:scale-95 ${
-                    isTrainRunning
-                      ? 'border-sky-200/60 bg-[#2b6f91] hover:bg-[#347fa5]'
-                      : 'border-sky-300/25 bg-[#183b4b] hover:bg-[#214b5e]'
-                  }`}
-                >
-                  {isTrainRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  <span>{isTrainRunning ? 'Treni Durdur' : 'Treni Başlat'}</span>
-                </button>
-
-                <div className="cockpit-speed-group flex items-center gap-1 bg-[#0a1820] p-1 rounded-2xl border border-slate-700">
-                  <button
-                    onClick={() => setTrainSpeed('slow')}
-                    className={`cockpit-speed-button px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-                      trainSpeed === 'slow' ? 'bg-[#2b6f91] text-white' : 'text-slate-400'
-                    }`}
-                  >
-                    🐢 Yavaş
+              <span className="gt-label">MANZARA</span>
+              <div className="gt-cats">
+                {([
+                  ['farm', '🌾', 'Çiftlik'],
+                  ['sunset', '🌅', 'Gün batımı'],
+                  ['night', '🌙', 'Gece'],
+                ] as const).map(([theme, icon, label]) => (
+                  <button key={theme} type="button" className={`gt-cat ${envTheme === theme ? 'on' : ''}`} aria-pressed={envTheme === theme} onClick={() => setEnvTheme(theme)}>
+                    <span aria-hidden="true">{icon}</span>{label}
                   </button>
-                  <button
-                    onClick={() => setTrainSpeed('normal')}
-                    className={`cockpit-speed-button px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-                      trainSpeed === 'normal' ? 'bg-[#2b6f91] text-white' : 'text-slate-400'
-                    }`}
-                  >
-                    🚂 Normal
-                  </button>
-                  <button
-                    onClick={() => setTrainSpeed('fast')}
-                    className={`cockpit-speed-button px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-                      trainSpeed === 'fast' ? 'bg-[#2b6f91] text-white' : 'text-slate-400'
-                    }`}
-                  >
-                    🚀 Hızlı
-                  </button>
-                </div>
-
-                <div className="cockpit-track-status flex items-center gap-1.5 rounded-2xl border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-xs font-bold text-emerald-100">
-                  <Compass className="h-3.5 w-3.5 text-emerald-700" />
-                  <span>Tek hat · Gidiş / Dönüş</span>
-                </div>
+                ))}
               </div>
-            </div>
-
-            {/* Wagon Selector & Theme Switcher */}
-            <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white space-y-2">
-              <div className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 uppercase tracking-wider">
-                <Layers className="w-4 h-4 text-emerald-700" />
-                <span>Vagon Ekle & Manzara Değiştir</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleWagon('passenger')}
-                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
-                    attachedWagons.includes('passenger')
-                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
-                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
-                  }`}
-                >
-                  🚃 Yolcu Vagonu
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => toggleWagon('cargo_coins')}
-                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
-                    attachedWagons.includes('cargo_coins')
-                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
-                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
-                  }`}
-                >
-                  🪙 Altın Vagonu
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => toggleWagon('cargo_fruits')}
-                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
-                    attachedWagons.includes('cargo_fruits')
-                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
-                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
-                  }`}
-                >
-                  🍎 Meyve Vagonu
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => toggleWagon('cargo_toys')}
-                  className={`cockpit-option-button px-3 py-1.5 rounded-xl font-game text-xs font-bold border transition-all ${
-                    attachedWagons.includes('cargo_toys')
-                      ? 'bg-[#2b6f91] border-sky-200/60 text-white'
-                      : 'bg-[#102b3a] border-sky-300/15 text-slate-400'
-                  }`}
-                >
-                  🧸 Oyuncak Vagonu
-                </button>
-              </div>
-
-              {/* Theme switcher options */}
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[11px] text-slate-400 font-bold">Tema:</span>
-                <button
-                  type="button"
-                  onClick={() => setEnvTheme('farm')}
-                  className={`cockpit-theme-button px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                    envTheme === 'farm' ? 'bg-[#2b6f91] text-white' : 'bg-[#102b3a] text-slate-400'
-                  }`}
-                >
-                  🌾 Çiftlik
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEnvTheme('sunset')}
-                  className={`cockpit-theme-button px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                    envTheme === 'sunset' ? 'bg-[#2b6f91] text-white' : 'bg-[#102b3a] text-slate-400'
-                  }`}
-                >
-                  🌅 Gün Batımı
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEnvTheme('night')}
-                  className={`cockpit-theme-button px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                    envTheme === 'night' ? 'bg-[#2b6f91] text-white' : 'bg-[#102b3a] text-slate-400'
-                  }`}
-                >
-                  🌌 Gece
-                </button>
-              </div>
-            </div>
+            </section>
           </div>
         </div>
       )}
@@ -1577,72 +1393,41 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* MODE 2: CUSTOM MAP BUILDER GRID                                        */}
       {/* ===================================================================== */}
       {viewMode === 'builder' && (
-        <div className="space-y-4">
-          <div className="bg-[#15303e] border border-slate-700/60 rounded-3xl p-3.5 text-white flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
-              {selectedInventoryItem ? (
-                <MousePointer2 className="w-4 h-4 text-amber-300" />
-              ) : (
-                <Plus className="w-4 h-4 text-emerald-400" />
-              )}
-              <span>
-                {selectedInventoryItem
-                  ? `${selectedInventoryItem.name} seçili. Haritada bir noktaya dokun veya kartı sürükle.`
-                  : 'Satın alınan bir parçayı seç; kasaba haritasında istediğin noktaya yerleştir.'}
-              </span>
-            </div>
+        <div className="gt-wbuild">
+          <p className="gt-result info">
+            {selectedInventoryItem
+              ? `${selectedInventoryItem.name} seçili. Haritada bir yere dokun.`
+              : 'Aşağıdan bir parça seç, sonra haritada bir yere dokun.'}
+          </p>
+          <div className="gt-wtools four" aria-label="Harita kolaylıkları">
             <button
+              type="button"
+              className={`gt-ghost ${isBuildMode ? 'on' : ''}`}
+              aria-pressed={isBuildMode}
               onClick={() => {
                 setIsBuildMode(!isBuildMode);
                 if (isBuildMode) setSelectedInventoryItem(null);
               }}
-              className={`px-4 py-2 rounded-2xl font-game text-xs font-bold border transition-all ${
-                isBuildMode
-                  ? 'bg-rose-600 border-rose-400 text-white'
-                  : 'bg-[#2263df] border-blue-400 text-white'
-              }`}
             >
-              {isBuildMode ? 'İnşayı Tamamla' : 'Parça Yerleştir'}
+              {isBuildMode ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}
+              {isBuildMode ? 'Bitti' : 'Yerleştir'}
             </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Harita kolaylıkları">
-            <button
-              type="button"
-              onClick={handleAutoPlaceSelected}
-              className="min-h-12 rounded-2xl border-2 border-emerald-300 bg-emerald-600 px-2 py-2 font-game text-xs font-black text-white shadow-md active:scale-95"
-            >
-              <WandSparkles className="mx-auto mb-0.5 h-4 w-4" />
-              Otomatik Yerleştir
+            <button type="button" className="gt-ghost" onClick={handleAutoPlaceSelected}>
+              <WandSparkles aria-hidden="true" />
+              Otomatik
             </button>
-            <button
-              type="button"
-              onClick={handleRotateSelection}
-              className="min-h-12 rounded-2xl border-2 border-sky-300 bg-sky-700 px-2 py-2 font-game text-xs font-black text-white shadow-md active:scale-95"
-            >
-              <RotateCw className="mx-auto mb-0.5 h-4 w-4" />
-              Döndür ({placementRotation}°)
+            <button type="button" className="gt-ghost" onClick={handleRotateSelection}>
+              <RotateCw aria-hidden="true" />
+              Döndür
             </button>
-            <button
-              type="button"
-              onClick={handleUndoPlacement}
-              disabled={placementHistory.length === 0}
-              className="min-h-12 rounded-2xl border-2 border-amber-300 bg-amber-500 px-2 py-2 font-game text-xs font-black text-amber-950 shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Undo2 className="mx-auto mb-0.5 h-4 w-4" />
-              Geri Al
-            </button>
-            <button
-              type="button"
-              onClick={clearMapSelection}
-              className="min-h-12 rounded-2xl border-2 border-slate-500 bg-slate-700 px-2 py-2 font-game text-xs font-black text-white shadow-md active:scale-95"
-            >
-              Seçimi Temizle
+            <button type="button" className="gt-ghost" onClick={handleUndoPlacement} disabled={placementHistory.length === 0}>
+              <Undo2 aria-hidden="true" />
+              Geri al
             </button>
           </div>
 
           {/* Living Graphic Builder Map */}
-          <div className="relative rounded-[2rem] border-4 border-sky-800 shadow-2xl overflow-hidden bg-sky-200 min-h-[420px] aspect-[16/9] select-none">
+          <div className="gt-wmap relative rounded-[2rem] border-4 border-sky-800 shadow-2xl overflow-hidden bg-sky-200 min-h-[420px] aspect-[16/9] select-none">
             {/* Kasaba burada da görünür kutudan daha geniş; taşan kısım yana
                 kaydırılarak keşfedilir. Köşedeki sabit etiketler bu kaydırılabilir
                 katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
@@ -1761,7 +1546,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                               setInteractiveMessage(`${placed.name} kaldırıldı. İstersen Geri Al düğmesine dokunabilirsin.`);
                               playPopSound(soundEnabled);
                             }}
-                            className="absolute -right-1 -top-1 z-30 rounded-full bg-rose-600 p-1 text-white shadow-lg ring-2 ring-white/80"
+                            className="absolute -right-1 -top-1 z-30 rounded-full bg-slate-700 p-1 text-white shadow-lg ring-2 ring-white/80"
                             role="button"
                             aria-label={`${placed.name} kaldır`}
                             title="Kaldır"
@@ -1801,38 +1586,30 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
         </div>
       )}
 
-      {/* Purchased Items Panel */}
-      <div className="bg-[#0e2531]/80 backdrop-blur-md border border-slate-700/80 rounded-3xl p-4 text-white shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div>
-            <h3 className="font-game text-white text-base sm:text-lg font-bold flex items-center gap-2">
-              <span>📦</span> Satın Alınanlar
-            </h3>
-            <p className="text-xs text-slate-300">
-              {viewMode === 'builder'
-                ? 'Kartı sürükle ya da seçip kasaba haritasında bir noktaya dokun.'
-                : 'Dokunarak dünyana yerleştir, tren lokomotifini değiştir veya haritada çiz!'}
-            </p>
-          </div>
-          <span className="bg-sky-900/80 text-sky-200 border border-sky-600/60 text-xs font-bold px-3 py-1 rounded-full w-fit">
-            {unlockedItems.length} Parça Açık
-          </span>
+      <section className="gt-wpanel gt-winv" aria-labelledby="world-inventory-title">
+        <div className="gt-wrow">
+          <span id="world-inventory-title" className="gt-label">SATIN ALDIKLARIM</span>
+          <span className="gt-wstars">{unlockedItems.length} parça</span>
         </div>
 
         {unlockedItems.length === 0 ? (
-          <div className="bg-[#091720] border border-slate-700/60 rounded-2xl p-4 text-center">
-            <p className="text-xs sm:text-sm text-amber-300 font-bold">
-              Henüz satın alınmış parça yok! 🛒
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Görevleri tamamlayıp kazandığın altın puanlarla Mağaza'dan yeni tren, köprü ve vagonlar satın alabilirsin.
-            </p>
-          </div>
+          <p className="gt-result info">Henüz parça yok. Görevlerden puan topla, Mağaza’dan tren ve vagon al! 🛒</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="gt-wgrid">
             {unlockedItems.map((item) => {
               const isPlaced = worldItems.some((w) => w.itemId === item.id);
               const isTrainActive = item.type === 'train' && user.activeTrainIcon === item.icon;
+              const isWagon = item.type === 'wagon' || item.category === 'wagons';
+              const isWagonAttached = isWagon && attachedWagons.includes(item.wagonType || 'passenger');
+              const selected = selectedInventoryItem?.id === item.id;
+              const active = viewMode === 'builder' ? selected : isTrainActive || isWagonAttached || (!isWagon && item.type !== 'train' && isPlaced);
+              const actionLabel = viewMode === 'builder'
+                ? selected ? 'Haritaya dokun' : isPlaced ? 'Taşı' : 'Haritaya koy'
+                : item.type === 'train'
+                ? isTrainActive ? 'Sürüyorsun' : 'Bunu sür'
+                : isWagon
+                ? isWagonAttached ? 'Bağlı' : 'Trene bağla'
+                : isPlaced ? 'Dünyanda' : 'Ekle';
 
               return (
                 <div
@@ -1841,110 +1618,32 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   draggable={viewMode === 'builder'}
                   onDragStart={(event) => handleInventoryDragStart(event, item)}
                   onDragEnd={() => setDraggedInventoryItem(null)}
-                  onClick={() => {
-                    if (viewMode === 'builder') {
-                      selectInventoryForMap(item);
-                    }
-                  }}
-                  className={`bg-[#15303d] border rounded-2xl p-3 flex flex-col justify-between transition-all shadow-md ${
-                    selectedInventoryItem?.id === item.id
-                      ? 'border-amber-300 ring-2 ring-amber-300/50 bg-[#1e4152]'
-                      : 'border-slate-700/70 hover:border-slate-500'
-                  } ${viewMode === 'builder' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  className={`gt-witem ${selected ? 'sel' : ''}`}
                 >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-xl bg-[#0a1820] border border-slate-700 flex items-center justify-center text-3xl shadow-inner flex-shrink-0 overflow-hidden">
-                      {SCENERY_IMAGES[item.id] ? (
-                        <img src={SCENERY_IMAGES[item.id]} alt={item.name} className="w-full h-full object-contain p-0.5" draggable={false} />
-                      ) : (
-                        item.icon
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-game text-sm font-bold text-white line-clamp-1">
-                        {item.name}
-                      </h4>
-                      <span className="text-[10px] text-sky-300 uppercase tracking-wider font-bold">
-                        {itemKindLabel(item)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700/60">
-                    {item.type === 'train' ? (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
-                        }}
-                        className={`w-full py-2 px-3 rounded-xl font-game text-xs font-bold border transition-all ${
-                          viewMode === 'builder'
-                            ? 'bg-amber-500 text-amber-950 border-amber-300'
-                            : isTrainActive
-                            ? 'bg-emerald-600 text-white border-emerald-400'
-                            : 'bg-[#2263df] hover:bg-[#1c55c5] text-white border-blue-400'
-                        }`}
-                      >
-                        {viewMode === 'builder'
-                          ? selectedInventoryItem?.id === item.id
-                            ? 'Seçildi, Haritaya Dokun'
-                            : isPlaced
-                            ? 'Yerini Değiştir'
-                            : 'Haritaya Yerleştir'
-                          : isTrainActive
-                          ? 'Sürüşte Etkin 🚂'
-                          : 'Bu Treni Sür 🚂'}
-                      </button>
-                    ) : item.type === 'wagon' || item.category === 'wagons' ? (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
-                        }}
-                        className={`w-full py-2 px-3 rounded-xl font-game text-xs font-bold border transition-all ${
-                          viewMode === 'builder'
-                            ? 'bg-amber-500 text-amber-950 border-amber-300'
-                            : attachedWagons.includes(item.wagonType || 'passenger')
-                            ? 'bg-emerald-600 text-white border-emerald-400'
-                            : 'bg-[#2263df] hover:bg-[#1c55c5] text-white border-blue-400'
-                        }`}
-                      >
-                        {viewMode === 'builder'
-                          ? selectedInventoryItem?.id === item.id
-                            ? 'Seçildi, Haritaya Dokun'
-                            : isPlaced
-                            ? 'Yerini Değiştir'
-                            : 'Haritaya Yerleştir'
-                          : attachedWagons.includes(item.wagonType || 'passenger')
-                          ? 'Trene Bağlı 🚃'
-                          : 'Trene Bağla 🚃'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
-                        }}
-                        className="w-full py-2 px-3 rounded-xl font-game text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-500 text-amber-950 border border-amber-300 hover:brightness-105 shadow-sm"
-                      >
-                        {viewMode === 'builder'
-                          ? selectedInventoryItem?.id === item.id
-                            ? 'Seçildi, Haritaya Dokun'
-                            : isPlaced
-                            ? 'Yerini Değiştir'
-                            : 'Haritaya Yerleştir'
-                          : isPlaced
-                          ? 'Dünyanda Yayında ✨'
-                          : 'Dünyana Ekle 🪄'}
-                      </button>
-                    )}
-                  </div>
+                  <span className="pic" aria-hidden="true">
+                    {SCENERY_IMAGES[item.id] ? <img src={SCENERY_IMAGES[item.id]} alt="" draggable={false} /> : item.icon}
+                  </span>
+                  <span className="t">
+                    <b>{item.name}</b>
+                    <small>{itemKindLabel(item)}</small>
+                  </span>
+                  <button
+                    type="button"
+                    className={`gt-wuse ${active ? 'on' : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      viewMode === 'builder' ? selectInventoryForMap(item) : handleUseInventoryItem(item);
+                    }}
+                  >
+                    {active && <Check aria-hidden="true" />}
+                    {actionLabel}
+                  </button>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };

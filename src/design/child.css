@@ -202,6 +202,82 @@
 .gt-en { font: 900 36px/1.1 var(--gt-font); color: var(--gt-mavi-d); text-align: center; }
 .gt-tr { font: 800 17px var(--gt-font); color: var(--gt-ink-2); margin-top: -8px; }
 
+/* ---------- Dünya ---------- */
+.gt-world { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
+.gt-world > .gt-head { padding: 14px 0 0; max-width: none; margin: 0; }
+.gt-world > .gt-head h1 { text-align: left; }
+.gt-wtop { display: flex; flex-direction: column; gap: 8px; }
+.gt-wtop .gt-seg { background: #fff; box-shadow: 0 2px 0 var(--gt-line); }
+.gt-wtop .gt-seg button.on { background: var(--gt-turkuaz) !important; color: #fff !important; box-shadow: none; }
+.gt-wmsg { margin: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 16px; background: #fff; box-shadow: 0 2px 0 var(--gt-line); font: 800 15px/1.3 var(--gt-font); color: var(--gt-ink); }
+.gt-world .world-ride-layout > :not(:last-child) { margin-bottom: 12px; }
+.gt-world .world-ride-canvas-shell { border-radius: 24px !important; border: 4px solid #fff !important; box-shadow: 0 3px 0 var(--gt-line) !important; }
+.gt .gt-wc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.gt .gt-wc > * { min-width: 0; }
+.gt .gt-wc > .gt-wpanel, .gt .gt-wpanel { background: #fff !important; border: 0 !important; border-radius: 24px; box-shadow: 0 3px 0 var(--gt-line) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; color: var(--gt-ink) !important; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.gt-wbtns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.gt-wbtn { min-height: 76px; border-radius: 20px; background: var(--gt-sky) !important; color: var(--gt-ink) !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 900 15px/1.1 var(--gt-font) !important; box-shadow: 0 3px 0 var(--gt-line); transition: transform .12s; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.gt-wbtn:active { transform: scale(.96); }
+.gt-wbtn svg { width: 30px; height: 30px; }
+.gt-wbtn .e { font-size: 30px; line-height: 1; }
+.gt-wbtn.yesil { background: var(--gt-yesil) !important; color: #fff !important; box-shadow: 0 4px 0 var(--gt-yesil-d); }
+.gt-wbtn.on-mavi { background: var(--gt-mavi) !important; color: #fff !important; box-shadow: 0 4px 0 var(--gt-mavi-d); }
+.gt-wbtn.turuncu { background: var(--gt-turuncu-s) !important; color: #7a4a00 !important; box-shadow: 0 3px 0 #f2d08a; }
+.gt-wbtn.toot { animation: gt-bump .5s; }
+.gt-wbtn.on-sari { background: #fff4c2 !important; box-shadow: inset 0 0 0 3px var(--gt-turuncu); }
+.gt-wbtn.on-mor { background: var(--gt-mor-s) !important; color: var(--gt-mor-d) !important; box-shadow: inset 0 0 0 3px var(--gt-mor); }
+.gt-wtools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gt-wtools.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gt-wtools .gt-ghost { width: 100%; padding: 0 10px; }
+.gt-ghost.on { background: var(--gt-yesil) !important; color: #fff !important; }
+.gt-ghost:disabled { opacity: .45; }
+.gt-wrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gt-wstars { font: 900 15px var(--gt-font); color: #7a4a00; background: var(--gt-turuncu-s); border-radius: 99px; padding: 6px 12px; white-space: nowrap; }
+.gt-wbar { height: 10px; border-radius: 99px; background: #eef3f4; overflow: hidden; }
+.gt-wbar i { display: block; height: 100%; border-radius: 99px; background: var(--gt-turuncu); transition: width .3s; }
+.gt-wmis { display: flex; flex-wrap: wrap; gap: 6px; }
+.gt-wmis > span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px; background: var(--gt-sky); font: 800 13px var(--gt-font); color: var(--gt-ink-2); }
+.gt-wmis > span.ok { background: var(--gt-yesil-s); color: var(--gt-yesil-d); }
+.gt-wbuild { display: flex; flex-direction: column; gap: 12px; }
+.gt-wbuild .gt-result { margin: 0; }
+.gt-wbuild .gt-result.info { background: #fff; color: var(--gt-ink); box-shadow: 0 2px 0 var(--gt-line); }
+.gt-wbuild .gt-ghost:not(.on) { background: #fff !important; box-shadow: 0 2px 0 var(--gt-line); }
+.gt .gt-wmap { border: 4px solid #fff !important; border-radius: 24px !important; box-shadow: 0 3px 0 var(--gt-line) !important; }
+.gt-wgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.gt-witem { display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--gt-sky); border-radius: 18px; padding: 10px; text-align: center; }
+.gt-witem.sel { box-shadow: inset 0 0 0 3px var(--gt-turuncu); background: var(--gt-turuncu-s); }
+.gt-witem[draggable="true"] { cursor: grab; }
+.gt-witem .pic { width: 56px; height: 56px; border-radius: 14px; background: #fff; display: grid; place-items: center; font-size: 32px; overflow: hidden; }
+.gt-witem .pic img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+.gt-witem .t { display: flex; flex-direction: column; gap: 2px; min-width: 0; width: 100%; flex: 1; }
+.gt-witem .t b { font: 900 15px/1.2 var(--gt-font); }
+.gt-witem .t small { font: 800 12px var(--gt-font); color: var(--gt-ink-2); }
+.gt-wuse { width: 100%; min-height: 52px; padding: 0 6px; border-radius: 14px; background: var(--gt-mavi) !important; color: #fff !important; font: 900 15px/1.15 var(--gt-font) !important; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.gt-wuse.on { background: var(--gt-yesil-s) !important; color: var(--gt-yesil-d) !important; }
+.gt-wuse svg { width: 20px; height: 20px; }
+.gt-wfab { position: absolute; top: 10px; z-index: 30; min-width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; background: rgba(255, 255, 255, .92) !important; color: var(--gt-ink) !important; font: 900 16px var(--gt-font) !important; box-shadow: 0 3px 10px rgba(0, 0, 0, .18); }
+.gt-wfab.right { right: 10px; }
+.gt-wfab.left { left: 10px; }
+.gt-wfab svg { width: 24px; height: 24px; }
+.gt .gt-whorn { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 32px; background: var(--gt-turuncu) !important; border: 4px solid #fff !important; box-shadow: 0 4px 12px rgba(0, 0, 0, .25) !important; transition: transform .12s; }
+.gt .gt-whorn:active { transform: scale(.92); }
+.gt-wpanel .gt-cats { flex-wrap: wrap; overflow: visible; }
+/* Tam ekranda kumanda paneli alttan açılan sayfa olur. */
+.gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { background: var(--gt-sky) !important; }
+.gt .world-ride-layout.is-fullscreen .world-ride-canvas-shell { border: 0 !important; }
+.gt .world-ride-layout.is-fullscreen .gt-wc > .gt-wpanel:not(:first-child) { display: none; }
+.gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { max-width: 640px; margin: 0 auto; }
+.gt .world-ride-layout.is-fullscreen .gt-wc .gt-wpanel > :not(.gt-wbtns) { display: none; }
+.gt .world-ride-layout.is-fullscreen .gt-wc .gt-wpanel { padding: 0; box-shadow: none !important; background: transparent !important; }
+.gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { max-height: none; overflow: visible; box-shadow: 0 -6px 20px rgba(0, 0, 0, .25); }
+.gt .cockpit-overlay-backdrop { background: transparent; }
+@media (orientation: landscape) and (max-height: 540px) {
+  .gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { left: auto; top: 0; bottom: 0; width: 112px; max-width: none; margin: 0; border-radius: 22px 0 0 22px; padding: 10px; padding-right: max(10px, env(safe-area-inset-right)); align-content: center; }
+  .gt .world-ride-layout.is-fullscreen .gt-wbtns { grid-template-columns: 1fr; gap: 8px; }
+  .gt .world-ride-layout.is-fullscreen .gt-wbtn { min-height: 72px; font-size: 14px !important; }
+  .gt .world-ride-layout.is-fullscreen .gt-wbtn svg, .gt .world-ride-layout.is-fullscreen .gt-wbtn .e { width: 26px; height: 26px; font-size: 26px; }
+}
+
 /* ---------- geniş ekran (tablet yatay, masaüstü) ---------- */
 @container gt (min-width: 720px) {
   .gt-main { margin-left: var(--gt-nav-w); padding-bottom: 32px; }
@@ -246,6 +322,19 @@
   .gt-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 640px; }
   .gt-balloons { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 640px; }
   .gt-lcard .gt-result, .gt-lcard .gt-pair, .gt-lcard .gt-seg { max-width: 560px; }
+  .gt-world { padding: 0 28px; gap: 16px; }
+  .gt-world > .gt-head { padding: 20px 0 0; }
+  .gt-wtop { flex-direction: row; align-items: stretch; }
+  .gt-wtop .gt-seg { width: auto; flex: none; min-width: 360px; }
+  .gt-wtop .gt-wmsg { flex: 1; }
+  .gt .gt-wc { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .gt .gt-wc > .gt-wpanel:first-child { grid-row: span 2; }
+  .gt-wbtns { gap: 12px; }
+  .gt-wbtn { min-height: 96px; font-size: 17px !important; }
+  .gt-wtools.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .gt-wgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gt .world-ride-layout.is-fullscreen .gt-wc { grid-template-columns: minmax(0, 1fr); }
+  .gt .world-ride-layout.is-fullscreen .gt-wc > .gt-wpanel:first-child { grid-row: auto; }
   .gt-toast { left: 50%; right: auto; transform: translateX(-50%); bottom: 28px; min-width: 320px; }
 }
 @container gt (min-width: 1100px) {
@@ -253,6 +342,15 @@
   .gt-top { max-width: 1024px; }
   .gt-all { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-head, .gt-modes, .gt-lcard { max-width: 1024px; margin-left: auto; margin-right: auto; }
+  .gt-world { max-width: 1180px; margin-left: auto; margin-right: auto; width: 100%; }
+  .gt-world .world-ride-layout:not(.is-fullscreen) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .gt-world .world-ride-layout:not(.is-fullscreen) > * { margin-bottom: 0 !important; }
+  .gt-world .world-ride-layout:not(.is-fullscreen) .world-ride-canvas-shell { position: sticky; top: 16px; }
+  .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wc { grid-template-columns: minmax(0, 1fr); }
+  .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wc > .gt-wpanel:first-child { grid-row: auto; }
+  .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wbtns { grid-template-columns: 1fr 1fr; }
+  .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wbtn { min-height: 84px; }
+  .gt-wgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 /* Yan menü sabit konumlu olduğu için kapsayıcı sorgusu yerine ekran genişliğine bakar. */
 @media (min-width: 720px) {

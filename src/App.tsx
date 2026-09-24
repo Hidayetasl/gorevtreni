@@ -1099,9 +1099,6 @@ export default function App() {
             />
           )}
 
-          {/* Bu sekmeler sırayla yeni tasarıma geçecek; şimdilik mevcut görünümleri. */}
-          <div className="app-main p-2 sm:p-3">
-
           {activeTab === 'world' && (
             <TrainWorldView
               worldItems={world.filter((item) => !item.deletedAt)}
@@ -1115,6 +1112,9 @@ export default function App() {
               onToggleSound={handleToggleSound}
             />
           )}
+
+          {/* Bu sekmeler sırayla yeni tasarıma geçecek; şimdilik mevcut görünümleri. */}
+          <div className="app-main p-2 sm:p-3">
 
           {activeTab === 'shop' && (
             <ShopView
