@@ -7,7 +7,8 @@ import { extractYoutubeId, hashParentPin, isWeakParentPin, needsNewParentPin } f
 const PARENT_UNLOCK_MS = 5 * 60 * 1000;
 import { getFamilyInviteLink } from '../utils/cloudSync';
 import { sortVideosNewestFirst } from '../utils/videoOrder';
-import { Lock, Check, X, Plus, Gift, BarChart3, Settings, ShieldCheck, Sparkles, Trash2, ArrowRight, Youtube, RotateCcw, History, LogIn, ShoppingBag, BookOpen } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Gift, History, ListChecks, Lock, Mic, Plus, RefreshCw, RotateCcw, Settings, Trash2, Tv, TrendingUp, Volume2, VolumeX, X } from 'lucide-react';
+import '../design/parent.css';
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -96,7 +97,12 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
   const [inviteMessage, setInviteMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'approvals' | 'add_task' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings'>('approvals');
+  // null = panelin ana sayfası (kimin yanında + onaylar + bölüm kartları).
+  type Section = 'tasks' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings';
+  const [section, setSection] = useState<Section | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [taskMessage, setTaskMessage] = useState('');
 
   // Video Form State
   const [videoUrl, setVideoUrl] = useState('');
@@ -172,6 +178,12 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     if (isOpen && Date.now() - unlockedAtRef.current > PARENT_UNLOCK_MS) {
       setIsAuthenticated(false);
       setPinInput('');
+    }
+    // Panel her açılışta ana sayfadan başlar; yarım kalan onaylar kapanır.
+    if (isOpen) {
+      setSection(null);
+      setConfirmDeleteId(null);
+      setConfirmReset(false);
     }
   }, [isOpen]);
 
@@ -261,9 +273,9 @@ export const ParentModal: React.FC<ParentModalProps> = ({
       isExtra: true,
     });
 
+    setTaskMessage(`“${newTaskTitle.trim()}” eklendi.`);
     setNewTaskTitle('');
     setNewTaskDesc('');
-    setActiveTab('approvals');
     speakText('Yeni görev başarıyla eklendi', speechEnabled);
   };
 
@@ -323,892 +335,463 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Aileye bağlanılamadı.'); }
   };
 
+  const TIME_LABEL: Record<string, string> = { morning: 'Sabah', afternoon: 'Öğle', evening: 'Akşam' };
+  const liveTasks = tasks.filter((t) => !t.deletedAt);
+  const SECTIONS: Array<{ id: Section; label: string; detail: string; Icon: typeof Plus; tone: string }> = [
+    { id: 'tasks', label: 'Görevler', detail: 'Ekle, sil, yeniden aç', Icon: ListChecks, tone: 'yesil' },
+    { id: 'bonus', label: 'Bonus gönder', detail: 'Sürpriz puan kartı', Icon: Gift, tone: 'mor' },
+    { id: 'videos', label: 'Videolar', detail: `${videos.filter((v) => v.moderationStatus !== 'approved').length} onay bekliyor`, Icon: Tv, tone: 'mavi' },
+    { id: 'stats', label: 'İstatistik', detail: 'Hafta ve seri', Icon: TrendingUp, tone: 'turkuaz' },
+    { id: 'activity', label: 'Geçmiş', detail: 'Ne zaman ne yapıldı', Icon: History, tone: 'turuncu' },
+    { id: 'settings', label: 'Ayarlar', detail: 'PIN, aile, cihaz', Icon: Settings, tone: 'gri' },
+  ];
+  const currentSection = SECTIONS.find((item) => item.id === section);
+
+  const openSection = (next: Section | null) => {
+    playPopSound(soundEnabled);
+    setSection(next);
+    setConfirmDeleteId(null);
+    setConfirmReset(false);
+    setTaskMessage('');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-white rounded-3xl max-w-xl w-full overflow-hidden border-4 border-rose-300 shadow-2xl flex flex-col max-h-[90vh]">
-        {/* Modal Top Header */}
-        <div className="bg-gradient-to-r from-rose-500 to-red-600 text-white p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/40 flex items-center justify-center text-xl">
-              🔐
-            </div>
-            <div>
-              <h2 className="font-game text-lg font-bold">Ebeveyn Kontrol Paneli</h2>
-              <p className="text-xs text-rose-100 font-bold">
-                {isAuthenticated ? 'Yönetim Merkezi (Makinist Başı)' : 'Şifre Girişi'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {isAuthenticated && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('settings')}
-                className="min-h-9 rounded-xl bg-white/20 hover:bg-white/40 px-2.5 flex items-center gap-1.5 text-xs font-game font-bold transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Ayarlar</span>
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors"
-              aria-label="Ebeveyn panelini kapat"
-            >
-              <X className="w-5 h-5 text-white" />
+    <div className="pp-wrap" role="dialog" aria-modal="true" aria-label="Ebeveyn paneli">
+      <div className="pp">
+        {/* Üst çubuk */}
+        <header className="pp-top">
+          {isAuthenticated && section ? (
+            <button type="button" className="pp-back" onClick={() => openSection(null)} aria-label="Panel ana sayfasına dön">
+              <ArrowLeft aria-hidden="true" strokeWidth={3} />
             </button>
+          ) : (
+            <span className="pp-badge" aria-hidden="true"><Lock /></span>
+          )}
+          <div className="pp-title">
+            <h2>{isAuthenticated && currentSection ? currentSection.label : 'Ebeveyn paneli'}</h2>
+            <small>{isAuthenticated ? (deviceControls?.adultName ? `${deviceControls.adultName} · açık` : 'Açık') : 'PIN ile açılır'}</small>
           </div>
-        </div>
+          <button type="button" className="pp-close" onClick={onClose} aria-label="Ebeveyn panelini kapat">
+            <X aria-hidden="true" />
+          </button>
+        </header>
 
-        {/* PIN Security Gate if not authenticated */}
         {!isAuthenticated ? (
-          <div className="p-6 text-center space-y-6">
-            <div className="space-y-2">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full mx-auto flex items-center justify-center text-3xl shadow-inner">
-                🔑
-              </div>
-              <h3 className="font-game text-gray-800 text-lg font-bold">
-                {parentConfig.pinHash ? 'Ebeveyn PIN Kodunu Girin' : 'Aile PIN’i henüz yüklenmedi'}
-              </h3>
-              <p className="text-xs text-gray-500 font-bold">{parentConfig.pinHash ? 'Onay, bonus ve ebeveyn alanı için ailedeki tüm cihazlarda aynı PIN kullanılır.' : 'İnternet bağlantısını kontrol edin. Aile PIN’i buluttan gelince panel açılır.'}</p>
+          /* PIN kapısı */
+          <div className="pp-body pp-pin">
+            <p className="pp-lead">{parentConfig.pinHash ? 'Aile PIN’ini girin' : 'Aile PIN’i henüz yüklenmedi'}</p>
+            <p className="pp-muted">{parentConfig.pinHash ? 'Ailedeki tüm cihazlarda aynı PIN geçerlidir.' : 'İnternet bağlantısını kontrol edin. PIN buluttan gelince panel açılır.'}</p>
+            <div className={`pp-dots ${pinError ? 'err' : ''}`} aria-hidden="true">
+              {[0, 1, 2, 3].map((idx) => <i key={idx} className={pinInput.length > idx ? 'on' : ''} />)}
             </div>
-
-            {/* PIN Dots Display */}
-            <div className="flex justify-center gap-3">
-              {[0, 1, 2, 3].map((idx) => (
-                <div
-                  key={idx}
-                  className={`w-12 h-14 rounded-2xl border-2 flex items-center justify-center font-game text-2xl transition-all ${
-                    pinError
-                      ? 'border-red-500 bg-red-50 text-red-600 animate-shake'
-                      : pinInput.length > idx
-                      ? 'border-rose-500 bg-rose-50 text-rose-700 font-bold shadow-md'
-                      : 'border-gray-200 bg-gray-50'
-                  }`}
-                >
-                  {pinInput.length > idx ? '●' : ''}
-                </div>
-              ))}
-            </div>
-            <p className={`min-h-5 text-center text-xs font-bold ${pinError ? 'text-rose-600' : 'text-gray-500'}`} role="status">
-              {pinMessage}
-            </p>
-
-            {/* Numeric Keypad */}
-            <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
+            <p className={`pp-pinmsg ${pinError ? 'err' : ''}`} role="status">{pinMessage}</p>
+            <div className="pp-keys">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => handlePinKeyPress(num)}
-                  className="h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 active:bg-rose-200 font-game text-xl text-gray-800 border-b-2 border-gray-300 transition-colors"
-                >
-                  {num}
-                </button>
+                <button key={num} type="button" onClick={() => handlePinKeyPress(num)}>{num}</button>
               ))}
-              <button
-                onClick={() => {
-                  setPinInput('');
-                  setPinError(false);
-                  setPinMessage('PIN 4 rakam olmalı.');
-                }}
-                className="h-12 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-game text-xs font-bold border-b-2 border-rose-300"
-              >
-                Sil
-              </button>
-              <button
-                onClick={() => handlePinKeyPress('0')}
-                className="h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 active:bg-rose-200 font-game text-xl text-gray-800 border-b-2 border-gray-300"
-              >
-                0
-              </button>
-              <div className="h-12 rounded-2xl bg-gray-100 text-gray-400 font-game text-xs font-bold border-b-2 border-gray-200 flex items-center justify-center">4 hane</div>
+              <button type="button" className="soft" onClick={() => { setPinInput(''); setPinError(false); setPinMessage('PIN 4 rakam olmalı.'); }}>Sil</button>
+              <button type="button" onClick={() => handlePinKeyPress('0')}>0</button>
+              <span />
             </div>
           </div>
-        ) : (
-          /* Authenticated Dashboard */
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Dashboard Sub-Tabs */}
-            <div className="relative flex items-center gap-1.5 overflow-x-auto pb-1 pr-5 no-scrollbar border-b border-gray-100 after:pointer-events-none after:absolute after:right-0 after:top-0 after:h-full after:w-8 after:bg-gradient-to-l after:from-white after:to-transparent sm:after:hidden">
-              <button
-                onClick={() => setActiveTab('approvals')}
-	                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-	                  activeTab === 'approvals'
-	                    ? 'bg-emerald-600 text-white shadow-sm'
-	                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-	                }`}
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Onay Bekleyenler ({pendingTasks.length})</span>
-              </button>
+        ) : section === null ? (
+          /* Ana sayfa */
+          <div className="pp-body">
+            {deviceControls && (
+              <section className={`pp-card pp-who ${deviceControls.isActiveDevice ? 'here' : ''}`}>
+                <div className="pp-row">
+                  <div>
+                    <p className="pp-label">RÜZGAR ŞU ANDA KİMİN YANINDA?</p>
+                    <p className="pp-big">{deviceControls.isActiveDevice ? `${deviceControls.adultName || 'Bu telefon'}’ın yanında` : deviceControls.activeDeviceLabel ? `${deviceControls.activeDeviceLabel}` : 'Henüz seçilmedi'}</p>
+                  </div>
+                  <span className="pp-whoicon" aria-hidden="true">{deviceControls.isActiveDevice ? '🧒' : '📱'}</span>
+                </div>
+                <label className="pp-switch">
+                  <input type="checkbox" checked={deviceControls.isActiveDevice} onChange={(event) => deviceControls.onSetActiveDevice(event.target.checked)} />
+                  <span className="track" aria-hidden="true"><span className="knob" /></span>
+                  <span>Rüzgar şu an bu telefonda</span>
+                </label>
+              </section>
+            )}
 
-              <button
-                onClick={() => setActiveTab('add_task')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'add_task'
-                    ? 'bg-rose-500 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>Yeni Görev Ekle</span>
-              </button>
+            <section className="pp-card">
+              <div className="pp-row">
+                <p className="pp-label">ONAY BEKLEYEN GÖREVLER</p>
+                <span className={`pp-count ${pendingTasks.length ? 'on' : ''}`}>{pendingTasks.length}</span>
+              </div>
+              {pendingTasks.length === 0 ? (
+                <p className="pp-muted">Şu an onay bekleyen görev yok. Rüzgar “Bitti!” dediğinde burada görünür.</p>
+              ) : (
+                <>
+                  <ul className="pp-list">
+                    {pendingTasks.map((t) => (
+                      <li key={t.id} className="pp-item">
+                        <span className="pp-ic" aria-hidden="true">{t.imageUrl ? <img src={t.imageUrl} alt="" /> : t.icon}</span>
+                        <span className="pp-itext"><b>{t.title}</b><small>+{t.rewardCoins} puan · {TIME_LABEL[t.timeOfDay] || ''}</small></span>
+                        <button type="button" className="pp-btn soft" onClick={() => onRejectTask(t.id)} aria-label={`${t.title}: tekrar yapsın`}>
+                          <RotateCcw aria-hidden="true" />
+                        </button>
+                        <button type="button" className="pp-btn ok" onClick={() => { onApproveTask(t.id); playCoinSound(soundEnabled); }}>
+                          <Check aria-hidden="true" strokeWidth={3} />Onayla
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {pendingTasks.length > 1 && (
+                    <button type="button" className="pp-wide ok" onClick={() => { onApproveAllTasks(); playCoinSound(soundEnabled); speakText('Tüm bekleyen görevler onaylandı!', speechEnabled); }}>
+                      <Check aria-hidden="true" strokeWidth={3} />Hepsini onayla (+{pendingTasks.reduce((sum, t) => sum + t.rewardCoins, 0)} puan)
+                    </button>
+                  )}
+                  <p className="pp-muted small">↺ “Tekrar yapsın” görevi Rüzgar’a geri gönderir, puan verilmez.</p>
+                </>
+              )}
+            </section>
 
-              <button
-                onClick={() => setActiveTab('bonus')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'bonus'
-                    ? 'bg-purple-500 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Gift className="w-4 h-4" />
-                <span>Bonus Gönder</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('videos')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'videos'
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Youtube className="w-4 h-4" />
-                <span>Video Ekle</span>
-              </button>
-
+            <div className="pp-grid">
               {onOpenVoiceModal && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenVoiceModal();
-                  }}
-                  className="px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sm hover:brightness-110"
-                >
-                  <span>🎙️</span>
-                  <span>Sesli Mesaj Gönder</span>
+                <button type="button" className="pp-tile mor" onClick={() => { onClose(); onOpenVoiceModal(); }}>
+                  <span className="ti" aria-hidden="true"><Mic /></span>
+                  <span className="tt"><b>Sesli mesaj</b><small>Rüzgar’a gönder</small></span>
                 </button>
               )}
-
-              <button
-                onClick={() => setActiveTab('stats')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'stats'
-                    ? 'bg-sky-500 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>İstatistikler</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('activity')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'activity'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <History className="w-4 h-4" />
-                <span>Etkinlik Geçmişi</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`px-3 py-2 rounded-2xl font-game text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === 'settings'
-                    ? 'bg-gray-800 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Ayarlar</span>
-              </button>
+              {SECTIONS.map(({ id, label, detail, Icon, tone }) => (
+                <button key={id} type="button" className={`pp-tile ${tone}`} onClick={() => openSection(id)}>
+                  <span className="ti" aria-hidden="true"><Icon /></span>
+                  <span className="tt"><b>{label}</b><small>{detail}</small></span>
+                </button>
+              ))}
             </div>
-
-            {/* TAB 1: APPROVALS */}
-            {activeTab === 'approvals' && (
-              <div className="space-y-4">
-                {pendingTasks.length > 0 && (
-                  <button
-                    onClick={() => {
-                      onApproveAllTasks();
-                      playCoinSound(soundEnabled);
-                      speakText('Tüm bekleyen görevler onaylandı!', speechEnabled);
-                    }}
-                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-game text-sm font-bold shadow-md border-b-4 border-emerald-700 flex items-center justify-center gap-2 hover:brightness-105"
-                  >
-                    <Check className="w-5 h-5" />
-                    <span>Tüm Bekleyen Görevleri Tek Tıkla Onayla (+🪙)</span>
-                  </button>
-                )}
-
-                {pendingTasks.length === 0 ? (
-                  <div className="bg-gray-50 rounded-2xl p-6 text-center border-2 border-dashed border-gray-200 text-gray-500 space-y-2">
-                    <div className="text-4xl">✅</div>
-                    <div className="font-game text-sm font-bold text-gray-700">
-                      Şu an onay bekleyen görev yok!
-                    </div>
-                    <div className="text-xs">
-                      Rüzgar görev butonuna bastığında onay istekleri burada listelenecektir.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingTasks.map((t) => (
-	                      <div
-	                        key={t.id}
-	                        className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm"
-	                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">{t.icon}</span>
-                          <div>
-                            <h4 className="font-game text-sm font-bold text-gray-800">
-                              {t.title}
-                            </h4>
-	                            <p className="text-xs text-emerald-700 font-bold">
-	                              Ödül: +{t.rewardCoins} Tren Parası 🪙
-	                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              onApproveTask(t.id);
-                              playCoinSound(soundEnabled);
-                            }}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-game text-xs font-bold border-b-2 border-emerald-700 flex items-center gap-1 shadow"
-                          >
-                            <Check className="w-4 h-4" />
-                            <span>Onayla</span>
-                          </button>
-                          <button
-                            onClick={() => onRejectTask(t.id)}
-                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2.5 py-1.5 rounded-xl font-game text-xs font-bold"
-                          >
-                            Yeniden Dene
-                          </button>
-                        </div>
-                      </div>
-	                    ))}
-	                  </div>
-	                )}
-
-	                {completedRoutineTasks.length > 0 && (
-	                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
-	                    <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-	                      <div>
-	                        <h4 className="font-game text-sm font-black text-emerald-900">
-	                          Tamamlanan Rutinler
-	                        </h4>
-	                        <p className="text-xs font-semibold text-emerald-700">
-	                          Yeni güne veya tekrar denemeye açmak istediğin görevi seç.
-	                        </p>
-	                      </div>
-	                      <div className="flex items-center gap-2">
-	                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-700 shadow-sm">
-	                          {completedRoutineTasks.length}
-	                        </span>
-	                        <button
-	                          type="button"
-	                          onClick={() => {
-	                            onReactivateAllRoutineTasks();
-	                            playPopSound(soundEnabled);
-	                            speakText('Tamamlanan rutin görevler tekrar aktif edildi', speechEnabled);
-	                          }}
-	                          className="flex items-center gap-1 rounded-xl border-b-2 border-emerald-800 bg-emerald-600 px-3 py-2 font-game text-[11px] font-black text-white shadow hover:bg-emerald-700"
-	                        >
-	                          <RotateCcw className="h-4 w-4" />
-	                          <span>Tümünü Aktif Et</span>
-	                        </button>
-	                      </div>
-	                    </div>
-	                    <div className="grid gap-2 sm:grid-cols-2">
-	                      {completedRoutineTasks.map((t) => (
-	                        <div
-	                          key={t.id}
-	                          className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white p-2"
-	                        >
-	                          <div className="flex min-w-0 items-center gap-2">
-	                            <span className="text-2xl">{t.icon}</span>
-	                            <div className="min-w-0">
-	                              <div className="truncate font-game text-xs font-black text-gray-800">
-	                                {t.title}
-	                              </div>
-	                              <div className="text-[10px] font-bold text-emerald-700">
-	                                Tamamlandı
-	                              </div>
-	                            </div>
-	                          </div>
-	                          <button
-	                            type="button"
-	                            onClick={() => {
-	                              onReactivateTask(t.id);
-	                              playPopSound(soundEnabled);
-	                              speakText(`${t.title} tekrar aktif edildi`, speechEnabled);
-	                            }}
-	                            className="flex shrink-0 items-center gap-1 rounded-lg border-b-2 border-sky-700 bg-sky-500 px-2.5 py-1.5 font-game text-[10px] font-bold text-white shadow hover:bg-sky-600"
-	                          >
-	                            <RotateCcw className="h-3.5 w-3.5" />
-	                            <span>Tekrar Aktif Et</span>
-	                          </button>
-	                        </div>
-	                      ))}
-	                    </div>
-	                  </div>
-	                )}
-	              </div>
-	            )}
-
-            {/* TAB 2: ADD TASK */}
-            {activeTab === 'add_task' && (
-              <form onSubmit={handleCreateTask} className="space-y-3 bg-gray-50 rounded-2xl p-4 border border-gray-200">
-                <h3 className="font-game text-sm font-bold text-gray-800 flex items-center gap-1">
-                  <Plus className="w-4 h-4 text-rose-500" />
-                  <span>Rüzgar İçin Yeni Rutin Görevi Oluştur</span>
-                </h3>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-600 block mb-1">Görev Başlığı</label>
-                  <input
-                    type="text"
-                    required
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    placeholder="Örn: Yatağımı Topladım"
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-rose-400 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-600 block mb-1">Açıklama / İpucu</label>
-                  <input
-                    type="text"
-                    value={newTaskDesc}
-                    onChange={(e) => setNewTaskDesc(e.target.value)}
-                    placeholder="Örn: Yastık ve yorganı düzelttim"
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-rose-400 outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 block mb-1">İkon (Emoji)</label>
-                    <select
-                      value={newTaskIcon}
-                      onChange={(e) => setNewTaskIcon(e.target.value)}
-                      className="w-full bg-white border border-gray-300 rounded-xl px-2 py-2 text-sm font-bold"
-                    >
-                      {['🪥', '🧸', '🥦', '🧼', '📚', '🌙', '👟', '🎨', '🛏️', '🍎', '🚴', '🐶', '💧', '🧩'].map((ic) => (
-                        <option key={ic} value={ic}>{ic}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 block mb-1">Ödül (🪙)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={newTaskCoins}
-                      onChange={(e) => setNewTaskCoins(Number(e.target.value))}
-                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 block mb-1">Zaman Dilimi</label>
-                    <select
-                      value={newTaskTime}
-                      onChange={(e) => setNewTaskTime(e.target.value as any)}
-                      className="w-full bg-white border border-gray-300 rounded-xl px-2 py-2 text-xs font-bold"
-                    >
-                      <option value="morning">Sabah</option>
-                      <option value="afternoon">Öğle</option>
-                      <option value="evening">Akşam</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-game text-xs font-bold shadow-md border-b-2 border-rose-700"
-                >
-                  Görev Ekle 🚀
-                </button>
-              </form>
-            )}
-
-            {/* TAB 3: SEND BONUS */}
-            {activeTab === 'bonus' && (
-              <form onSubmit={handleCreateBonus} className="space-y-3 bg-purple-50 rounded-2xl p-4 border border-purple-200">
-                <h3 className="font-game text-sm font-bold text-purple-900 flex items-center gap-1">
-                  <Gift className="w-4 h-4 text-purple-600" />
-                  <span>Rüzgar'a Sürpriz Bonus Tren Parası Gönder</span>
-                </h3>
-
-                <div>
-                  <label className="text-xs font-bold text-purple-800 block mb-1">Hediye Başlığı</label>
-                  <input
-                    type="text"
-                    required
-                    value={bonusTitle}
-                    onChange={(e) => setBonusTitle(e.target.value)}
-                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-purple-800 block mb-1">Sevgi Notunuz</label>
-                  <textarea
-                    rows={2}
-                    value={bonusMessage}
-                    onChange={(e) => setBonusMessage(e.target.value)}
-                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-purple-800 block mb-1">Bonus Parası (🪙)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={bonusCoins}
-                      onChange={(e) => setBonusCoins(Number(e.target.value))}
-                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-purple-800 block mb-1">İkon</label>
-                    <select
-                      value={bonusIcon}
-                      onChange={(e) => setBonusIcon(e.target.value)}
-                      className="bg-white border border-purple-300 rounded-xl px-3 py-2 text-sm font-bold"
-                    >
-                      {['🎁', '⭐', '🏆', '🎉', '💖', '🥇'].map((ic) => (
-                        <option key={ic} value={ic}>{ic}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-game text-xs font-bold shadow-md border-b-2 border-purple-800"
-                >
-                  Ekrandan Hediye Kartını Gönder ✨
-                </button>
-              </form>
-            )}
-
-            {/* TAB: YOUTUBE VIDEOS */}
-            {activeTab === 'videos' && (
-              <div className="space-y-4">
-                <form onSubmit={handleCreateVideo} className="space-y-3 bg-red-50 rounded-2xl p-4 border border-red-200">
-                  <h3 className="font-game text-sm font-bold text-red-900 flex items-center gap-1.5">
-                    <Youtube className="w-5 h-5 text-red-600" />
-                    <span>Çocuğunuz İçin YouTube Çizgi Film / Video Ekle</span>
-                  </h3>
-
-                  {videoSuccess && (
-                    <div className="bg-emerald-100 border border-emerald-400 text-emerald-800 text-xs p-2.5 rounded-xl font-bold flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-emerald-600" />
-                      <span>Video eklendi; önce siz kontrol edip "Çocukta göster" onayı vermelisiniz.</span>
-                    </div>
-                  )}
-
-                  {videoError && (
-                    <div className="bg-rose-100 border border-rose-400 text-rose-800 text-xs p-2.5 rounded-xl font-bold">
-                      ⚠️ {videoError}
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-xs font-bold text-red-800 block mb-1">YouTube Video Linki veya Video Kodu *</label>
-                    <input
-                      type="text"
-                      required
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=3G1P2cMYeXw"
-                      className="w-full bg-white border border-red-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-red-400 outline-none font-mono text-gray-800"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-red-800 block mb-1">Video Başlığı *</label>
-                    <input
-                      type="text"
-                      required
-                      value={videoTitle}
-                      onChange={(e) => setVideoTitle(e.target.value)}
-                      placeholder="Örn: Diş Fırçalama Eğlenceli Çizgi Filmi"
-                      className="w-full bg-white border border-red-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-red-400 outline-none text-gray-800"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs font-bold text-red-800 block mb-1">Kategori</label>
-                      <select
-                        value={videoCategory}
-                        onChange={(e) => setVideoCategory(e.target.value)}
-                        className="w-full bg-white border border-red-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800"
-                      >
-                        {['Çizgi Film', 'Diş Fırçalama', 'Uyku Masalı', 'Düzen & Temizlik', 'Eğitici Oyun', 'Şarkılar & Müzik'].map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
+            <p className="pp-muted small pp-status">{cloudStatus}</p>
+          </div>
+        ) : (
+          <div className="pp-body">
+            {/* GÖREVLER */}
+            {section === 'tasks' && (
+              <>
+                <form onSubmit={handleCreateTask} className="pp-card pp-form">
+                  <p className="pp-label">YENİ GÖREV</p>
+                  <label>Görev adı
+                    <input type="text" required value={newTaskTitle} onChange={(e) => { setNewTaskTitle(e.target.value); setTaskMessage(''); }} placeholder="Örn: Ayakkabılarımı dizdim" />
+                  </label>
+                  <label>Kısa açıklama (isteğe bağlı)
+                    <input type="text" value={newTaskDesc} onChange={(e) => setNewTaskDesc(e.target.value)} placeholder="Örn: Kapının önüne yan yana" />
+                  </label>
+                  <div className="pp-cols">
+                    <label>Simge
+                      <select value={newTaskIcon} onChange={(e) => setNewTaskIcon(e.target.value)}>
+                        {['🌟', '🪥', '🧸', '🥦', '🧼', '📚', '🌙', '👟', '🎨', '🛏️', '🍎', '🚴', '🐶', '💧', '🧩'].map((ic) => <option key={ic} value={ic}>{ic}</option>)}
                       </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-red-800 block mb-1">Açıklama</label>
-                      <input
-                        type="text"
-                        value={videoDesc}
-                        onChange={(e) => setVideoDesc(e.target.value)}
-                        placeholder="Örn: Rüzgar için neşeli tren videosu"
-                        className="w-full bg-white border border-red-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-red-400 outline-none text-gray-800"
-                      />
-                    </div>
+                    </label>
+                    <label>Puan
+                      <input type="number" min={1} max={10} value={newTaskCoins} onChange={(e) => setNewTaskCoins(Number(e.target.value))} />
+                    </label>
+                    <label>Zaman
+                      <select value={newTaskTime} onChange={(e) => setNewTaskTime(e.target.value as 'morning' | 'afternoon' | 'evening')}>
+                        <option value="morning">Sabah</option>
+                        <option value="afternoon">Öğle</option>
+                        <option value="evening">Akşam</option>
+                      </select>
+                    </label>
                   </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white rounded-xl font-game text-xs font-bold shadow-md border-b-2 border-red-800 flex items-center justify-center gap-1.5"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Videoyu onay kuyruğuna ekle</span>
-                  </button>
+                  <button type="submit" className="pp-wide ok"><Plus aria-hidden="true" />Görevi ekle</button>
+                  {taskMessage && <p className="pp-note ok" role="status">✓ {taskMessage}</p>}
                 </form>
 
-                {/* Video doğrulama kuyruğu */}
-                {orderedVideos.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-game text-xs font-bold text-gray-700">Video doğrulama kuyruğu ({orderedVideos.length})</h4>
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {orderedVideos.map((vid) => {
-                        const status = vid.moderationStatus || 'pending';
-                        const statusLabel = status === 'approved' ? 'Çocukta gösteriliyor' : status === 'blocked' ? 'Gizlendi' : 'Onay bekliyor';
-                        const statusClass = status === 'approved' ? 'bg-emerald-100 text-emerald-700' : status === 'blocked' ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700';
-                        return (
-                          <div key={vid.id} className="p-2.5 bg-white border border-gray-200 rounded-xl space-y-2 shadow-sm">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 overflow-hidden">
-                                <img src={vid.thumbnailUrl} alt={vid.title} className="w-12 h-8 rounded object-cover flex-shrink-0" />
-                                <div className="truncate">
-                                  <div className="text-xs font-bold text-gray-800 truncate">{vid.title}</div>
-                                  <div className="text-[10px] text-gray-500 font-bold truncate">{vid.category} · YouTube ID: {vid.youtubeId}</div>
-                                  {vid.failureReason && <div className="text-[10px] text-amber-700 font-bold truncate">{vid.failureReason}</div>}
-                                </div>
-                              </div>
-                              <span className={`text-[10px] font-black px-2 py-1 rounded-lg whitespace-nowrap ${statusClass}`}>{statusLabel}</span>
-                            </div>
-                            <div className="flex items-center justify-end gap-1.5">
-                              {status !== 'approved' && onApproveVideo && (
-                                <button type="button" onClick={() => onApproveVideo(vid.id)} className="min-h-9 px-2.5 rounded-lg bg-emerald-600 text-white text-[10px] font-black">Çocukta göster</button>
-                              )}
-                              {status !== 'blocked' && onBlockVideo && (
-                                <button type="button" onClick={() => onBlockVideo(vid.id)} className="min-h-9 px-2.5 rounded-lg bg-gray-100 border border-gray-300 text-gray-700 text-[10px] font-black">Gizle</button>
-                              )}
-                              {onDeleteVideo && (
-                                <button type="button" onClick={() => onDeleteVideo(vid.id)} className="min-h-9 px-2 rounded-lg text-red-500 hover:bg-red-50" title="Kalıcı sil">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                <section className="pp-card">
+                  <div className="pp-row">
+                    <p className="pp-label">TÜM GÖREVLER ({liveTasks.length})</p>
+                    {completedRoutineTasks.length > 0 && (
+                      <button type="button" className="pp-link" onClick={() => { onReactivateAllRoutineTasks(); playPopSound(soundEnabled); }}>
+                        <RotateCcw aria-hidden="true" />Bitenleri yeniden aç
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
+                  <ul className="pp-list">
+                    {liveTasks.map((t) => (
+                      <li key={t.id} className="pp-item">
+                        <span className="pp-ic" aria-hidden="true">{t.imageUrl ? <img src={t.imageUrl} alt="" /> : t.icon}</span>
+                        <span className="pp-itext">
+                          <b>{t.title}</b>
+                          <small>
+                            {TIME_LABEL[t.timeOfDay] || ''} · +{t.rewardCoins} puan · {t.status === 'completed' ? '✓ bitti' : t.status === 'pending_approval' ? '⏳ onayda' : 'yapılacak'}{t.isExtra ? ' · ekstra' : ''}
+                          </small>
+                        </span>
+                        {confirmDeleteId === t.id ? (
+                          <span className="pp-confirm">
+                            <button type="button" className="pp-btn soft" onClick={() => setConfirmDeleteId(null)}>Vazgeç</button>
+                            <button type="button" className="pp-btn danger" onClick={() => { onDeleteTask(t.id); setConfirmDeleteId(null); playPopSound(soundEnabled); }}>Sil</button>
+                          </span>
+                        ) : (
+                          <>
+                            {t.status === 'completed' && !t.isExtra && (
+                              <button type="button" className="pp-btn soft" onClick={() => { onReactivateTask(t.id); playPopSound(soundEnabled); }} aria-label={`${t.title}: yeniden aç`}>
+                                <RotateCcw aria-hidden="true" />
+                              </button>
+                            )}
+                            <button type="button" className="pp-btn soft" onClick={() => setConfirmDeleteId(t.id)} aria-label={`${t.title}: sil`}>
+                              <Trash2 aria-hidden="true" />
+                            </button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="pp-muted small">Silinen görev ailedeki bütün cihazlardan kalkar.</p>
+                </section>
+              </>
             )}
 
-            {/* TAB 4: STATS */}
-            {activeTab === 'stats' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-sky-50 border border-sky-200 rounded-2xl p-3 text-center">
-                    <div className="text-xs font-bold text-sky-700">Toplam Tamamlanan</div>
-                    <div className="font-game text-2xl font-extrabold text-sky-900">{userProfile.totalCompletedTasks} Görev</div>
-                  </div>
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
-                    <div className="text-xs font-bold text-amber-700">Aktif Gün Serisi</div>
-                    <div className="font-game text-2xl font-extrabold text-amber-900">🔥 {userProfile.currentStreak} Gün</div>
-                  </div>
+            {/* BONUS */}
+            {section === 'bonus' && (
+              <form onSubmit={handleCreateBonus} className="pp-card pp-form">
+                <p className="pp-muted">Rüzgar’ın ekranında bir hediye kartı açılır; kartı açınca puan onun olur.</p>
+                <label>Başlık
+                  <input type="text" required value={bonusTitle} onChange={(e) => setBonusTitle(e.target.value)} />
+                </label>
+                <label>Sevgi notun
+                  <textarea rows={2} value={bonusMessage} onChange={(e) => setBonusMessage(e.target.value)} />
+                </label>
+                <div className="pp-cols two">
+                  <label>Puan
+                    <input type="number" min={1} max={20} value={bonusCoins} onChange={(e) => setBonusCoins(Number(e.target.value))} />
+                  </label>
+                  <label>Simge
+                    <select value={bonusIcon} onChange={(e) => setBonusIcon(e.target.value)}>
+                      {['🎁', '⭐', '🏆', '🎉', '💖', '🥇'].map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                    </select>
+                  </label>
                 </div>
+                <button type="submit" className="pp-wide mor"><Gift aria-hidden="true" />Hediye kartını gönder</button>
+              </form>
+            )}
 
-                <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <div>
-                      <h4 className="font-game text-sm font-black text-indigo-900">Günlük ve iletişim özeti</h4>
-                      <p className="text-[11px] font-semibold text-indigo-700">İçerikler yalnızca bu aile alanında görünür; otomatik oynatılmaz.</p>
-                    </div>
-                    <span className="text-2xl">🎙️</span>
+            {/* VİDEOLAR */}
+            {section === 'videos' && (
+              <>
+                <form onSubmit={handleCreateVideo} className="pp-card pp-form">
+                  <p className="pp-label">VİDEO EKLE</p>
+                  <p className="pp-muted">Eklenen video önce onay kuyruğuna girer; siz “Çocukta göster” deyince YouTube’dan doğrulanıp İzle ekranına çıkar.</p>
+                  <label>YouTube bağlantısı
+                    <input type="text" required value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" />
+                  </label>
+                  <label>Başlık
+                    <input type="text" required value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} placeholder="Örn: Diş fırçalama şarkısı" />
+                  </label>
+                  <div className="pp-cols two">
+                    <label>Kategori
+                      <select value={videoCategory} onChange={(e) => setVideoCategory(e.target.value)}>
+                        {['Çizgi Film', 'Diş Fırçalama', 'Uyku Masalı', 'Düzen & Temizlik', 'Eğitici Oyun', 'Şarkılar & Müzik'].map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </label>
+                    <label>Açıklama
+                      <input type="text" value={videoDesc} onChange={(e) => setVideoDesc(e.target.value)} placeholder="İsteğe bağlı" />
+                    </label>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-xl bg-white p-2">
-                      <div className="text-[10px] font-bold text-gray-500">Günlük</div>
-                      <div className="font-game text-lg font-black text-indigo-900">{journalEntries.length}</div>
-                    </div>
-                    <div className="rounded-xl bg-white p-2">
-                      <div className="text-[10px] font-bold text-gray-500">Gelen</div>
-                      <div className="font-game text-lg font-black text-sky-900">{receivedVoiceMessages.length}</div>
-                    </div>
-                    <div className="rounded-xl bg-white p-2">
-                      <div className="text-[10px] font-bold text-gray-500">Gönderilen</div>
-                      <div className="font-game text-lg font-black text-emerald-900">{sentVoiceMessages.length}</div>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-[11px] font-semibold text-indigo-800">
-                    {latestJournal ? `Son günlük: ${latestJournal.title || 'Bugünüm'} · ${new Date(latestJournal.createdAt).toLocaleDateString('tr-TR')}` : 'Henüz günlük kaydı yok. Rüzgar Günlüğüm bölümünden bir kayıt başlatabilir.'}
-                  </p>
+                  {videoError && <p className="pp-note warn" role="alert">{videoError}</p>}
+                  {videoSuccess && <p className="pp-note ok" role="status">✓ Video kuyruğa eklendi. Aşağıdan “Çocukta göster” ile onaylayın.</p>}
+                  <button type="submit" className="pp-wide mavi"><Plus aria-hidden="true" />Onay kuyruğuna ekle</button>
+                </form>
+
+                {orderedVideos.length > 0 && (
+                  <section className="pp-card">
+                    <p className="pp-label">VİDEOLAR ({orderedVideos.length})</p>
+                    <ul className="pp-list">
+                      {orderedVideos.map((vid) => {
+                        const status = vid.moderationStatus || 'pending';
+                        return (
+                          <li key={vid.id} className="pp-item pp-vitem">
+                            <img className="pp-thumb" src={vid.thumbnailUrl} alt="" />
+                            <span className="pp-itext">
+                              <b>{vid.title}</b>
+                              <small className={`st ${status}`}>{status === 'approved' ? '✓ Çocukta gösteriliyor' : status === 'blocked' ? 'Gizlendi' : '⏳ Onay bekliyor'}</small>
+                              {vid.failureReason && <small className="st warn">{vid.failureReason}</small>}
+                            </span>
+                            <span className="pp-vbtns">
+                              {status !== 'approved' && onApproveVideo && <button type="button" className="pp-btn ok" onClick={() => onApproveVideo(vid.id)}>Çocukta göster</button>}
+                              {status !== 'blocked' && onBlockVideo && <button type="button" className="pp-btn soft" onClick={() => onBlockVideo(vid.id)}>Gizle</button>}
+                              {onDeleteVideo && (
+                                confirmDeleteId === vid.id
+                                  ? <button type="button" className="pp-btn danger" onClick={() => { onDeleteVideo(vid.id); setConfirmDeleteId(null); }}>Kalıcı sil</button>
+                                  : <button type="button" className="pp-btn soft" onClick={() => setConfirmDeleteId(vid.id)} aria-label={`${vid.title}: sil`}><Trash2 aria-hidden="true" /></button>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                )}
+              </>
+            )}
+
+            {/* İSTATİSTİK */}
+            {section === 'stats' && (
+              <>
+                <div className="pp-stats">
+                  <div className="pp-stat"><small>Toplam biten görev</small><b>{userProfile.totalCompletedTasks}</b></div>
+                  <div className="pp-stat"><small>Gün serisi</small><b>🔥 {userProfile.currentStreak}</b></div>
+                  <div className="pp-stat"><small>Puan</small><b>{userProfile.coins}</b></div>
                 </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2">
-                  <h4 className="font-game text-xs font-bold text-gray-700">Haftalık Tamamlama Rutin Oranı</h4>
-                  <div className="space-y-1.5">
+                <section className="pp-card">
+                  <p className="pp-label">BU HAFTA RUTİNLER</p>
+                  <div className="pp-week">
                     {weeklyStats.map((day) => {
                       const labels: Record<string, string> = { Paz: 'Pazar', Pzt: 'Pazartesi', Sal: 'Salı', Çar: 'Çarşamba', Per: 'Perşembe', Cum: 'Cuma', Cmt: 'Cumartesi' };
                       const hasData = day.rate !== null;
                       const rate = day.rate ?? 0;
                       return (
-                        <div key={day.dateKey} className="flex items-center gap-2 text-xs font-bold">
-                          <span className="w-20 text-gray-500">{labels[day.label] || day.label}</span>
-                          <div className="flex-1 bg-gray-200 h-3 rounded-full overflow-hidden" aria-label={hasData ? `${rate}% tamamlandı` : 'Henüz veri yok'}>
-                            <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${rate}%` }} />
-                          </div>
-                          <span className={`font-game ${hasData ? 'text-emerald-700' : 'text-gray-400'}`}>{hasData ? `${rate}%` : '—'}</span>
+                        <div key={day.dateKey} className="pp-day">
+                          <span>{labels[day.label] || day.label}</span>
+                          <span className="bar" aria-label={hasData ? `%${rate} tamamlandı` : 'Henüz veri yok'}><i style={{ width: `${rate}%` }} /></span>
+                          <b>{hasData ? `%${rate}` : '—'}</b>
                         </div>
                       );
                     })}
                   </div>
-                </div>
-              </div>
+                </section>
+                <section className="pp-card">
+                  <p className="pp-label">GÜNLÜK VE SESLİ MESAJLAR</p>
+                  <div className="pp-stats in">
+                    <div className="pp-stat"><small>Günlük</small><b>{journalEntries.length}</b></div>
+                    <div className="pp-stat"><small>Rüzgar’dan</small><b>{receivedVoiceMessages.length}</b></div>
+                    <div className="pp-stat"><small>Ona giden</small><b>{sentVoiceMessages.length}</b></div>
+                  </div>
+                  <p className="pp-muted">{latestJournal ? `Son günlük: ${latestJournal.title || 'Bugünüm'} · ${new Date(latestJournal.createdAt).toLocaleDateString('tr-TR')}` : 'Henüz günlük kaydı yok.'}</p>
+                </section>
+              </>
             )}
 
-            {/* TAB: ETKİNLİK GEÇMİŞİ */}
-            {activeTab === 'activity' && (
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-3">
-                  <h3 className="font-game text-sm font-bold text-indigo-900 flex items-center gap-1.5">
-                    <History className="w-4 h-4 text-indigo-600" />
-                    <span>Uygulamada Ne Zaman Ne Yapıldı</span>
-                  </h3>
-                  <p className="text-[11px] font-semibold text-indigo-800 mt-0.5">
-                    Uygulama açılışları, tamamlanan görevler, mağaza alımları ve günlük kayıtları burada, en yeniden eskiye listelenir.
-                  </p>
-                </div>
-
+            {/* GEÇMİŞ */}
+            {section === 'activity' && (
+              <section className="pp-card">
+                <p className="pp-muted">Uygulama açılışları, onaylanan görevler, alışverişler ve günlükler; en yeni en üstte.</p>
                 {activityFeed.length === 0 ? (
-                  <div className="bg-gray-50 rounded-2xl p-6 text-center border-2 border-dashed border-gray-200 text-gray-500 space-y-2">
-                    <div className="text-4xl">🕰️</div>
-                    <div className="font-game text-sm font-bold text-gray-700">Henüz kayıtlı bir etkinlik yok.</div>
-                  </div>
+                  <p className="pp-muted">Henüz kayıtlı bir etkinlik yok.</p>
                 ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {activityFeed.map((item) => (
-                      <div key={item.id} className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm">
-                        <span className="text-xl leading-none mt-0.5">{item.icon}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-game text-xs font-bold text-gray-800 truncate">{item.title}</span>
-                            <span className="text-[10px] font-bold text-gray-400 whitespace-nowrap">{formatActivityTime(item.timestamp)}</span>
-                          </div>
-                          {(item.detail || item.durationMs) && (
-                            <p className="text-[11px] text-gray-500 font-semibold mt-0.5 truncate">
-                              {[item.detail, formatActivityDuration(item.durationMs)].filter(Boolean).join(' · ')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                  <ul className="pp-list">
+                    {activityFeed.slice(0, 150).map((item) => (
+                      <li key={item.id} className="pp-item pp-feed">
+                        <span className="pp-ic" aria-hidden="true">{item.icon}</span>
+                        <span className="pp-itext">
+                          <b>{item.title}</b>
+                          {(item.detail || item.durationMs) && <small>{[item.detail, formatActivityDuration(item.durationMs)].filter(Boolean).join(' · ')}</small>}
+                        </span>
+                        <time className="pp-time">{formatActivityTime(item.timestamp)}</time>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+
+            {/* AYARLAR */}
+            {section === 'settings' && (
+              <>
+                {deviceControls && (
+                  <section className="pp-card">
+                    <p className="pp-label">BU CİHAZ{deviceControls.adultName ? ` · ${deviceControls.adultName.toLocaleUpperCase('tr-TR')}` : ''}</p>
+                    <div className="pp-cols two">
+                      <button type="button" className="pp-wide soft" onClick={deviceControls.onToggleSound}>
+                        {soundEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}{soundEnabled ? 'Ses açık' : 'Ses kapalı'}
+                      </button>
+                      <button type="button" className="pp-wide soft" onClick={deviceControls.onManualSync} disabled={deviceControls.isSyncing}>
+                        <RefreshCw aria-hidden="true" />{deviceControls.isSyncing ? 'Eşitleniyor…' : 'Şimdi eşitle'}
+                      </button>
+                    </div>
+                    <p className="pp-muted small">{cloudStatus}</p>
+                    {deviceControls.onSwitchAccount && (
+                      <button type="button" className="pp-wide soft" onClick={deviceControls.onSwitchAccount}>Bu cihazda çıkış yap / hesap değiştir</button>
+                    )}
+                  </section>
+                )}
+
+                <section className="pp-card pp-form">
+                  <p className="pp-label">ÇOCUK VE PIN</p>
+                  <label>Çocuğun adı
+                    <input type="text" value={editingChildName} onChange={(e) => setEditingChildName(e.target.value)} />
+                  </label>
+                  <label>Yeni aile PIN’i (4 rakam)
+                    <input type="password" autoComplete="new-password" maxLength={4} value={editingPin} inputMode="numeric" pattern="[0-9]*" placeholder="Değiştirmek için yazın"
+                      onChange={(e) => { setEditingPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                  </label>
+                  {editingPin && (
+                    <label>Yeni PIN tekrar
+                      <input type="password" autoComplete="new-password" maxLength={4} value={editingPinAgain} inputMode="numeric" pattern="[0-9]*" placeholder="Aynı 4 rakam"
+                        onChange={(e) => { setEditingPinAgain(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                    </label>
+                  )}
+                  <button type="button" className="pp-wide dark" onClick={handleSaveSettings}>Kaydet</button>
+                  {settingsMessage && <p role="status" className="pp-note">{settingsMessage}</p>}
+                </section>
+
+                <section className="pp-card">
+                  <p className="pp-label">HECE OYUNU SEVİYELERİ</p>
+                  <p className="pp-muted">Açık seviyeler arasında Rüzgar ilerledikçe otomatik geçilir. En az biri açık kalır.</p>
+                  <div className="pp-chips">
+                    {[{ level: 1, note: '2 heceli' }, { level: 2, note: '3 heceli' }, { level: 3, note: '4 heceli' }].map((item) => (
+                      <button key={item.level} type="button" className={activeSyllableLevels.includes(item.level) ? 'on' : ''} aria-pressed={activeSyllableLevels.includes(item.level)} onClick={() => handleToggleSyllableLevel(item.level)}>
+                        <b>Seviye {item.level}</b><small>{item.note}</small>
+                      </button>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                </section>
 
-            {/* TAB 5: SETTINGS */}
-            {activeTab === 'settings' && (
-              <div className="space-y-4 bg-gray-50 rounded-2xl p-4 border border-gray-200">
-                {deviceControls && (
-                  <div className="rounded-2xl border border-gray-200 bg-white p-3 space-y-2">
-                    <p className="text-xs font-bold text-gray-600">Bu cihaz{deviceControls.adultName ? ` · ${deviceControls.adultName}` : ''}</p>
-                    <label className="flex min-h-10 items-center gap-2 text-xs font-bold text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={deviceControls.isActiveDevice}
-                        onChange={(event) => deviceControls.onSetActiveDevice(event.target.checked)}
-                        className="h-5 w-5 accent-emerald-600"
-                      />
-                      <span>Rüzgar şu an bu cihazda (aktif cihaz)</span>
-                    </label>
-                    <p className="text-xs text-gray-500 font-bold">{deviceControls.activeDeviceLabel ? `Şu an aktif cihaz: ${deviceControls.activeDeviceLabel}` : 'Aktif çocuk cihazı henüz seçilmedi.'}</p>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={deviceControls.onToggleSound} className="flex-1 min-h-11 rounded-xl border border-gray-300 bg-gray-50 text-gray-800 font-game text-xs font-bold">{soundEnabled ? '🔊 Sesi kapat' : '🔇 Sesi aç'}</button>
-                      <button type="button" onClick={deviceControls.onManualSync} disabled={deviceControls.isSyncing} className="flex-1 min-h-11 rounded-xl border border-gray-300 bg-gray-50 text-gray-800 font-game text-xs font-bold">{deviceControls.isSyncing ? 'Eşitleniyor…' : '🔄 Şimdi eşitle'}</button>
-                    </div>
-                    <p className="text-xs text-gray-500 font-bold">{cloudStatus}</p>
-                    {deviceControls.onSwitchAccount && (
-                      <button type="button" onClick={deviceControls.onSwitchAccount} className="w-full min-h-11 rounded-xl border border-gray-300 bg-gray-50 text-gray-800 font-game text-xs font-bold">Bu cihazda çıkış yap / hesap değiştir</button>
-                    )}
-                  </div>
-                )}
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 block mb-1">Çocuğunuzun Adı</label>
-                    <input
-                      type="text"
-                      value={editingChildName}
-                      onChange={(e) => setEditingChildName(e.target.value)}
-                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="editing-pin" className="text-xs font-bold text-gray-600 block mb-1">Yeni aile PIN’i (4 hane)</label>
-                    <input
-                      id="editing-pin"
-                      type="password"
-                      autoComplete="new-password"
-                      maxLength={4}
-                      value={editingPin}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="Değiştirmek için 4 rakam yazın"
-                      onChange={(e) => { setEditingPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }}
-                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold font-game"
-                    />
-                  </div>
-                  {editingPin && (
-                    <div>
-                      <label htmlFor="editing-pin-again" className="text-xs font-bold text-gray-600 block mb-1">Yeni PIN tekrarı</label>
-                      <input
-                        id="editing-pin-again"
-                        type="password"
-                        autoComplete="new-password"
-                        maxLength={4}
-                        value={editingPinAgain}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="Yeni PIN’i tekrar yazın"
-                        onChange={(e) => { setEditingPinAgain(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold font-game"
-                      />
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleSaveSettings}
-                    className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-game text-xs font-bold"
-                  >
-                    Ayarları Kaydet 💾
-                  </button>
-                  {settingsMessage && <p role="status" className="text-xs text-gray-500 font-bold">{settingsMessage}</p>}
-                </div>
-
-                <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-3 space-y-2">
-                  <h3 className="font-game text-sm text-purple-900">🎈 Heceleme Oyunu Seviyesi</h3>
-                  <p className="text-[11px] leading-relaxed text-purple-800">
-                    Hangi seviyeler açık olsun? Birden fazla seçebilirsiniz. Rüzgar bir seviyeyi
-                    tamamlayınca (birkaç kelime doğru bulunca) sıradaki açık seviyeye otomatik geçer.
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { level: 1, label: 'Seviye 1', note: '2 Heceli' },
-                      { level: 2, label: 'Seviye 2', note: '3 Heceli' },
-                      { level: 3, label: 'Seviye 3', note: '4 Heceli' },
-                    ].map((item) => {
-                      const isOn = activeSyllableLevels.includes(item.level);
-                      return (
-                        <button
-                          key={item.level}
-                          type="button"
-                          onClick={() => handleToggleSyllableLevel(item.level)}
-                          className={`rounded-xl border-2 py-2 flex flex-col items-center gap-0.5 transition-all active:scale-95 ${
-                            isOn
-                              ? 'bg-purple-600 border-purple-300 text-white shadow-sm'
-                              : 'bg-white border-purple-200 text-purple-400'
-                          }`}
-                        >
-                          <span className="font-game text-xs font-black">{item.label}</span>
-                          <span className="text-[10px] font-bold">{item.note}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border-2 border-sky-200 bg-sky-50 p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-game text-sm text-sky-900">☁️ Anne ve Baba Eşitleme</h3>
-                    <span className="text-[10px] font-bold text-sky-700">{cloudStatus}</span>
-                  </div>
+                <section className="pp-card">
+                  <p className="pp-label">AİLE EŞİTLEMESİ</p>
                   {!cloudConfigured ? (
-                    <p className="text-xs font-semibold leading-relaxed text-sky-900">Firebase bağlantısı henüz eklenmedi. Bağlantı tamamlandığında burada aile kodu görünür.</p>
+                    <p className="pp-muted">Bulut bağlantısı yapılandırılmadı.</p>
                   ) : familyCode ? (
                     <>
-                      <p className="text-xs font-semibold text-sky-900">Diğer telefon için aile kodu:</p>
-                      <div className="rounded-xl bg-white border border-sky-300 px-3 py-2 text-center font-mono font-black tracking-[0.18em] text-sky-800">{familyCode}</div>
+                      <p className="pp-muted">Aile kodu (diğer yetişkinlerin telefonu için):</p>
+                      <div className="pp-code">{familyCode}</div>
                       <button
                         type="button"
+                        className="pp-wide mavi"
                         onClick={async () => {
                           const inviteLink = getFamilyInviteLink(familyCode);
                           try {
                             await navigator.clipboard.writeText(inviteLink);
-                            setInviteMessage('Davet bağlantısı kopyalandı. WhatsApp ile gönderin.');
+                            setInviteMessage('Davet bağlantısı kopyalandı. WhatsApp ile gönderebilirsiniz.');
                           } catch {
                             setInviteMessage(`Davet bağlantısı: ${inviteLink}`);
                           }
                         }}
-                        className="w-full min-h-11 rounded-xl bg-sky-700 text-white font-game text-xs font-bold"
-                      >
-                        🔗 Davet Bağlantısını Kopyala
-                      </button>
-                      <p className="text-[11px] leading-relaxed text-sky-800">Bağlantıyı diğer telefonda açmak yeterlidir: görevler, puanlar, dünya, videolar ve sesli notlar otomatik ortak olur. PIN yalnızca ebeveyn ekranını açar.</p>
-                      {inviteMessage && <p role="status" className="break-all text-[11px] font-bold text-sky-800">{inviteMessage}</p>}
-
-                      <div className="border-t border-sky-200 pt-3 space-y-2">
-                        <p className="text-xs font-bold text-sky-900">Bu Mac'i başka bir aileye bağla</p>
-                        <p className="text-[10px] leading-relaxed text-sky-800">Telefonunuzdaki aile kodunu yazın. Bu cihazdaki eski eşitleme kodu değişir; telefonun buluttaki kayıtları önce güvenle yüklenir.</p>
-                        <div className="flex gap-2">
-                          <input value={joiningCode} onChange={(e) => setJoiningCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="Telefonun aile kodu" className="min-w-0 flex-1 rounded-xl border border-sky-300 bg-white px-3 py-2 text-xs font-bold" />
-                          <button onClick={handleJoin} disabled={joiningCode.length < 8} className="min-h-11 rounded-xl bg-sky-700 px-3 text-xs font-game font-bold text-white disabled:opacity-50">Bağlan</button>
+                      >Davet bağlantısını kopyala</button>
+                      {inviteMessage && <p role="status" className="pp-note">{inviteMessage}</p>}
+                      <details className="pp-more">
+                        <summary>Bu cihazı başka bir aileye bağla</summary>
+                        <p className="pp-muted">Diğer ailenin kodunu yazın. Bu cihazın eşitlemesi o aileye geçer.</p>
+                        <div className="pp-inline">
+                          <input value={joiningCode} onChange={(e) => setJoiningCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="Aile kodu" />
+                          <button type="button" className="pp-btn ok" onClick={handleJoin} disabled={joiningCode.length < 8}>Bağlan</button>
                         </div>
-                      </div>
+                      </details>
                     </>
                   ) : (
-                    <button onClick={async () => setSyncMessage(`Aile kodu hazır: ${await onCreateFamily()}`)} className="w-full min-h-11 rounded-xl bg-sky-600 text-white font-game text-xs font-bold">Aileyi Bu Telefonla Başlat</button>
+                    <>
+                      <button type="button" className="pp-wide mavi" onClick={async () => setSyncMessage(`Aile kodu hazır: ${await onCreateFamily()}`)}>Aileyi bu telefonla başlat</button>
+                      <div className="pp-inline">
+                        <input value={joiningCode} onChange={(e) => setJoiningCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="Diğer telefonun aile kodu" />
+                        <button type="button" className="pp-btn ok" onClick={handleJoin} disabled={joiningCode.length < 8}>Bağlan</button>
+                      </div>
+                    </>
                   )}
-                  {/* Bu cihaz zaten aileye bağlıysa tekrar kod istemeyiz. Aksi
-                      halde davet bağlantısını koda dönüştürmeye çalışmak
-                      gereksiz "kayıt bulunamadı" uyarıları çıkarıyordu. */}
-                  {cloudConfigured && !familyCode && (
-                    <div className="pt-1 flex gap-2">
-                      <input value={joiningCode} onChange={(e) => setJoiningCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="Diğer telefonun aile kodu" className="min-w-0 flex-1 rounded-xl border border-sky-300 bg-white px-3 py-2 text-xs font-bold" />
-                      <button onClick={handleJoin} disabled={joiningCode.length < 8} className="min-h-11 rounded-xl bg-sky-700 px-3 text-xs font-game font-bold text-white disabled:opacity-50">Bağlan</button>
-                    </div>
-                  )}
-                  {syncMessage && <p role="status" className="text-[11px] font-bold text-sky-800">{syncMessage}</p>}
-                </div>
+                  {syncMessage && <p role="status" className="pp-note">{syncMessage}</p>}
+                </section>
 
-                <div className="pt-3 border-t border-gray-200">
-                  <button
-                    onClick={onResetData}
-                    className="w-full py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-game text-xs font-bold border border-red-300 flex items-center justify-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>İlk Güne Dön: Puanları ve Görevleri Sıfırla</span>
-                  </button>
-                </div>
-              </div>
+                <section className="pp-card pp-dangerzone">
+                  <p className="pp-label">İLK GÜNE DÖN</p>
+                  <p className="pp-muted">Puanı başlangıç değerine (6) indirir, görevleri ilk hâline döndürür. Satın almalar ve Dünya yerleşimleri kalır.</p>
+                  {confirmReset ? (
+                    <div className="pp-cols two">
+                      <button type="button" className="pp-wide soft" onClick={() => setConfirmReset(false)}>Vazgeç</button>
+                      <button type="button" className="pp-wide danger" onClick={() => { setConfirmReset(false); onResetData(); }}>Evet, sıfırla</button>
+                    </div>
+                  ) : (
+                    <button type="button" className="pp-wide soft danger-text" onClick={() => setConfirmReset(true)}><Trash2 aria-hidden="true" />Puanları ve görevleri sıfırla…</button>
+                  )}
+                </section>
+              </>
             )}
           </div>
         )}
