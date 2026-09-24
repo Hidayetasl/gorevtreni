@@ -166,6 +166,14 @@ function chooseSyncedWorld(remoteWorld: unknown, localWorld: PlacedWorldItem[]) 
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
+  // Alttaki menüde bulunulan sekmeye yeniden basılınca o bölüm ana menüsünden
+  // başlasın (ör. Öğren → İngilizce → Renkler'deyken "Öğren"e basmak).
+  const [tabResetKey, setTabResetKey] = useState(0);
+  const handleChangeTab = (tab: TabType) => {
+    if (tab === activeTab) setTabResetKey((value) => value + 1);
+    setActiveTab(tab);
+    window.scrollTo({ top: 0 });
+  };
   // Kullanıcı Google hesabı görmez. Firebase anonim oturumu arka planda
   // çalışır; gizli aile bağlantısına katılan cihazlar aynı veriyi eşitler.
   const cloudEnabled = true;
@@ -1059,7 +1067,7 @@ export default function App() {
     <ChildShell
       user={user}
       activeTab={activeTab}
-      onChangeTab={(tab) => setActiveTab(tab)}
+      onChangeTab={handleChangeTab}
       doneTodayCount={completedCount + pendingCount}
       unreadVoiceCount={unreadVoiceCount}
       onOpenVoice={() => openVoiceModal('inbox')}
@@ -1070,6 +1078,7 @@ export default function App() {
         {/* Main Content Body */}
           {activeTab === 'tasks' && (
             <TasksHome
+              key={tabResetKey}
               tasks={liveTasks}
               onMarkTaskDone={handleMarkTaskDone}
               onOpenJournal={() => openJournal('record')}
@@ -1081,6 +1090,7 @@ export default function App() {
 
           {activeTab === 'learn' && (
             <LearnView
+              key={tabResetKey}
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
               syllableGameLevels={user.syllableGameLevels}
@@ -1092,6 +1102,7 @@ export default function App() {
 
           {activeTab === 'world' && (
             <TrainWorldView
+              key={tabResetKey}
               worldItems={world.filter((item) => !item.deletedAt)}
               inventory={shop}
               user={user}
@@ -1106,6 +1117,7 @@ export default function App() {
 
           {activeTab === 'shop' && (
             <ShopView
+              key={tabResetKey}
               shopItems={shop}
               user={user}
               onBuyItem={handleBuyItem}
@@ -1117,6 +1129,7 @@ export default function App() {
 
           {activeTab === 'videos' && (
             <VideosView
+              key={tabResetKey}
               videos={videos}
               parentConfig={parentConfig}
               onVideoStarted={handleVideoStarted}
