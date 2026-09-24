@@ -5,7 +5,8 @@ service cloud.firestore {
     // Yalnızca e-posta/şifre ile giriş yapmış yetişkin hesapları. Eski anonim
     // "çocuk olarak devam" oturumları artık hiçbir aile verisine erişemez.
     function signedIn() {
-      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+      // Yalnızca yetişkin hesapları (e-posta/şifre ya da Google); anonim oturum kabul edilmez.
+      return request.auth != null && request.auth.token.firebase.sign_in_provider in ['password', 'google.com'];
     }
 
     function familyPath(familyCode) {

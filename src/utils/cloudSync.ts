@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { connectAuthEmulator, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type User } from 'firebase/auth';
+import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updatePassword, type User } from 'firebase/auth';
 import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
@@ -118,6 +118,42 @@ export async function signInAdult(email: string, password: string) {
   return credentials.user;
 }
 
+/**
+ * Google hesabıyla giriş. İzin listesi e-postaya göre aynı (Baba/Anne/Anneanne).
+ * Açılır pencere engellenirse yönlendirmeyle devam edilir; o durumda null döner
+ * ve sonuç sayfa geri yüklenince completeGoogleRedirect ile alınır.
+ */
+export async function signInAdultWithGoogle(): Promise<User | null> {
+  const auth = firebaseAuth();
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  let user: User;
+  try {
+    user = (await signInWithPopup(auth, provider)).user;
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    throw error;
+  }
+  if (!getAdultName(user)) {
+    await signOut(auth);
+    throw new Error(`${user.email || 'Bu Google hesabı'} izinli aile hesaplarından biri değil.`);
+  }
+  return user;
+}
+
+/** Yönlendirmeli Google girişi döndüğünde hatayı yakalar (başarı onAuthStateChanged ile gelir). */
+export async function completeGoogleRedirect() {
+  const result = await getRedirectResult(firebaseAuth());
+  if (result?.user && !getAdultName(result.user)) {
+    await signOut(firebaseAuth());
+    throw new Error(`${result.user.email || 'Bu Google hesabı'} izinli aile hesaplarından biri değil.`);
+  }
+}
+
 /** Şu an giriş yapmış hesabın kimliği (yoksa boş). */
 export function getCurrentUid() {
   return isCloudConfigured ? firebaseAuth().currentUser?.uid || '' : '';
@@ -142,6 +178,11 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-email': 'E-posta adresi geçerli görünmüyor.',
   'auth/missing-password': 'Şifre yazın.',
   'auth/requires-recent-login': 'Güvenlik için yeniden giriş yapmanız gerekiyor.',
+  'auth/popup-closed-by-user': 'Google penceresi kapatıldı. Tekrar deneyin.',
+  'auth/cancelled-popup-request': 'Google penceresi kapatıldı. Tekrar deneyin.',
+  'auth/unauthorized-domain': 'Bu adres Firebase’de yetkili değil (Authorized domains).',
+  'auth/operation-not-allowed': 'Bu giriş yöntemi Firebase’de henüz açık değil.',
+  'auth/account-exists-with-different-credential': 'Bu e-posta başka bir giriş yöntemiyle kayıtlı. E-posta ve şifreyle deneyin.',
   'auth/weak-password': 'Bu şifre çok zayıf. En az 8 karakter, harf ve rakam kullanın.',
   'auth/invalid-credential': 'E-posta veya şifre hatalı.',
   'auth/invalid-login-credentials': 'E-posta veya şifre hatalı.',

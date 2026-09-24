@@ -60,3 +60,8 @@
 .ag-box { background: #f4f8f8; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ag-code { font-family: ui-monospace, Menlo, monospace; font-weight: 800; font-size: 18px; letter-spacing: .12em; text-align: center; word-break: break-all; }
 @media (prefers-reduced-motion: reduce) { .ag-spin { animation: none; } }
+
+/* Google ile giriş: Google'ın beyaz düğme stili */
+.ag-google { min-height: 60px; width: 100%; border: 2px solid #dadce0; border-radius: 18px; background: #fff; color: #1f1f1f; font: 800 18px/1 inherit; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 3px 0 #dadce0; }
+.ag-google:active { transform: translateY(2px); box-shadow: 0 1px 0 #dadce0; }
+.ag-google:disabled { opacity: .6; cursor: default; }
