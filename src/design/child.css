@@ -283,6 +283,13 @@
 .gt .gt-whorn { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 32px; background: var(--gt-turuncu) !important; border: 4px solid #fff !important; box-shadow: 0 4px 12px rgba(0, 0, 0, .25) !important; transition: transform .12s; }
 .gt .gt-whorn:active { transform: scale(.92); }
 .gt-wpanel .gt-cats { flex-wrap: wrap; overflow: visible; }
+.gt-world .gt-menu, .gt-world .gt-menu-hint { margin-left: 0; margin-right: 0; }
+.gt-menu.world .gt-menu-card:first-child { grid-column: 1 / -1; flex-direction: row; gap: 16px; min-height: 120px; }
+.gt-menu.world .gt-menu-card:first-child .t { text-align: left; }
+.gt-menu-card.w-ride { box-shadow: inset 0 -6px 0 var(--gt-mavi-s), 0 3px 0 var(--gt-line); }
+.gt-menu-card.w-builder { box-shadow: inset 0 -6px 0 var(--gt-yesil-s), 0 3px 0 var(--gt-line); }
+.gt-menu-card.w-garage { box-shadow: inset 0 -6px 0 var(--gt-turuncu-s), 0 3px 0 var(--gt-line); }
+.gt-world .gt-subhead { padding-top: 14px; }
 /* Tam ekranda kumanda paneli alttan açılan sayfa olur. */
 .gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { background: var(--gt-sky) !important; }
 .gt .world-ride-layout.is-fullscreen .world-ride-canvas-shell { border: 0 !important; }
@@ -345,6 +352,9 @@
   .gt-menu-card .t { font-size: 20px; }
   .gt-menu.cats .gt-menu-card { min-height: 150px; }
   .gt-subhead { flex-wrap: nowrap; }
+  .gt-menu.world { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gt-menu.world .gt-menu-card:first-child { grid-column: auto; flex-direction: column; min-height: 190px; }
+  .gt-menu.world .gt-menu-card:first-child .t { text-align: center; }
   .gt-subhead h1 { order: 0; flex: 1; font-size: 28px; }
   .gt-subhead .gt-goal { margin-left: 0; }
   .gt-letters { grid-template-columns: repeat(8, minmax(0, 1fr)); }
