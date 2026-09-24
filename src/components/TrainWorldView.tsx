@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext } from '../utils/audio';
 import { ArrowLeft, Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
+import { HangarIcon } from './child/HangarIcon';
 
 // Import generated cartoon assets
 import cartoonBg from '../assets/images/bos-genis.webp';
@@ -37,10 +38,10 @@ interface TrainWorldViewProps {
 
 // menu = Dünya'nın giriş ekranı (üç büyük kutu); diğerleri tek başına açılır.
 type ViewMode = 'menu' | 'ride' | 'builder' | 'garage';
-const WORLD_SECTIONS: Array<{ id: Exclude<ViewMode, 'menu'>; label: string; detail: string; icon: string }> = [
+const WORLD_SECTIONS: Array<{ id: Exclude<ViewMode, 'menu'>; label: string; detail: string; icon: React.ReactNode }> = [
   { id: 'ride', label: 'Treni sür', detail: 'Kumandayı kullan', icon: '🚂' },
   { id: 'builder', label: 'Kasabayı kur', detail: 'Parçaları yerleştir', icon: '🗺️' },
-  { id: 'garage', label: 'Vagonlarım', detail: 'Tren, vagon, manzara', icon: '🎒' },
+  { id: 'garage', label: 'Hangar', detail: 'Satın aldığın her şey', icon: <HangarIcon className="gt-hangar" /> },
 ];
 type EnvironmentTheme = 'farm' | 'mountains' | 'sunset' | 'night';
 
@@ -864,7 +865,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             <button type="button" className="gt-back" onClick={backToMenu} aria-label="Dünya menüsüne geri dön">
               <span className="ar" aria-hidden="true"><ArrowLeft strokeWidth={3.5} /></span>Geri
             </button>
-            <h1>{WORLD_SECTIONS.find((section) => section.id === viewMode)?.icon} {WORLD_SECTIONS.find((section) => section.id === viewMode)?.label}</h1>
+            <h1 className="gt-wtitle">{WORLD_SECTIONS.find((section) => section.id === viewMode)?.icon} {WORLD_SECTIONS.find((section) => section.id === viewMode)?.label}</h1>
             {viewMode === 'ride' && <span className="gt-goal">⭐ <b>{cockpitProgress.score}/25</b></span>}
           </div>
           {viewMode === 'ride' && <p className="gt-wmsg" role="status">{interactiveMessage}</p>}
@@ -1597,39 +1598,6 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
         </div>
       )}
 
-      {viewMode === 'garage' && (
-      <section className="gt-wpanel" aria-label="Vagonlar ve manzara">
-        <span className="gt-label">VAGONLAR</span>
-        <div className="gt-cats">
-          {([
-            ['passenger', '🚃', 'Yolcu'],
-            ['cargo_coins', '🪙', 'Altın'],
-            ['cargo_fruits', '🍎', 'Meyve'],
-            ['cargo_toys', '🧸', 'Oyuncak'],
-          ] as const).map(([type, icon, label]) => (
-            <button key={type} type="button" className={`gt-cat ${attachedWagons.includes(type) ? 'on' : ''}`} aria-pressed={attachedWagons.includes(type)} onClick={() => toggleWagon(type)}>
-              <span aria-hidden="true">{icon}</span>{label}
-            </button>
-          ))}
-        </div>
-        <span className="gt-label">MANZARA</span>
-        <div className="gt-cats">
-          {([
-            ['farm', '🌾', 'Çiftlik'],
-            ['sunset', '🌅', 'Gün batımı'],
-            ['night', '🌙', 'Gece'],
-          ] as const).map(([theme, icon, label]) => (
-            <button key={theme} type="button" className={`gt-cat ${envTheme === theme ? 'on' : ''}`} aria-pressed={envTheme === theme} onClick={() => setEnvTheme(theme)}>
-              <span aria-hidden="true">{icon}</span>{label}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="gt-big turkuaz" onClick={() => openSection('ride')}>
-          <span aria-hidden="true">🚂</span>Treni sür
-        </button>
-      </section>
-      )}
-
       {(viewMode === 'builder' || viewMode === 'garage') && (
       <section className="gt-wpanel gt-winv" aria-labelledby="world-inventory-title">
         <div className="gt-wrow">
@@ -1688,6 +1656,39 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             })}
           </div>
         )}
+
+      {viewMode === 'garage' && (
+      <section className="gt-wpanel" aria-label="Vagonlar ve manzara">
+        <span className="gt-label">VAGONLAR</span>
+        <div className="gt-cats">
+          {([
+            ['passenger', '🚃', 'Yolcu'],
+            ['cargo_coins', '🪙', 'Altın'],
+            ['cargo_fruits', '🍎', 'Meyve'],
+            ['cargo_toys', '🧸', 'Oyuncak'],
+          ] as const).map(([type, icon, label]) => (
+            <button key={type} type="button" className={`gt-cat ${attachedWagons.includes(type) ? 'on' : ''}`} aria-pressed={attachedWagons.includes(type)} onClick={() => toggleWagon(type)}>
+              <span aria-hidden="true">{icon}</span>{label}
+            </button>
+          ))}
+        </div>
+        <span className="gt-label">MANZARA</span>
+        <div className="gt-cats">
+          {([
+            ['farm', '🌾', 'Çiftlik'],
+            ['sunset', '🌅', 'Gün batımı'],
+            ['night', '🌙', 'Gece'],
+          ] as const).map(([theme, icon, label]) => (
+            <button key={theme} type="button" className={`gt-cat ${envTheme === theme ? 'on' : ''}`} aria-pressed={envTheme === theme} onClick={() => setEnvTheme(theme)}>
+              <span aria-hidden="true">{icon}</span>{label}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="gt-big turkuaz" onClick={() => openSection('ride')}>
+          <span aria-hidden="true">🚂</span>Treni sür
+        </button>
+      </section>
+      )}
       </section>
       )}
     </div>

@@ -290,6 +290,8 @@
 .gt-menu-card.w-builder { box-shadow: inset 0 -6px 0 var(--gt-yesil-s), 0 3px 0 var(--gt-line); }
 .gt-menu-card.w-garage { box-shadow: inset 0 -6px 0 var(--gt-turuncu-s), 0 3px 0 var(--gt-line); }
 .gt-world .gt-subhead { padding-top: 14px; }
+.gt-hangar { display: inline-block; width: 70px; height: 70px; }
+.gt-wtitle .gt-hangar { width: 34px; height: 34px; vertical-align: -6px; }
 /* Tam ekranda kumanda paneli alttan açılan sayfa olur. */
 .gt .world-ride-layout.is-fullscreen.cockpit-open .world-control-sidebar.gt-wc { background: var(--gt-sky) !important; }
 .gt .world-ride-layout.is-fullscreen .world-ride-canvas-shell { border: 0 !important; }
@@ -353,6 +355,7 @@
   .gt-menu.cats .gt-menu-card { min-height: 150px; }
   .gt-subhead { flex-wrap: nowrap; }
   .gt-menu.world { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gt-menu-card .gt-hangar { width: 84px; height: 84px; }
   .gt-menu.world .gt-menu-card:first-child { grid-column: auto; flex-direction: column; min-height: 190px; }
   .gt-menu.world .gt-menu-card:first-child .t { text-align: center; }
   .gt-subhead h1 { order: 0; flex: 1; font-size: 28px; }
