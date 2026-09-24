@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
-import { Volume2, RotateCcw, Mic, ChevronLeft } from 'lucide-react';
+import { Volume2, RotateCcw, Mic, ArrowLeft } from 'lucide-react';
 
 interface LearnViewProps {
   soundEnabled: boolean;
@@ -757,7 +757,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     <div>
       <div className="gt-head gt-subhead">
         <button type="button" className="gt-back" onClick={handleBack} aria-label={`${backLabel} bölümüne geri dön`}>
-          <ChevronLeft aria-hidden="true" strokeWidth={3} />Geri
+          <span className="ar" aria-hidden="true"><ArrowLeft strokeWidth={3.5} /></span>Geri
         </button>
         <h1>{screenTitle}</h1>
         <span className="gt-goal coin" aria-label={`Her ${answersPerCoin} doğru cevapta 1 puan. Şu an ${answersTowardNextCoin}`}>
