@@ -9,7 +9,7 @@ import taskEatMealImg from '../assets/images/gorev-yemek.webp';
 import taskWashHandsImg from '../assets/images/gorev-el-yikama.webp';
 import taskToiletFlushImg from '../assets/images/gorev-tuvalet.webp';
 import taskSleepBedImg from '../assets/images/gorev-uyku.webp';
-import taskDeskStudyImg from '../assets/images/ruzgar-gunluk.jpg';
+import taskDeskStudyImg from '../assets/images/gorev-gunluk.webp';
 
 const STORAGE_KEYS = {
   TASKS: 'ruzgar_tasks_v4',
