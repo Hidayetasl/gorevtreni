@@ -49,6 +49,7 @@ import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
+import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
 import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
@@ -85,61 +86,6 @@ function getLocalDateKey(value: Date | string = new Date()) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-/**
- * Bir kaydın yeni sürümü, üzerine kurulduğu sürümden her zaman daha yeni
- * damgalanır. Saati geri kalmış bir cihazın yaptığı onay/işaretleme,
- * birleştirmede "eski" sayılıp kaybolmaz.
- */
-function stampAfter(previous?: string) {
-  const prev = Date.parse(previous || '');
-  return new Date(Math.max(Date.now(), Number.isFinite(prev) ? prev + 1 : 0)).toISOString();
-}
-
-/** Alan sırasından ve boş (undefined/null) alanlardan bağımsız içerik karşılaştırması. */
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value as Record<string, unknown>)
-      .filter((key) => (value as Record<string, unknown>)[key] !== undefined && (value as Record<string, unknown>)[key] !== null)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-/**
- * Birleştirme sonucunda buluttakinden içerik olarak farklı (yerelden gelen) bir
- * kayıt kaldı mı? Kimlik değil içerik karşılaştırılır; aksi halde aynı veriyi
- * taşıyan iki kopya "farklı" sayılıp cihazlar birbirine sonsuz kez yazıyordu.
- */
-/**
- * Buluttaki ve bu cihazdaki sesli mesajları birleştirir. Bulutta olmayan yerel
- * mesajlar eklenir; bir tarafta silinmiş (deletedAt) mesaj silinmiş kalır ki
- * silinen mesaj bir sonraki eşitlemede geri gelmesin.
- */
-function combineVoiceMessages(remote: VoiceMessage[], local: VoiceMessage[]) {
-  const localById = new Map(local.map((message) => [message.id, message]));
-  const combined = remote.map((message) => {
-    const mine = localById.get(message.id);
-    const deletedAt = message.deletedAt || mine?.deletedAt;
-    return deletedAt && !message.deletedAt ? { ...message, deletedAt, audioUrl: undefined, isNew: false } : message;
-  });
-  for (const message of local) {
-    if (!remote.some((remoteMessage) => remoteMessage.id === message.id)) combined.push(message);
-  }
-  return combined;
-}
-
-function mergeKeptLocal<T extends { id: string }>(remote: T[] = [], merged: T[] = []) {
-  if (remote.length !== merged.length) return true;
-  const remoteById = new Map(remote.map((item) => [item.id, item]));
-  return merged.some((item) => {
-    const remoteItem = remoteById.get(item.id);
-    return remoteItem !== item && stableStringify(remoteItem) !== stableStringify(item);
-  });
 }
 
 // Ailenin başlangıç bakiyesi kaydı. Tarihi en başa sabitlenir; böylece hiçbir

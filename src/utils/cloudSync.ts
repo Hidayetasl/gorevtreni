@@ -3,7 +3,9 @@ import { connectAuthEmulator, getAuth, onAuthStateChanged, sendPasswordResetEmai
 import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
-import { mergeVideosById } from './videoOrder';
+import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages } from './syncMerge';
+// Uygulama bu birleştirme kurallarını cloudSync üzerinden de kullanır.
+export { mergeById, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems } from './syncMerge';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
 const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || (
@@ -292,105 +294,6 @@ async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
       return { ...message, audioUrl: undefined };
     }
   }));
-}
-
-/**
- * Uygulamanın diğer verileri tek aile belgesinde duruyor. İki telefon aynı
- * anda eşitlerken eski bir kopyanın yeni sesli notları silmesini önlemek için
- * sesli not listesini kimliğine göre birleştiriyoruz.
- */
-function mergeVoiceMessages(remote: VoiceMessage[], local: VoiceMessage[]) {
-  const messages = new Map<string, VoiceMessage>();
-  for (const message of remote) messages.set(message.id, message);
-  for (const message of local) {
-    const existing = messages.get(message.id);
-    // Storage'a daha önce çıkmış indirme adresini, yerel data: URL ile geri
-    // ezme. Böylece diğer telefonlar gerçek ses dosyasını dinleyebilir.
-    const remoteAudio = existing?.audioUrl?.startsWith('http') ? existing.audioUrl : undefined;
-    // Silme her iki taraftan da kalıcıdır: bir cihaz silmişse mesaj geri gelmez.
-    const deletedAt = message.deletedAt || existing?.deletedAt;
-    messages.set(message.id, deletedAt
-      ? { ...existing, ...message, deletedAt, audioUrl: undefined, isNew: false }
-      : { ...existing, ...message, audioUrl: remoteAudio ?? message.audioUrl ?? existing?.audioUrl });
-  }
-  return [...messages.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-// Video ekleme işlemi de iki cihazdan gelebilir. Eski bir telefonun boş/önceki
-// listesi, Mac'te yeni eklenen videoyu artık silemez.
-function mergeVideos(remote: StoryVideo[], local: StoryVideo[]) {
-  return mergeVideosById(remote, local);
-}
-
-export function mergeById<T extends { id: string; updatedAt?: string; deletedAt?: string }>(remote: T[] = [], local: T[] = [], includeDeleted = false) {
-  const entries = new Map<string, T>();
-  const timestamp = (value?: string) => {
-    const parsed = Date.parse(value || '');
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
-  for (const entry of remote) entries.set(entry.id, entry);
-  for (const entry of local) {
-    const existing = entries.get(entry.id);
-    if (!existing || timestamp(entry.updatedAt) >= timestamp(existing.updatedAt)) entries.set(entry.id, entry);
-  }
-  return [...entries.values()].filter((entry) => includeDeleted || !entry.deletedAt);
-}
-
-/**
- * Mağaza ürünleri: satın alma geri alınmaz. Bir ürün bulutta ya da bu cihazda
- * "alındı" ise alınmış sayılır; eski bir cihazın kopyası (ya da zaman damgası
- * kaybolmuş bir kayıt) satın alınmış bir ürünü asla yeniden kilitleyemez.
- */
-export function mergeShopUnlocks(remote: ShopItem[] = [], local: ShopItem[] = []): ShopItem[] {
-  const localById = new Map(local.map((item) => [item.id, item]));
-  const result = remote.map((item) => {
-    const mine = localById.get(item.id);
-    if (!mine) return item;
-    localById.delete(item.id);
-    const unlocked = Boolean(item.unlocked || mine.unlocked);
-    const updatedAt = [item.updatedAt, mine.updatedAt].filter(Boolean).sort().pop();
-    return { ...item, unlocked, ...(updatedAt ? { updatedAt } : {}) };
-  });
-  return [...result, ...localById.values()];
-}
-
-/**
- * Puan defterinde parası ödenmiş (`purchase-<ürün>`) ama kilitli görünen ürünleri
- * açar. Eski sürümdeki eşitleme hatası yüzünden kaybolmuş satın almalar, canlı
- * veriye geçildiğinde böylece kendiliğinden geri gelir. Değişiklik yoksa aynı
- * diziyi döndürür.
- */
-export function unlockPaidItems(shop: ShopItem[], ledger: CoinLedgerEntry[] = []): ShopItem[] {
-  const paid = new Set(
-    ledger
-      .filter((entry) => entry.type === 'purchase' && entry.coinDelta < 0)
-      .map((entry) => entry.referenceId || entry.id.replace(/^purchase-/, '')),
-  );
-  // Gerçek ödüller tekrar alınabilir; onların kilidi hiç açılmaz.
-  const shouldUnlock = (item: ShopItem) => !item.unlocked && item.type !== 'real_reward' && paid.has(item.id);
-  if (!shop.some(shouldUnlock)) return shop;
-  return shop.map((item) => (shouldUnlock(item) ? { ...item, unlocked: true } : item));
-}
-
-/**
- * Puan hareketleri değişmez kayıtlardır. Aynı kimlikte iki kayıt varsa buluttaki
- * kazanır; böylece bir cihazın kendi "başlangıç bakiyesi" kopyası ailenin
- * bakiyesini asla ezemez. Yalnızca bulutta olmayan yeni hareketler eklenir.
- */
-export function mergeCoinLedger(remote: CoinLedgerEntry[] = [], local: CoinLedgerEntry[] = []) {
-  const entries = new Map<string, CoinLedgerEntry>();
-  for (const entry of local) entries.set(entry.id, entry);
-  for (const entry of remote) entries.set(entry.id, entry);
-  return [...entries.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-}
-
-// Etkinlik geçmişi (uygulama açılışı, görev onayı, satın alma) kimliğe göre
-// birleştirilir; hiçbir cihaz diğerinin kaydını manuel/otomatik eşitlemede silemez.
-function mergeActivityLog(remote: ActivityLogEntry[] = [], local: ActivityLogEntry[] = []) {
-  const entries = new Map<string, ActivityLogEntry>();
-  for (const entry of remote) entries.set(entry.id, entry);
-  for (const entry of local) entries.set(entry.id, entry);
-  return [...entries.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 300);
 }
 
 function removeUndefinedFields(value: unknown): unknown {
