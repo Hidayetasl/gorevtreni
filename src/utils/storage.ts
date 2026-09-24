@@ -173,10 +173,10 @@ export const INITIAL_SHOP: ShopItem[] = [
   { id: 'wagon-coins', name: 'Altın & Hazine Vagonu', category: 'wagons', price: 10, icon: '🪙', description: 'İçinde parlayan altınlar olan hazine vagonu', unlocked: true, type: 'wagon', wagonType: 'cargo_coins' },
   { id: 'wagon-fruits', name: 'Meyve Vagonu', category: 'wagons', price: 10, icon: '🍎', description: 'Taze elma ve muz taşıyan neşeli vagon', unlocked: true, type: 'wagon', wagonType: 'cargo_fruits' },
   { id: 'wagon-toys', name: 'Oyuncak Vagonu', category: 'wagons', price: 15, icon: '🧸', description: 'Sevimli ayıcıklar ve hediyelerle dolu vagon', unlocked: false, type: 'wagon', wagonType: 'cargo_toys' },
-  { id: 'wagon-animals', name: 'Hayvan Dostlar Vagonu', category: 'wagons', price: 15, icon: '🦁', description: 'Aslan, zürafa ve sevimli hayvanlar vagonu', unlocked: false, type: 'wagon', wagonType: 'cargo_animals' },
+  { id: 'wagon-animals', name: 'Yük Vagonu', category: 'wagons', price: 15, icon: '📦', description: 'Tahta kasalarla dolu turkuaz yük vagonu', unlocked: false, type: 'wagon', wagonType: 'cargo_animals' },
   { id: 'wagon-candy', name: 'Şeker & Dondurma Vagonu', category: 'wagons', price: 20, icon: '🍦', description: 'Renkli dondurmalar ve tatlı şekerler vagonu', unlocked: false, type: 'wagon', wagonType: 'cargo_candy' },
   { id: 'wagon-space', name: 'Uzay & Roket Vagonu', category: 'wagons', price: 25, icon: '🚀', description: 'Uzay roketleri ve yıldızlar taşıyan vagon', unlocked: false, type: 'wagon', wagonType: 'cargo_space' },
-  { id: 'wagon-passenger-green', name: 'Yeşil Yolcu Vagonu', category: 'wagons', price: 15, icon: '🚋', description: 'Sincap Köy hattında ikinci yolcu vagonu', unlocked: false, type: 'wagon', wagonType: 'passenger_green' },
+  { id: 'wagon-passenger-green', name: 'Mor Yolcu Vagonu', category: 'wagons', price: 15, icon: '🚋', description: 'Sincap Köy hattında ikinci, mor yolcu vagonu', unlocked: false, type: 'wagon', wagonType: 'passenger_green' },
 
   // Scenery & Decorations (1 to 6 coins)
   { id: 'scenery-tree', name: 'Yeşil Çam Ağacı', category: 'scenery', price: 5, icon: '🌳', description: 'Rayların yanına dikilen sevimli doğa ağacı', unlocked: true, type: 'decoration' },

@@ -26,9 +26,11 @@ import urunTrackBridge from '../assets/images/urun-track-bridge.webp';
 import urunTrackStation from '../assets/images/urun-track-station.webp';
 import urunTrackTunnel from '../assets/images/urun-track-tunnel.webp';
 import urunTrainSteam from '../assets/images/urun-train-steam.webp';
+import urunWagonAnimals from '../assets/images/urun-wagon-animals.webp';
 import urunWagonCoins from '../assets/images/urun-wagon-coins.webp';
 import urunWagonFruits from '../assets/images/urun-wagon-fruits.webp';
 import urunWagonPassenger from '../assets/images/urun-wagon-passenger.webp';
+import urunWagonPassengerGreen from '../assets/images/urun-wagon-passenger-green.webp';
 import urunWagonToys from '../assets/images/urun-wagon-toys.webp';
 
 export const SCENERY_IMAGES: Record<string, string> = {
@@ -58,8 +60,10 @@ export const SCENERY_IMAGES: Record<string, string> = {
   'track-station': urunTrackStation,
   'track-tunnel': urunTrackTunnel,
   'train-steam': urunTrainSteam,
+  'wagon-animals': urunWagonAnimals,
   'wagon-coins': urunWagonCoins,
   'wagon-fruits': urunWagonFruits,
   'wagon-passenger': urunWagonPassenger,
+  'wagon-passenger-green': urunWagonPassengerGreen,
   'wagon-toys': urunWagonToys,
 };

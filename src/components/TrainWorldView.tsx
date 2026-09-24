@@ -26,8 +26,9 @@ import pandaLocomotive from '../assets/images/cartoon_panda_locomotive_178540009
 import merkezGarImg from '../assets/images/sincap-koy-gari-v2.webp';
 import lokomotifImg from '../assets/images/lokomotif-yesil.webp';
 import yolcuVagonuKirmiziImg from '../assets/images/yolcu-vagonu-kirmizi.webp';
-import yolcuVagonuYesilImg from '../assets/images/yolcu-vagonu-yesil.webp';
 import yukVagonuImg from '../assets/images/yuk-vagonu.webp';
+import yukVagonuTurkuazImg from '../assets/images/yuk-vagonu-turkuaz.webp';
+import yolcuVagonuMorImg from '../assets/images/yolcu-vagonu-mor.webp';
 import altinVagonuImg from '../assets/images/altin-vagonu.webp';
 import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
@@ -236,7 +237,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [trainImagesReady, setTrainImagesReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    const sources = [lokomotifImg, yolcuVagonuKirmiziImg, yolcuVagonuYesilImg, yukVagonuImg, altinVagonuImg, elmaVagonuImg, oyuncakVagonuImg];
+    const sources = [lokomotifImg, yolcuVagonuKirmiziImg, yolcuVagonuMorImg, yukVagonuImg, yukVagonuTurkuazImg, altinVagonuImg, elmaVagonuImg, oyuncakVagonuImg];
     Promise.all(
       sources.map(
         (src) =>
@@ -1267,8 +1268,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
                     {type === 'passenger_green' && (
                       <img
-                        src={yolcuVagonuYesilImg}
-                        alt="Yeşil Yolcu Vagonu"
+                        src={yolcuVagonuMorImg}
+                        alt="Mor Yolcu Vagonu"
                         width={480}
                         height={319}
                         className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
@@ -1309,8 +1310,18 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                       />
                     )}
 
-                    {(type === 'cargo_animals' ||
-                      type === 'cargo_candy' ||
+                    {type === 'cargo_animals' && (
+                      <img
+                        src={yukVagonuTurkuazImg}
+                        alt="Yük Vagonu"
+                        width={480}
+                        height={319}
+                        className="shrink-0 h-9 sm:h-14 w-auto object-contain mb-0.5"
+                        draggable={false}
+                      />
+                    )}
+
+                    {(type === 'cargo_candy' ||
                       type === 'cargo_space') && (
                       <img
                         src={yukVagonuImg}
