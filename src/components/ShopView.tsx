@@ -21,7 +21,7 @@ interface ShopViewProps {
 }
 
 const CATEGORIES: Array<{ id: ShopCategory; label: string; detail: string; icon: string; image: string }> = [
-  { id: 'rewards', label: 'Gerçek ödüller', detail: 'Büyüğünle birlikte al', icon: '🎁', image: magazaOduller },
+  { id: 'rewards', label: 'Gerçek ödüller', detail: 'İstediğin kadar alabilirsin', icon: '🎁', image: magazaOduller },
   { id: 'trains', label: 'Trenler', detail: 'Yeni lokomotifler', icon: '🚂', image: magazaTrenler },
   { id: 'wagons', label: 'Vagonlar', detail: 'Trenine vagon ekle', icon: '🚃', image: magazaVagonlar },
   { id: 'tracks', label: 'Raylar', detail: 'Köprü, viraj, tünel', icon: '🛤️', image: magazaRaylar },
@@ -133,16 +133,18 @@ export const ShopView: React.FC<ShopViewProps> = ({
         <div className="gt-shop-grid">
           {items.map((item) => {
             const missing = Math.max(0, item.price - user.coins);
+            // Gerçek ödüller her zaman yeniden alınabilir; "Sende var" olmaz.
+            const owned = item.unlocked && item.type !== 'real_reward';
             const isTrainActive = item.type === 'train' && user.activeTrainIcon === item.icon;
             return (
-              <div key={item.id} className={`gt-sitem ${item.unlocked ? 'owned' : ''}`}>
+              <div key={item.id} className={`gt-sitem ${owned ? 'owned' : ''}`}>
                 <ItemPicture item={item} className="pic" />
                 <b className="nm">{item.name}</b>
                 <span className="ds">{item.description}</span>
-                {!item.unlocked && (
+                {!owned && (
                   <span className="pr"><span className="gt-coin-dot small" aria-hidden="true" />{item.price}</span>
                 )}
-                {item.unlocked ? (
+                {owned ? (
                   item.type === 'train' ? (
                     <button type="button" className={`gt-sbuy ${isTrainActive ? 'have' : 'use'}`} onClick={() => onSetActiveTrain(item.icon)} disabled={isTrainActive}>
                       {isTrainActive ? <><Check aria-hidden="true" />Sürüyorsun</> : 'Bunu sür'}

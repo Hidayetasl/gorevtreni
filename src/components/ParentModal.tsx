@@ -43,6 +43,8 @@ interface ParentModalProps {
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
   weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
+  /** Rüzgar'ın mağazadan aldığı gerçek ödüller (en yeni önce); ebeveyn vermeyi unutmasın. */
+  recentRewards?: Array<{ id: string; name: string; icon: string; createdAt: string }>;
   /** Eski üst çubuktan taşınan yetişkin işleri (çocuk ekranında artık görünmez). */
   deviceControls?: {
     adultName?: string;
@@ -89,6 +91,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   activityLog = [],
   voiceMessages = [],
   weeklyStats = [],
+  recentRewards = [],
   deviceControls,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -456,6 +459,21 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 </>
               )}
             </section>
+
+            {recentRewards.length > 0 && (
+              <section className="pp-card pp-rewards">
+                <p className="pp-label">🎁 RÜZGAR ÖDÜL ALDI</p>
+                <ul className="pp-list">
+                  {recentRewards.map((reward) => (
+                    <li key={reward.id} className="pp-item">
+                      <span className="pp-ic" aria-hidden="true">{reward.icon}</span>
+                      <span className="pp-itext"><b>{reward.name}</b><small>{formatActivityTime(reward.createdAt)}</small></span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="pp-muted small">Rüzgar bu ödülleri puanıyla aldı; birlikte yapmayı unutmayın. Son 2 hafta gösterilir.</p>
+              </section>
+            )}
 
             <div className="pp-grid">
               {onOpenVoiceModal && (

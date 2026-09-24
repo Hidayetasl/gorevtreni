@@ -811,11 +811,16 @@ export default function App() {
   // Shop & Inventory Handlers
   const handleBuyItem = (itemId: string, price: number) => {
     const item = shop.find((s) => s.id === itemId);
-    if (!item || item.unlocked || !Number.isFinite(price) || price < 0 || user.coins < price) return;
+    // Gerçek ödüller (dondurma, park...) tekrar tekrar alınabilir: kilit açılmaz,
+    // her alış defterde ayrı bir kayıt olur. Diğer ürünler bir kez alınır.
+    const repeatable = item?.type === 'real_reward';
+    if (!item || (!repeatable && item.unlocked) || !Number.isFinite(price) || price < 0 || user.coins < price) return;
     setUser((prev) => ({ ...prev, coins: prev.coins - price }));
-    setShop((prev) => prev.map((item) => (item.id === itemId ? { ...item, unlocked: true, updatedAt: stampAfter(item.updatedAt) } : item)));
-    appendCoinLedger({ id: `purchase-${itemId}`, type: 'purchase', coinDelta: -price, referenceId: itemId });
-    logActivity('purchase', item?.name || itemId, `-${price} Tren Parası`);
+    if (!repeatable) {
+      setShop((prev) => prev.map((entry) => (entry.id === itemId ? { ...entry, unlocked: true, updatedAt: stampAfter(entry.updatedAt) } : entry)));
+    }
+    appendCoinLedger({ id: repeatable ? `purchase-${itemId}-${Date.now()}` : `purchase-${itemId}`, type: 'purchase', coinDelta: -price, referenceId: itemId });
+    logActivity('purchase', item.name || itemId, `-${price} puan`);
   };
 
   const handleSetActiveTrain = (icon: string) => {
@@ -1053,6 +1058,14 @@ export default function App() {
   const completedCount = liveTasks.filter((t) => t.status === 'completed').length;
   const pendingCount = liveTasks.filter((t) => t.status === 'pending_approval').length;
   const liveVoiceMessages = voiceMessages.filter((m) => !m.deletedAt);
+  // Son iki haftada alınan gerçek ödüller: ebeveyn panelinde "verilecek" diye görünür.
+  const realRewardById = new Map(mergeShopItemsWithCatalog(shop).filter((item) => item.type === 'real_reward').map((item) => [item.id, item]));
+  const recentRewards = coinLedger
+    .filter((entry) => entry.type === 'purchase' && entry.referenceId && realRewardById.has(entry.referenceId)
+      && Date.now() - Date.parse(entry.createdAt) < 14 * 24 * 60 * 60 * 1000)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6)
+    .map((entry) => ({ id: entry.id, name: realRewardById.get(entry.referenceId!)!.name, icon: realRewardById.get(entry.referenceId!)!.icon, createdAt: entry.createdAt }));
   const unreadVoiceCount = liveVoiceMessages.filter((m) => m.isNew && m.sender !== 'child').length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
@@ -1188,6 +1201,7 @@ export default function App() {
           onJoinFamily={handleJoinFamily}
           activityLog={activityLog}
           voiceMessages={liveVoiceMessages}
+          recentRewards={recentRewards}
           deviceControls={{
             adultName: adultUser?.name,
             onToggleSound: handleToggleSound,

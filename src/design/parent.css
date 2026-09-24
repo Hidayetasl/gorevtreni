@@ -148,6 +148,7 @@
 .pp-chips button small { font-size: 12px; font-weight: 700; }
 .pp-chips button.on { background: var(--pp-mor) !important; color: #fff !important; }
 .pp-dangerzone { border: 2px dashed #f0c9a8; }
+.pp-rewards { border: 3px solid #d5c4fb; background: linear-gradient(180deg, #faf6ff, #fff) !important; }
 
 /* İstatistik */
 .pp-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }

@@ -366,8 +366,10 @@ export function unlockPaidItems(shop: ShopItem[], ledger: CoinLedgerEntry[] = []
       .filter((entry) => entry.type === 'purchase' && entry.coinDelta < 0)
       .map((entry) => entry.referenceId || entry.id.replace(/^purchase-/, '')),
   );
-  if (!shop.some((item) => !item.unlocked && paid.has(item.id))) return shop;
-  return shop.map((item) => (!item.unlocked && paid.has(item.id) ? { ...item, unlocked: true } : item));
+  // Gerçek ödüller tekrar alınabilir; onların kilidi hiç açılmaz.
+  const shouldUnlock = (item: ShopItem) => !item.unlocked && item.type !== 'real_reward' && paid.has(item.id);
+  if (!shop.some(shouldUnlock)) return shop;
+  return shop.map((item) => (shouldUnlock(item) ? { ...item, unlocked: true } : item));
 }
 
 /**
