@@ -1,7 +1,7 @@
 import React from 'react';
 import { Lock, Mic } from 'lucide-react';
 import '../../design/child.css';
-import familyPhoto from '../../assets/images/rb-family.jpg';
+import familyPhoto from '../../assets/images/rb-family.webp';
 import navGorevler from '../../assets/images/nav-gorevler.webp';
 import navOgren from '../../assets/images/nav-ogren.webp';
 import navDunya from '../../assets/images/nav-dunya.webp';
