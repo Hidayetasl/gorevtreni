@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
-import { Volume2, RotateCcw, Mic } from 'lucide-react';
+import { Volume2, RotateCcw, Mic, ChevronLeft } from 'lucide-react';
 
 interface LearnViewProps {
   soundEnabled: boolean;
@@ -294,7 +294,8 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     }
     previousTowardRef.current = answersTowardNextCoin;
   }, [answersTowardNextCoin, answersPerCoin, speechEnabled]);
-  const [mode, setMode] = useState<Mode>('kesfet');
+  // null = Öğren menüsü (dört büyük kutu). Bir oyuna girilince yalnızca o görünür.
+  const [mode, setMode] = useState<Mode | null>(null);
   const [dailyLearnCount, setDailyLearnCount] = useState(readDailyLearningCount);
 
   const registerLearningAction = useCallback(() => {
@@ -545,6 +546,8 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
   // Türkçe 'bul' modundan tamamen ayrı state/ref kullanıyor ki iki mikrofon
   // akışı birbirine karışmasın. ---
   const [englishCategory, setEnglishCategory] = useState<EnglishCategoryId>('animals');
+  // İngilizce'de önce konu kartları; bir konu seçilince o ders açılır.
+  const [englishPicked, setEnglishPicked] = useState(false);
   const [englishGameType, setEnglishGameType] = useState<EnglishGameType>('find');
   const [englishRound, setEnglishRound] = useState(() => buildEnglishFindRound('animals'));
   const [englishFeedback, setEnglishFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
@@ -657,8 +660,8 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     }
   };
 
-  const handleModeChange = (nextMode: Mode) => {
-    playPopSound(soundEnabled);
+  // Oyundan çıkarken bekleyen geçişler ve açık mikrofon kapatılır.
+  const stopActivity = () => {
     if (quizAdvanceTimeoutRef.current) window.clearTimeout(quizAdvanceTimeoutRef.current);
     if (syllableAdvanceTimeoutRef.current) window.clearTimeout(syllableAdvanceTimeoutRef.current);
     if (englishAdvanceTimeoutRef.current) window.clearTimeout(englishAdvanceTimeoutRef.current);
@@ -666,13 +669,31 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     stopEnglishListening();
     setMicState('idle');
     setEnglishMicState('idle');
+  };
+
+  const handleModeChange = (nextMode: Mode) => {
+    playPopSound(soundEnabled);
+    stopActivity();
     if (nextMode === 'bul') nextQuizTarget();
     if (nextMode === 'hece') nextSyllableRound(activeHeceLevel);
-    if (nextMode === 'ingilizce') {
-      if (englishGameType === 'find') nextEnglishFindRound(englishCategory);
-      else nextEnglishRepeatWord(englishCategory);
-    }
+    if (nextMode === 'ingilizce') setEnglishPicked(false);
     setMode(nextMode);
+  };
+
+  const handleEnglishPick = (category: EnglishCategoryId) => {
+    handleEnglishCategoryChange(category);
+    setEnglishPicked(true);
+  };
+
+  // Tek geri düğmesi: İngilizce dersinden konulara, diğer her yerden Öğren menüsüne.
+  const handleBack = () => {
+    playPopSound(soundEnabled);
+    stopActivity();
+    if (mode === 'ingilizce' && englishPicked) {
+      setEnglishPicked(false);
+      return;
+    }
+    setMode(null);
   };
 
   // Bileşen kapanırken açık kalmış bir mikrofon dinlemesi olmasın.
@@ -698,35 +719,52 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
     return null;
   };
 
+  const currentWagon = LEARNING_WAGONS.find((wagon) => wagon.id === mode);
+  const currentCategory = ENGLISH_CATEGORIES.find((cat) => cat.id === englishCategory);
+  const backLabel = mode === 'ingilizce' && englishPicked ? 'İngilizce' : 'Öğren';
+  const screenTitle = mode === 'ingilizce' && englishPicked && currentCategory
+    ? `${currentCategory.icon} ${currentCategory.label}`
+    : currentWagon ? `${currentWagon.icon} ${currentWagon.label}` : '';
+
+  if (mode === null) {
+    return (
+      <div>
+        <div className="gt-head">
+          <h1>Öğren</h1>
+          <span className="gt-goal" aria-label={`Bugünkü hedef ${dailyLearnCount} / ${DAILY_LEARNING_GOAL} keşif`}>
+            <span aria-hidden="true">⭐</span><b>{dailyLearnCount}/{DAILY_LEARNING_GOAL}</b>
+          </span>
+          <span className="gt-goal coin" aria-label={`Her ${answersPerCoin} doğru cevapta 1 puan. Şu an ${answersTowardNextCoin}`}>
+            <span className="gt-coin-dot small" aria-hidden="true" /><b>{answersTowardNextCoin}/{answersPerCoin}</b>
+          </span>
+        </div>
+        <p className="gt-menu-hint">Ne öğrenmek istersin?</p>
+        <div className="gt-menu" aria-label="Öğrenme oyunları">
+          {LEARNING_WAGONS.map((wagon) => (
+            <button key={wagon.id} type="button" className={`gt-menu-card w-${wagon.id}`} onClick={() => handleModeChange(wagon.id)}>
+              <span className="e" aria-hidden="true">{wagon.icon}</span>
+              <span className="t">{wagon.label}<small>{wagon.detail}</small></span>
+              {modeDone[wagon.id] && <span className="ok" aria-label="Bugün oynandı">✓</span>}
+            </button>
+          ))}
+        </div>
+        {coinToast && <div className="gt-toast" role="status">🎉 {answersPerCoin} doğru cevap! +1 puan kazandın.</div>}
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div className="gt-head">
-        <h1>Öğren</h1>
-        <span className="gt-goal" aria-label={`Bugünkü hedef ${dailyLearnCount} / ${DAILY_LEARNING_GOAL} keşif`}>
-          <span aria-hidden="true">⭐</span><b>{dailyLearnCount}/{DAILY_LEARNING_GOAL}</b>
-        </span>
+      <div className="gt-head gt-subhead">
+        <button type="button" className="gt-back" onClick={handleBack} aria-label={`${backLabel} bölümüne geri dön`}>
+          <ChevronLeft aria-hidden="true" strokeWidth={3} />Geri
+        </button>
+        <h1>{screenTitle}</h1>
         <span className="gt-goal coin" aria-label={`Her ${answersPerCoin} doğru cevapta 1 puan. Şu an ${answersTowardNextCoin}`}>
           <span className="gt-coin-dot small" aria-hidden="true" /><b>{answersTowardNextCoin}/{answersPerCoin}</b>
         </span>
       </div>
       {coinToast && <div className="gt-toast" role="status">🎉 {answersPerCoin} doğru cevap! +1 puan kazandın.</div>}
-
-      <div className="gt-modes" role="tablist" aria-label="Öğrenme oyunları">
-        {LEARNING_WAGONS.map((wagon) => (
-          <button
-            key={wagon.id}
-            type="button"
-            role="tab"
-            aria-selected={mode === wagon.id}
-            className={`gt-mode ${mode === wagon.id ? 'on' : ''}`}
-            onClick={() => handleModeChange(wagon.id)}
-          >
-            <span className="e" aria-hidden="true">{wagon.icon}</span>
-            <span className="t">{wagon.label}<small>{wagon.detail}</small></span>
-            {modeDone[wagon.id] && <span className="ok" aria-label="Bugün oynandı">✓</span>}
-          </button>
-        ))}
-      </div>
 
       {mode === 'kesfet' && (
         <section className="gt-lcard" aria-label="Sesleri keşfet">
@@ -819,14 +857,20 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
       )}
 
       {mode === 'ingilizce' && (
-        <section className="gt-lcard" aria-label="İngilizce">
-          <div className="gt-cats" role="tablist" aria-label="Kategoriler">
+        !englishPicked ? (
+        <>
+          <p className="gt-menu-hint">Hangi konuyu öğrenelim?</p>
+          <div className="gt-menu cats" aria-label="İngilizce konuları">
             {ENGLISH_CATEGORIES.map((cat) => (
-              <button key={cat.id} type="button" role="tab" aria-selected={englishCategory === cat.id} className={`gt-cat ${englishCategory === cat.id ? 'on' : ''}`} onClick={() => handleEnglishCategoryChange(cat.id)}>
-                <span aria-hidden="true">{cat.icon}</span>{cat.label}
+              <button key={cat.id} type="button" className="gt-menu-card" onClick={() => handleEnglishPick(cat.id)}>
+                <span className="e" aria-hidden="true">{cat.icon}</span>
+                <span className="t">{cat.label}</span>
               </button>
             ))}
           </div>
+        </>
+        ) : (
+        <section className="gt-lcard" aria-label={`İngilizce: ${currentCategory?.label || ''}`}>
           <div className="gt-seg" role="tablist" aria-label="Oyun türü">
             <button type="button" role="tab" aria-selected={englishGameType === 'find'} className={englishGameType === 'find' ? 'on' : ''} onClick={() => handleEnglishGameTypeChange('find')}>👂 Dinle ve bul</button>
             <button type="button" role="tab" aria-selected={englishGameType === 'repeat'} className={englishGameType === 'repeat' ? 'on' : ''} onClick={() => handleEnglishGameTypeChange('repeat')}>🗣️ Tekrar et</button>
@@ -874,6 +918,7 @@ export const LearnView: React.FC<LearnViewProps> = ({ soundEnabled, speechEnable
             </>
           )}
         </section>
+        )
       )}
     </div>
   );
