@@ -5,6 +5,11 @@ import { mergeShopItemsWithCatalog } from '../utils/storage';
 import confetti from 'canvas-confetti';
 import { ArrowLeft, Check } from 'lucide-react';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
+import magazaOduller from '../assets/images/magaza-oduller.webp';
+import magazaTrenler from '../assets/images/magaza-trenler.webp';
+import magazaVagonlar from '../assets/images/magaza-vagonlar.webp';
+import magazaRaylar from '../assets/images/magaza-raylar.webp';
+import magazaKasaba from '../assets/images/magaza-kasaba.webp';
 
 interface ShopViewProps {
   shopItems: ShopItem[];
@@ -15,12 +20,12 @@ interface ShopViewProps {
   speechEnabled: boolean;
 }
 
-const CATEGORIES: Array<{ id: ShopCategory; label: string; detail: string; icon: string }> = [
-  { id: 'rewards', label: 'Gerçek ödüller', detail: 'Büyüğünle birlikte al', icon: '🎁' },
-  { id: 'trains', label: 'Trenler', detail: 'Yeni lokomotifler', icon: '🚂' },
-  { id: 'wagons', label: 'Vagonlar', detail: 'Trenine vagon ekle', icon: '🚃' },
-  { id: 'tracks', label: 'Raylar', detail: 'Köprü, viraj, tünel', icon: '🛤️' },
-  { id: 'scenery', label: 'Kasaba', detail: 'Ev, ağaç, park', icon: '🏡' },
+const CATEGORIES: Array<{ id: ShopCategory; label: string; detail: string; icon: string; image: string }> = [
+  { id: 'rewards', label: 'Gerçek ödüller', detail: 'Büyüğünle birlikte al', icon: '🎁', image: magazaOduller },
+  { id: 'trains', label: 'Trenler', detail: 'Yeni lokomotifler', icon: '🚂', image: magazaTrenler },
+  { id: 'wagons', label: 'Vagonlar', detail: 'Trenine vagon ekle', icon: '🚃', image: magazaVagonlar },
+  { id: 'tracks', label: 'Raylar', detail: 'Köprü, viraj, tünel', icon: '🛤️', image: magazaRaylar },
+  { id: 'scenery', label: 'Kasaba', detail: 'Ev, ağaç, park', icon: '🏡', image: magazaKasaba },
 ];
 
 function ItemPicture({ item, className }: { item: ShopItem; className: string }) {
@@ -93,7 +98,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
           <button type="button" className="gt-back" onClick={() => openCategory(null)} aria-label="Mağaza menüsüne geri dön">
             <span className="ar" aria-hidden="true"><ArrowLeft strokeWidth={3.5} /></span>Geri
           </button>
-          <h1>{current.icon} {current.label}</h1>
+          <h1 className="gt-wtitle"><img className="gt-menu-img" src={current.image} alt="" draggable={false} /> {current.label}</h1>
         </div>
       ) : (
         <>
@@ -109,11 +114,10 @@ export const ShopView: React.FC<ShopViewProps> = ({
           {CATEGORIES.map((cat) => {
             const inCat = catalogItems.filter((item) => item.category === cat.id);
             const owned = inCat.filter((item) => item.unlocked).length;
-            const sample = inCat.find((item) => SCENERY_IMAGES[item.id]);
             return (
               <button key={cat.id} type="button" className={`gt-menu-card s-${cat.id}`} onClick={() => openCategory(cat.id)}>
                 <span className="e" aria-hidden="true">
-                  {cat.id !== 'rewards' && sample ? <img className="gt-menu-img" src={SCENERY_IMAGES[sample.id]} alt="" draggable={false} /> : cat.icon}
+                  <img className="gt-menu-img" src={cat.image} alt="" draggable={false} />
                 </span>
                 <span className="t">
                   {cat.label}
