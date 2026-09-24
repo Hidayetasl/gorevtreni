@@ -1208,7 +1208,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               className="absolute z-30 flex items-end flex-row-reverse pointer-events-auto cursor-pointer"
               style={{
                 left: `${trainXPos}%`,
-                bottom: '16.2%',
+                // Ray yatağı alttan %13'te ve sabit piksel yüksekliğinde; tren sahne
+                // yüksekliğine göre değil raya göre konumlanır ki her ekranda ray üstünde kalsın.
+                bottom: 'calc(13% + var(--gt-rail-lift, 7px))',
                 width: 'max-content',
                 transform: trainTransform,
                 transformOrigin: trainDirection === 'left' ? 'right bottom' : 'left bottom',
