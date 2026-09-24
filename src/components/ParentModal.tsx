@@ -42,6 +42,17 @@ interface ParentModalProps {
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
   weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
+  /** Eski üst çubuktan taşınan yetişkin işleri (çocuk ekranında artık görünmez). */
+  deviceControls?: {
+    adultName?: string;
+    onToggleSound: () => void;
+    onManualSync: () => void;
+    isSyncing: boolean;
+    onSwitchAccount?: () => void;
+    isActiveDevice: boolean;
+    activeDeviceLabel?: string;
+    onSetActiveDevice: (checked: boolean) => void;
+  };
 }
 
 export const ParentModal: React.FC<ParentModalProps> = ({
@@ -77,6 +88,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   activityLog = [],
   voiceMessages = [],
   weeklyStats = [],
+  deviceControls,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const unlockedAtRef = useRef(0);
@@ -1026,6 +1038,29 @@ export const ParentModal: React.FC<ParentModalProps> = ({
             {/* TAB 5: SETTINGS */}
             {activeTab === 'settings' && (
               <div className="space-y-4 bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                {deviceControls && (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-3 space-y-2">
+                    <p className="text-xs font-bold text-gray-600">Bu cihaz{deviceControls.adultName ? ` · ${deviceControls.adultName}` : ''}</p>
+                    <label className="flex min-h-10 items-center gap-2 text-xs font-bold text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={deviceControls.isActiveDevice}
+                        onChange={(event) => deviceControls.onSetActiveDevice(event.target.checked)}
+                        className="h-5 w-5 accent-emerald-600"
+                      />
+                      <span>Rüzgar şu an bu cihazda (aktif cihaz)</span>
+                    </label>
+                    <p className="text-xs text-gray-500 font-bold">{deviceControls.activeDeviceLabel ? `Şu an aktif cihaz: ${deviceControls.activeDeviceLabel}` : 'Aktif çocuk cihazı henüz seçilmedi.'}</p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={deviceControls.onToggleSound} className="flex-1 min-h-11 rounded-xl border border-gray-300 bg-gray-50 text-gray-800 font-game text-xs font-bold">{soundEnabled ? '🔊 Sesi kapat' : '🔇 Sesi aç'}</button>
+                      <button type="button" onClick={deviceControls.onManualSync} disabled={deviceControls.isSyncing} className="flex-1 min-h-11 rounded-xl border border-gray-300 bg-gray-50 text-gray-800 font-game text-xs font-bold">{deviceControls.isSyncing ? 'Eşitleniyor…' : '🔄 Şimdi eşitle'}</button>
+                    </div>
+                    <p className="text-xs text-gray-500 font-bold">{cloudStatus}</p>
+                    {deviceControls.onSwitchAccount && (
+                      <button type="button" onClick={deviceControls.onSwitchAccount} className="w-full min-h-11 rounded-xl border border-gray-300 bg-gray-50 text-gray-800 font-game text-xs font-bold">Bu cihazda çıkış yap / hesap değiştir</button>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-bold text-gray-600 block mb-1">Çocuğunuzun Adı</label>

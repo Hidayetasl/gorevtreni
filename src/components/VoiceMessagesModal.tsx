@@ -127,11 +127,6 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     if (isOpen) setActiveTab(initialTab);
   }, [isOpen, initialTab]);
 
-  // GEÇİCİ TEŞHİS: modal'ın isOpen prop'unu gerçekten alıp almadığını gösterir.
-  useEffect(() => {
-    window.__debugLog?.(`VoiceMessagesModal: isOpen=${isOpen} journalMode=${journalMode}`);
-  }, [isOpen, journalMode]);
-
   if (!isOpen) return null;
 
   const startRecording = async () => {

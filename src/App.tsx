@@ -39,9 +39,6 @@ import {
   INITIAL_VIDEOS,
   START_LEVEL_VERSION,
 } from './utils/storage';
-import { Header } from './components/Header';
-import { Navigation } from './components/Navigation';
-import { TasksView } from './components/TasksView';
 import { TrainWorldView } from './components/TrainWorldView';
 import { ShopView } from './components/ShopView';
 import { VideosView } from './components/VideosView';
@@ -51,6 +48,8 @@ import { BonusModal } from './components/BonusModal';
 import { RewardClaimModal } from './components/RewardClaimModal';
 import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { AuthGate } from './components/AuthGate';
+import { ChildShell } from './components/child/ChildShell';
+import { TasksHome } from './components/child/TasksHome';
 import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
@@ -975,14 +974,12 @@ export default function App() {
   };
 
   const openVoiceModal = (initialTab: 'inbox' | 'record' = 'inbox') => {
-    window.__debugLog?.(`openVoiceModal çağrıldı (${initialTab})`);
     setVoiceModalInitialTab(initialTab);
     setIsJournalMode(false);
     setIsVoiceModalOpen(true);
   };
 
   const openJournal = (initialTab: 'inbox' | 'record' = 'inbox') => {
-    window.__debugLog?.(`openJournal çağrıldı (${initialTab})`);
     setVoiceModalInitialTab(initialTab);
     setIsJournalMode(true);
     setIsVoiceModalOpen(true);
@@ -1044,78 +1041,31 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell min-h-screen bg-[#F9F6F0] text-[#4E342E] relative selection:bg-[#FFF59D]">
-      {/* Background Animated Sky & Clouds */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Floating Sun */}
-        <div className="absolute top-4 right-6 w-14 h-14 sm:w-18 sm:h-18 bg-[#FFF59D] rounded-full shadow-[0_0_34px_rgba(255,193,7,0.24)] animate-sun-spin flex items-center justify-center text-3xl opacity-60">
-          ☀
-        </div>
-
-        {/* Floating Sky Clouds */}
-        <div className="absolute top-10 left-[-80px] text-4xl opacity-70 animate-cloud-slow">☁️</div>
-        <div className="absolute top-24 left-1/4 text-5xl opacity-50 animate-cloud-fast">☁️</div>
-        <div className="absolute top-16 right-1/3 text-3xl opacity-60 animate-cloud-slow">☁️</div>
-      </div>
-
-      {/* Main Container */}
-      <div className="relative z-10 max-w-5xl mx-auto flex flex-col min-h-screen">
-        {/* Header */}
-        <Header
-          user={user}
-          activeTab={activeTab}
-          onChangeTab={(tab) => setActiveTab(tab)}
-          onToggleSound={handleToggleSound}
-          onOpenParentModal={() => setIsParentModalOpen(true)}
-          completedTasksCount={completedCount}
-          totalTasksCount={liveTasks.length}
-          hasUnclaimedBonus={!!unclaimedBonus}
-          onOpenBonusModal={() => {}}
-          pendingCount={pendingCount}
-          onOpenVoiceModal={() => openVoiceModal('inbox')}
-          unreadVoiceCount={unreadVoiceCount}
-          cloudStatus={cloudStatus}
-          onManualSync={handleManualSync}
-          isSyncing={isManualSyncing}
-          adultName={adultUser?.name}
-          onSwitchAccount={adultUser ? handleSwitchAccount : undefined}
-        />
-
-        {(adultUser || activeChildDevice) && (
-          <section className="mx-2 mt-2 rounded-2xl border border-sky-200 bg-white/85 px-3 py-2.5 shadow-sm sm:mx-3" aria-label="Aile cihaz durumu">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              {adultUser ? (
-                <label className="flex min-h-10 items-center gap-2 text-xs font-extrabold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={activeChildDevice?.deviceId === deviceIdRef.current}
-                    onChange={(event) => void handleSetActiveChildDevice(event.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  <span>Bu cihaz şu an çocuğun aktif cihazı</span>
-                </label>
-              ) : <span className="text-xs font-bold text-slate-500">Yetişkin girişi yapılmadı</span>}
-              <p className="text-xs font-black text-sky-800 sm:text-right">
-                {activeChildDevice
-                  ? <>Şu an aktif çocuk cihazı: <span className="text-emerald-700">{activeChildDevice.label || activeChildDevice.setByName}</span></>
-                  : 'Aktif çocuk cihazı henüz seçilmedi.'}
-              </p>
-            </div>
-          </section>
-        )}
-
+    <ChildShell
+      user={user}
+      activeTab={activeTab}
+      onChangeTab={(tab) => setActiveTab(tab)}
+      doneTodayCount={completedCount + pendingCount}
+      unreadVoiceCount={unreadVoiceCount}
+      onOpenVoice={() => openVoiceModal('inbox')}
+      onOpenParent={() => setIsParentModalOpen(true)}
+      coinBump={user.coins}
+    >
+      <div className="relative">
         {/* Main Content Body */}
-        <main className="app-main flex-1 p-2 sm:p-3">
           {activeTab === 'tasks' && (
-            <TasksView
+            <TasksHome
               tasks={liveTasks}
               onMarkTaskDone={handleMarkTaskDone}
+              onOpenJournal={() => openJournal('record')}
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
-              onOpenVoiceModal={openVoiceModal}
-              onOpenJournal={openJournal}
+              caregiver={activeChildDevice?.setByName || adultUser?.name || null}
             />
           )}
+
+          {/* Bu sekmeler sırayla yeni tasarıma geçecek; şimdilik mevcut görünümleri. */}
+          <div className="app-main p-2 sm:p-3">
 
           {activeTab === 'world' && (
             <TrainWorldView
@@ -1158,14 +1108,7 @@ export default function App() {
               syllableGameLevels={user.syllableGameLevels}
             />
           )}
-        </main>
-
-        {/* Bottom Navigation */}
-        <Navigation
-          activeTab={activeTab}
-          onChangeTab={(tab) => setActiveTab(tab)}
-          onOpenParentModal={() => setIsParentModalOpen(true)}
-        />
+          </div>
 
         {/* Parent Engine Room Modal */}
         <ParentModal
@@ -1198,6 +1141,16 @@ export default function App() {
           onJoinFamily={handleJoinFamily}
           activityLog={activityLog}
           voiceMessages={voiceMessages}
+          deviceControls={{
+            adultName: adultUser?.name,
+            onToggleSound: handleToggleSound,
+            onManualSync: () => void handleManualSync(),
+            isSyncing: isManualSyncing,
+            onSwitchAccount: adultUser ? () => void handleSwitchAccount() : undefined,
+            isActiveDevice: activeChildDevice?.deviceId === deviceIdRef.current,
+            activeDeviceLabel: activeChildDevice?.label || activeChildDevice?.setByName,
+            onSetActiveDevice: (checked) => void handleSetActiveChildDevice(checked),
+          }}
           weeklyStats={weeklyStats}
           onApproveVideo={handleApproveVideo}
           onBlockVideo={handleBlockVideo}
@@ -1237,6 +1190,6 @@ export default function App() {
           />
         )}
       </div>
-    </div>
+    </ChildShell>
   );
 }
