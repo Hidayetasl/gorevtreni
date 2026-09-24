@@ -62,6 +62,8 @@ export interface VoiceMessage {
   kind?: 'message' | 'journal';
   title?: string;
   mood?: JournalMood;
+  /** Silinen mesaj eşitleme için işaretli kalır; hiçbir ekranda görünmez. */
+  deletedAt?: string;
 }
 
 export interface CoinLedgerEntry {

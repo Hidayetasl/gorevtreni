@@ -115,6 +115,24 @@ function stableStringify(value: unknown): string {
  * kayıt kaldı mı? Kimlik değil içerik karşılaştırılır; aksi halde aynı veriyi
  * taşıyan iki kopya "farklı" sayılıp cihazlar birbirine sonsuz kez yazıyordu.
  */
+/**
+ * Buluttaki ve bu cihazdaki sesli mesajları birleştirir. Bulutta olmayan yerel
+ * mesajlar eklenir; bir tarafta silinmiş (deletedAt) mesaj silinmiş kalır ki
+ * silinen mesaj bir sonraki eşitlemede geri gelmesin.
+ */
+function combineVoiceMessages(remote: VoiceMessage[], local: VoiceMessage[]) {
+  const localById = new Map(local.map((message) => [message.id, message]));
+  const combined = remote.map((message) => {
+    const mine = localById.get(message.id);
+    const deletedAt = message.deletedAt || mine?.deletedAt;
+    return deletedAt && !message.deletedAt ? { ...message, deletedAt, audioUrl: undefined, isNew: false } : message;
+  });
+  for (const message of local) {
+    if (!remote.some((remoteMessage) => remoteMessage.id === message.id)) combined.push(message);
+  }
+  return combined;
+}
+
 function mergeKeptLocal<T extends { id: string }>(remote: T[] = [], merged: T[] = []) {
   if (remote.length !== merged.length) return true;
   const remoteById = new Map(remote.map((item) => [item.id, item]));
@@ -307,6 +325,8 @@ export default function App() {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [voiceModalInitialTab, setVoiceModalInitialTab] = useState<'inbox' | 'record'>('inbox');
   const [isJournalMode, setIsJournalMode] = useState(false);
+  // Sesli mesaj ekranını kim açtı: çocuk (üst çubuk) ya da ebeveyn (panel).
+  const [voiceSenderRole, setVoiceSenderRole] = useState<'child' | 'parent'>('child');
 
   // Sync to LocalStorage
   useEffect(() => saveStoredUser(user), [user]);
@@ -406,10 +426,7 @@ export default function App() {
           setCoinLedger(syncedLedger);
           const remoteMessages = remote.voiceMessages || [];
           const localMessages = voiceMessagesRef.current;
-          const combinedMessages = [...remoteMessages];
-          for (const message of localMessages) {
-            if (!combinedMessages.some((remoteMessage) => remoteMessage.id === message.id)) combinedMessages.push(message);
-          }
+          const combinedMessages = combineVoiceMessages(remoteMessages, localMessages);
           setVoiceMessages(combinedMessages);
           const remoteVideos = remote.videos || [];
           const localVideos = videosRef.current;
@@ -436,6 +453,7 @@ export default function App() {
           // Birleştirmede bu cihazdan gelen (buluta henüz gitmemiş) bir şey kaldıysa gönder.
           const keptLocal = (hadLocalChanges && !uploadInFlightRef.current) || shopCatalogChanged || worldChanged
             || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length
+            || combinedMessages.some((message) => message.deletedAt && !remoteMessages.find((remoteMessage) => remoteMessage.id === message.id)?.deletedAt)
             || combinedActivityLog.length > remoteActivityLog.length
             || mergeKeptLocal(remote.tasks || [], syncedTasks) || mergeKeptLocal(syncedShop, mergedShop)
             || mergeKeptLocal(remote.bonuses || [], syncedBonuses) || mergeKeptLocal(remote.coinLedger || [], syncedLedger);
@@ -571,10 +589,7 @@ export default function App() {
       // asla silinmemeli (otomatik arka plan eşitlemesiyle aynı davranış).
       const remoteMessages = remote.voiceMessages || [];
       const localMessages = voiceMessagesRef.current;
-      const combinedMessages = [...remoteMessages];
-      for (const message of localMessages) {
-        if (!combinedMessages.some((remoteMessage) => remoteMessage.id === message.id)) combinedMessages.push(message);
-      }
+      const combinedMessages = combineVoiceMessages(remoteMessages, localMessages);
       const remoteActivityLog = remote.activityLog || [];
       const localActivityLog = activityLogRef.current;
       const combinedActivityLog = [...remoteActivityLog];
@@ -586,7 +601,7 @@ export default function App() {
       const remoteWorldCount = Array.isArray(remote.world) ? remote.world.length : 0;
       const worldChanged = stableStringify(mergedWorld) !== stableStringify(remote.world || []);
       const syncedLedger = mergeCoinLedger(remote.coinLedger || [], coinLedger);
-      if (worldChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedActivityLog.length > remoteActivityLog.length) {
+      if (worldChanged || combinedVideos.length > remoteVideos.length || combinedMessages.length > remoteMessages.length || combinedMessages.some((message) => message.deletedAt && !remoteMessages.find((remoteMessage) => remoteMessage.id === message.id)?.deletedAt) || combinedActivityLog.length > remoteActivityLog.length) {
         await uploadFamilyData(familyCode, { ...remote, shop: mergeShopItemsWithCatalog(remote.shop), world: mergedWorld, videos: combinedVideos, voiceMessages: combinedMessages, activityLog: combinedActivityLog, coinLedger: syncedLedger });
       }
       setUser({
@@ -992,17 +1007,21 @@ export default function App() {
   };
 
   const handleDeleteVoiceMessage = (id: string) => {
-    setVoiceMessages((prev) => prev.filter((m) => m.id !== id));
+    // Kaldırmak yerine işaretle: diğer cihazlar da silindiğini öğrensin.
+    const deletedAt = new Date().toISOString();
+    setVoiceMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deletedAt, audioUrl: undefined, isNew: false } : m)));
   };
 
-  const openVoiceModal = (initialTab: 'inbox' | 'record' = 'inbox') => {
+  const openVoiceModal = (initialTab: 'inbox' | 'record' = 'inbox', role: 'child' | 'parent' = 'child') => {
     setVoiceModalInitialTab(initialTab);
+    setVoiceSenderRole(role);
     setIsJournalMode(false);
     setIsVoiceModalOpen(true);
   };
 
   const openJournal = (initialTab: 'inbox' | 'record' = 'inbox') => {
     setVoiceModalInitialTab(initialTab);
+    setVoiceSenderRole('child');
     setIsJournalMode(true);
     setIsVoiceModalOpen(true);
   };
@@ -1033,7 +1052,8 @@ export default function App() {
 
   const completedCount = liveTasks.filter((t) => t.status === 'completed').length;
   const pendingCount = liveTasks.filter((t) => t.status === 'pending_approval').length;
-  const unreadVoiceCount = voiceMessages.filter((m) => m.isNew).length;
+  const liveVoiceMessages = voiceMessages.filter((m) => !m.deletedAt);
+  const unreadVoiceCount = liveVoiceMessages.filter((m) => m.isNew && m.sender !== 'child').length;
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
   if (isCloudConfigured && !authChecked) {
@@ -1157,7 +1177,7 @@ export default function App() {
           onResetData={handleResetData}
           soundEnabled={user.soundEnabled}
           speechEnabled={user.speechEnabled}
-          onOpenVoiceModal={() => openVoiceModal('record')}
+          onOpenVoiceModal={() => openVoiceModal('inbox', 'parent')}
           videos={videos}
           onAddVideo={handleAddVideo}
           onDeleteVideo={handleDeleteVideo}
@@ -1167,7 +1187,7 @@ export default function App() {
           onCreateFamily={handleCreateFamily}
           onJoinFamily={handleJoinFamily}
           activityLog={activityLog}
-          voiceMessages={voiceMessages}
+          voiceMessages={liveVoiceMessages}
           deviceControls={{
             adultName: adultUser?.name,
             onToggleSound: handleToggleSound,
@@ -1187,8 +1207,10 @@ export default function App() {
         <VoiceMessagesModal
           isOpen={isVoiceModalOpen}
           onClose={() => setIsVoiceModalOpen(false)}
-          messages={voiceMessages}
+          messages={liveVoiceMessages}
           onSendMessage={handleSendVoiceMessage}
+          senderRole={voiceSenderRole}
+          senderName={voiceSenderRole === 'parent' ? (adultUser?.name || 'Baba') : (user.name || 'Rüzgar')}
           onMarkRead={handleMarkReadVoiceMessage}
           onDeleteMessage={handleDeleteVoiceMessage}
           soundEnabled={user.soundEnabled}

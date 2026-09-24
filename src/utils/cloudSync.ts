@@ -266,7 +266,7 @@ export async function createFamily(data: FamilyData) {
 async function moveAudioToStorage(code: string, messages: VoiceMessage[]) {
   const { storage } = await getServices();
   return Promise.all(messages.map(async (message) => {
-    if (!message.audioUrl?.startsWith('data:audio/')) return message;
+    if (message.deletedAt || !message.audioUrl?.startsWith('data:audio/')) return message;
     try {
       // Keep the recording's original format. Safari normally creates MP4/AAC,
       // while Chrome/Android normally creates WebM/Opus. Giving an iPhone MP4
@@ -307,7 +307,11 @@ function mergeVoiceMessages(remote: VoiceMessage[], local: VoiceMessage[]) {
     // Storage'a daha önce çıkmış indirme adresini, yerel data: URL ile geri
     // ezme. Böylece diğer telefonlar gerçek ses dosyasını dinleyebilir.
     const remoteAudio = existing?.audioUrl?.startsWith('http') ? existing.audioUrl : undefined;
-    messages.set(message.id, { ...existing, ...message, audioUrl: remoteAudio ?? message.audioUrl ?? existing?.audioUrl });
+    // Silme her iki taraftan da kalıcıdır: bir cihaz silmişse mesaj geri gelmez.
+    const deletedAt = message.deletedAt || existing?.deletedAt;
+    messages.set(message.id, deletedAt
+      ? { ...existing, ...message, deletedAt, audioUrl: undefined, isNew: false }
+      : { ...existing, ...message, audioUrl: remoteAudio ?? message.audioUrl ?? existing?.audioUrl });
   }
   return [...messages.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

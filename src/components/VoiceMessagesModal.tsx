@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { JournalMood, VoiceMessage } from '../types';
 import { playPopSound, playCoinSound, speakText } from '../utils/audio';
-import { X, Mic, Square, Play, Send, Volume2, MessageCircle, Trash2, RotateCcw, Headphones } from 'lucide-react';
+import { ArrowLeft, Check, Mic, Play, RotateCcw, Send, Square, Trash2, X } from 'lucide-react';
 
 interface VoiceMessagesModalProps {
   isOpen: boolean;
@@ -13,6 +13,8 @@ interface VoiceMessagesModalProps {
   soundEnabled: boolean;
   speechEnabled: boolean;
   senderRole?: 'child' | 'parent';
+  /** Gönderen adı: çocuk için Rüzgar, ebeveyn için giriş yapan yetişkin (Baba, Anne...). */
+  senderName?: string;
   initialTab?: 'inbox' | 'record';
   journalMode?: boolean;
   onJournalSaved?: () => void;
@@ -35,6 +37,14 @@ const audioBlobToDataUrl = (blob: Blob) =>
  * natively in both iPhone Safari and Chrome/Android, so a note sent from a
  * computer cannot become silent on an iPhone.
  */
+/** "Baba’dan", "Anne’den", "Rüzgar’dan": ayrılma eki ünlü uyumuna göre -dan/-den. */
+const fromName = (name: string) => {
+  const vowels = name.toLocaleLowerCase('tr-TR').match(/[aeıioöuü]/g) || [];
+  const back = ['a', 'ı', 'o', 'u'].includes(vowels[vowels.length - 1] || 'e');
+  const hard = /[fsthşçkp]$/i.test(name);
+  return `${name}’${hard ? 't' : 'd'}${back ? 'an' : 'en'}`;
+};
+
 const moodOptions: { value: JournalMood; label: string; emoji: string }[] = [
   { value: 'happy', label: 'Neşeli', emoji: '😊' },
   { value: 'calm', label: 'Sakin', emoji: '😌' },
@@ -85,12 +95,14 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   soundEnabled,
   speechEnabled,
   senderRole = 'child',
+  senderName,
   initialTab = 'inbox',
   journalMode = false,
   onJournalSaved,
 }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'record'>('inbox');
-  const [messageFilter, setMessageFilter] = useState<'all' | 'received' | 'sent'>('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [savedToast, setSavedToast] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playbackError, setPlaybackError] = useState('');
   const [recordingError, setRecordingError] = useState('');
@@ -124,8 +136,11 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen) setActiveTab(initialTab);
-  }, [isOpen, initialTab]);
+    if (isOpen) {
+      setActiveTab(journalMode ? 'record' : initialTab);
+      setConfirmDeleteId(null);
+    }
+  }, [isOpen, initialTab, journalMode]);
 
   if (!isOpen) return null;
 
@@ -214,7 +229,9 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       recordingStreamRef.current = null;
       setIsRecording(false);
       setRecordingTime(0);
-      setRecordingError('Mikrofon açılamadı. Tarayıcı ayarlarından mikrofon izni verip yeniden deneyebilirsin. Kayıt olmadan mesaj gönderilmeyecek.');
+      setRecordingError(senderRole === 'parent'
+        ? 'Mikrofon açılamadı. Tarayıcı ayarlarından mikrofon izni verip yeniden deneyin.'
+        : 'Mikrofon açılamadı. Bir büyüğünden yardım iste 💜');
     }
   };
 
@@ -256,7 +273,8 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
       setRecordingError('Önce gerçek bir ses kaydı yapmalısın. Büyük düğmeye dokunup konuş, sonra kaydı dinle.');
       return;
     }
-    const finalTranscript = journalMode ? 'Rüzgar’ın günlüğünden bir ses kaydı 📔' : 'Rüzgar’dan sesli mesaj 🎙️';
+    const name = senderName || (senderRole === 'parent' ? 'Baba' : 'Rüzgar');
+    const finalTranscript = journalMode ? 'Günlükten bir ses kaydı 📔' : `${fromName(name)} sesli mesaj 🎙️`;
     let persistentAudioUrl: string | undefined;
 
     if (audioBlob) {
@@ -271,18 +289,20 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
 
     onSendMessage({
       sender: senderRole === 'parent' ? 'parent' : 'child',
-      senderName: senderRole === 'parent' ? 'Anne & Baba ❤️' : 'Rüzgar 👦',
+      senderName: name,
       transcript: finalTranscript,
       durationSeconds: recordingTime > 0 ? recordingTime : 5,
       audioUrl: persistentAudioUrl,
       kind: journalMode ? 'journal' : 'message',
-      title: journalMode ? (journalTitle.trim() || 'Bugünüm') : undefined,
+      title: journalMode ? (journalTitle.trim() || `Bugünüm · ${new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}`) : undefined,
       mood: journalMode ? journalMood : undefined,
     });
 
     if (journalMode) onJournalSaved?.();
 
-    speakText(finalTranscript, speechEnabled);
+    speakText(journalMode ? 'Günlüğüne kaydedildi. Aferin!' : 'Mesajın gönderildi!', speechEnabled);
+    setSavedToast(journalMode ? '📔 Günlüğüne kaydedildi!' : '✓ Mesajın gönderildi!');
+    window.setTimeout(() => setSavedToast(''), 2400);
 
     // Reset recording form
     if (audioUrl) URL.revokeObjectURL(audioUrl);
@@ -340,10 +360,11 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     setPlayingId(null);
   };
 
+  // Silme yalnızca ebeveyn ekranında var; önce büyük bir onay kartı sorar.
   const handleDeleteMessage = (id: string) => {
-    if (!window.confirm('Bu sesli mesaj silinsin mi?')) return;
     if (playingId === id) handleStopMessage();
     onDeleteMessage(id);
+    setConfirmDeleteId(null);
   };
 
   const handleRedoRecording = () => {
@@ -355,338 +376,169 @@ export const VoiceMessagesModal: React.FC<VoiceMessagesModalProps> = ({
     playPopSound(soundEnabled);
   };
 
-  const visibleMessages = messages.filter((message) => journalMode ? message.kind === 'journal' : message.kind !== 'journal');
-  const displayedMessages = journalMode || messageFilter === 'all'
-    ? visibleMessages
-    : visibleMessages.filter((message) => messageFilter === 'received' ? message.sender !== senderRole : message.sender === senderRole);
-  const newMessagesCount = visibleMessages.filter((m) => m.isNew).length;
-  const receivedCount = visibleMessages.filter((message) => message.sender !== senderRole).length;
-  const sentCount = visibleMessages.filter((message) => message.sender === senderRole).length;
+  const isParent = senderRole === 'parent';
+  const visibleMessages = messages
+    .filter((message) => !message.deletedAt)
+    .filter((message) => journalMode ? message.kind === 'journal' : message.kind !== 'journal')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const time = (iso: string) => new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const whoLabel = (msg: VoiceMessage) => {
+    if (msg.kind === 'journal') return msg.title || 'Günlüğüm';
+    // Aynı rolden başka bir yetişkinin mesajı (Baba açıkken Anne’ninki) kendi adıyla görünür.
+    if (msg.sender === senderRole && (!senderName || msg.senderName === senderName || senderRole === 'child')) return 'Senin mesajın';
+    const clean = msg.senderName.replace(/[^\p{L}\s&]/gu, '').trim();
+    // Eski kayıtlarda "Anne & Baba" gibi birleşik adlar var; onlarda eksiz yaz.
+    if (!clean || clean.includes('&')) return clean ? `${clean} gönderdi` : msg.sender === 'child' ? 'Rüzgar’dan' : 'Baba’dan';
+    return fromName(clean);
+  };
+  const avatar = (msg: VoiceMessage) => {
+    if (msg.kind === 'journal') return moodOptions.find((mood) => mood.value === msg.mood)?.emoji || '📔';
+    if (msg.sender === 'panda') return '🐼';
+    return msg.sender === 'parent' ? '❤️' : '🧒';
+  };
+  const mm = String(Math.floor(recordingTime / 60)).padStart(2, '0');
+  const ss = String(recordingTime % 60).padStart(2, '0');
+  const title = journalMode ? 'Günümü anlat' : isParent ? 'Rüzgar’la mesajlar' : 'Mesajlar';
+  const recordTitle = journalMode ? 'Bugün neler yaptın?' : isParent ? 'Rüzgar’a ses gönder' : 'Ses gönder';
+  const confirmMsg = visibleMessages.find((msg) => msg.id === confirmDeleteId);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-[#0e2531] border-2 border-slate-700/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[88vh] text-white">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center text-2xl shadow-inner">
-              🎙️
-            </div>
-            <div>
-              <h2 className="font-game text-lg sm:text-xl font-bold flex items-center gap-2 text-white">
-                {journalMode ? 'Günlüğüm' : 'Sesli Notlar'}
-                {newMessagesCount > 0 && (
-                  <span className="bg-rose-500 text-white text-xs font-black px-2 py-0.5 rounded-full animate-bounce">
-                    {newMessagesCount} Yeni
-                  </span>
-                )}
-              </h2>
-              <p className="text-xs text-sky-100 font-bold">
-                {journalMode ? 'Bugününü anlat; günlüğün tarih ve saatle saklansın.' : 'Babama ses bırak, gelen mesajı dinle.'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors text-white"
-          >
-            <X className="w-5 h-5" />
+    <div className="gt-vm-wrap" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="gt-vm">
+        <header className="gt-vm-top">
+          {activeTab === 'record' && !journalMode ? (
+            <button type="button" className="gt-vm-iconbtn back" onClick={() => { handleRedoRecording(); setActiveTab('inbox'); }} aria-label="Mesajlara dön">
+              <ArrowLeft aria-hidden="true" strokeWidth={3} />
+            </button>
+          ) : (
+            <span className={`gt-vm-badge ${journalMode ? 'mor' : ''}`} aria-hidden="true">{journalMode ? '📔' : '🎙️'}</span>
+          )}
+          <h2>{activeTab === 'record' && !journalMode ? recordTitle : title}</h2>
+          <button type="button" className="gt-vm-iconbtn" onClick={() => { if (isRecording) stopRecording(); handleStopMessage(); onClose(); }} aria-label="Kapat">
+            <X aria-hidden="true" />
           </button>
-        </div>
+        </header>
 
-        {/* Tab Switcher */}
-        <div className="flex border-b border-slate-800 bg-[#0a1820] p-1.5 gap-1.5">
-          <button
-            onClick={() => setActiveTab('inbox')}
-            className={`flex-1 py-2.5 rounded-2xl font-game text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'inbox'
-                ? 'bg-[#2263df] text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#142934]'
-            }`}
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>{journalMode ? `📔 Günlükler (${visibleMessages.length})` : `📥 Gelenler (${visibleMessages.length})`}</span>
-            {newMessagesCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('record')}
-            className={`flex-1 py-2.5 rounded-2xl font-game text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'record'
-                ? 'bg-rose-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#142934]'
-            }`}
-          >
-            <Mic className="w-4 h-4" />
-            <span>{journalMode ? '🎙️ Günlük Kaydı' : '🎙️ Babama Gönder'}</span>
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="p-4 overflow-y-auto space-y-4 flex-1">
-          {activeTab === 'inbox' ? (
-            <div className="space-y-3">
-              {playbackError && (
-                <div role="alert" className="rounded-xl border border-amber-300 bg-amber-950/60 px-3 py-2 text-center text-xs font-bold text-amber-100">
-                  {playbackError}
-                </div>
+        <div className="gt-vm-body">
+          {activeTab === 'record' ? (
+            /* KAYIT: tek dev mikrofon */
+            <section className="gt-vm-rec">
+              {journalMode && (
+                <>
+                  <p className="gt-q">{recordTitle}</p>
+                  <p className="gt-vm-sub">Bugün kendini nasıl hissediyorsun?</p>
+                  <div className="gt-moods" role="radiogroup" aria-label="Bugünkü duygu">
+                    {moodOptions.map((mood) => (
+                      <button key={mood.value} type="button" role="radio" aria-checked={journalMood === mood.value} className={journalMood === mood.value ? 'on' : ''} onClick={() => { playPopSound(soundEnabled); setJournalMood(mood.value); }}>
+                        <span className="e" aria-hidden="true">{mood.emoji}</span>{mood.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
-              {!journalMode && visibleMessages.length > 0 && (
-                <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-700 bg-[#091720] p-1.5" aria-label="Mesaj filtresi">
-                  {([
-                    ['all', `Tümü (${visibleMessages.length})`],
-                    ['received', `Gelen (${receivedCount})`],
-                    ['sent', `Gönderilen (${sentCount})`],
-                  ] as const).map(([filter, label]) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => setMessageFilter(filter)}
-                      className={`min-h-10 rounded-xl px-1 text-[11px] font-black ${messageFilter === filter ? 'bg-sky-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                      {label}
+
+              {!audioUrl && (
+                <>
+                  <button type="button" className={`gt-mic ${isRecording ? 'rec' : ''}`} onClick={isRecording ? stopRecording : startRecording} aria-label={isRecording ? 'Konuşmam bitti' : 'Konuşmaya başla'}>
+                    {isRecording ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+                  </button>
+                  <p className="gt-vm-hint" aria-live="polite">
+                    {isRecording ? <><b className="gt-rec-dot" aria-hidden="true" />Dinliyorum… {mm}:{ss}<br />Bitince yine dokun</> : journalMode ? 'Mikrofona dokun ve anlat' : 'Mikrofona dokun ve konuş'}
+                  </p>
+                </>
+              )}
+
+              {audioUrl && !isRecording && (
+                <>
+                  <span className="gt-vm-ready" aria-hidden="true">🎉</span>
+                  <p className="gt-q">Kaydın hazır!</p>
+                  <audio controls src={audioUrl} className="gt-vm-audio" aria-label="Kaydını dinle" />
+                  <div className="gt-pair">
+                    <button type="button" className="gt-ghost" onClick={handleRedoRecording}><RotateCcw aria-hidden="true" />Tekrar</button>
+                    <button type="button" className={`gt-big ${journalMode ? 'mor' : ''}`} onClick={() => void handleSend()}>
+                      {journalMode ? <Check aria-hidden="true" strokeWidth={3} /> : <Send aria-hidden="true" />}{journalMode ? 'Kaydet' : 'Gönder'}
                     </button>
-                  ))}
+                  </div>
+                </>
+              )}
+
+              {recordingError && <p className="gt-result again" role="alert">{recordingError}</p>}
+
+              {journalMode && visibleMessages.length > 0 && (
+                <div className="gt-vm-list">
+                  <p className="gt-label">ESKİ GÜNLÜKLERİM</p>
+                  {visibleMessages.slice(0, 20).map((msg) => renderRow(msg))}
                 </div>
               )}
-              {displayedMessages.length === 0 ? (
-                <div className="bg-[#091720] border border-slate-800 rounded-2xl p-6 text-center text-slate-400 space-y-2">
-                  <div className="text-4xl">📭</div>
-                  <p className="font-game text-sm font-bold text-slate-300">
-                    {journalMode ? 'Henüz günlük kaydın yok!' : 'Henüz sesli mesajınız yok!'}
-                  </p>
-                  <p className="text-xs">
-                    {journalMode ? '🎙️ Günlük Kaydı düğmesine dokunup bugününü anlatabilirsin.' : '“Babama Gönder” düğmesine dokunarak ilk sesli notunu bırakabilirsin.'}
-                  </p>
+            </section>
+          ) : (
+            /* GELEN KUTUSU */
+            <section className="gt-vm-inbox">
+              {playbackError && <p className="gt-result again" role="alert">{playbackError}</p>}
+              {visibleMessages.length === 0 ? (
+                <div className="gt-vm-empty">
+                  <span aria-hidden="true">📭</span>
+                  <p className="gt-q">Henüz mesaj yok</p>
+                  <p className="gt-vm-sub">{isParent ? 'Aşağıdan Rüzgar’a ilk sesli mesajını gönder.' : 'Aşağıdaki mikrofona dokunup ilk mesajını gönder.'}</p>
                 </div>
               ) : (
-                    displayedMessages.map((msg) => {
-                  const isPlaying = playingId === msg.id;
-
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`relative bg-[#142a36] border rounded-2xl p-3.5 transition-all shadow-md cursor-pointer ${
-                        msg.isNew
-                          ? 'border-amber-300 ring-2 ring-amber-400/60 bg-[#193646] animate-pulse'
-                          : 'border-slate-700/70'
-                      }`}
-                      onClick={() => !isPlaying && handlePlayMessage(msg)}
-                    >
-                      {/* Sender Row */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                          <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-lg">
-                            {msg.sender === 'panda'
-                              ? '🐼'
-                              : msg.sender === 'parent'
-                              ? '❤️'
-                              : '👦'}
-                          </div>
-                          <div>
-                            <div className="font-game text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-                              <span>{msg.senderName}</span>
-                              {msg.isNew && (
-                                <span className="bg-rose-500 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full uppercase animate-pulse">
-                                  YENİ 🔴
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-400">
-                              {new Date(msg.createdAt).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span className="text-[10px] font-bold text-sky-300">
-                              {msg.sender === senderRole ? 'Gönderdiğin kayıt' : 'Sana gelen kayıt'}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteMessage(msg.id);
-                          }}
-                          className="min-w-11 min-h-11 rounded-xl border border-rose-500/60 bg-rose-950/50 text-rose-200 hover:bg-rose-700 hover:text-white flex items-center justify-center transition-colors"
-                          aria-label={`${msg.senderName} mesajını sil`}
-                          title="Mesajı sil"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {msg.kind === 'journal' && (msg.title || msg.mood) && (
-                        <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-indigo-400/30 bg-indigo-950/40 px-3 py-2">
-                          <span className="font-game text-xs font-black text-indigo-100">{msg.title || 'Bugünüm'}</span>
-                          {msg.mood && <span className="text-xs font-bold text-indigo-200">{moodOptions.find((mood) => mood.value === msg.mood)?.emoji} {moodOptions.find((mood) => mood.value === msg.mood)?.label}</span>}
-                        </div>
-                      )}
-
-                      {/* Message Content & Waveform */}
-                      <div className="bg-[#0a1820] border border-slate-800 rounded-xl p-2 grid grid-cols-2 gap-2">
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handlePlayMessage(msg);
-                          }}
-                          disabled={isPlaying}
-                          className="min-h-14 flex items-center justify-center gap-2 py-2 px-2 rounded-xl font-game text-sm sm:text-base font-bold transition-all shadow-sm bg-[#2263df] hover:bg-[#1c55c5] text-white border border-blue-400 disabled:cursor-default disabled:bg-slate-600 disabled:opacity-70"
-                        >
-                          <Play className="w-4 h-4 fill-current" />
-                          <span>{isPlaying ? 'Dinleniyor…' : 'Oynat'}</span>
-                        </button>
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleStopMessage();
-                          }}
-                          disabled={!isPlaying}
-                          className="min-h-14 flex items-center justify-center gap-2 py-2 px-2 rounded-xl font-game text-sm sm:text-base font-bold transition-all shadow-sm bg-rose-600 hover:bg-rose-500 text-white border border-rose-300 disabled:cursor-default disabled:bg-slate-700 disabled:text-slate-500 disabled:border-slate-600"
-                        >
-                          <Square className="w-4 h-4 fill-current" />
-                          <span>Durdur</span>
-                        </button>
-                      </div>
-
-                      {/* Animated Audio Wave Graphic when playing */}
-                      {isPlaying && (
-                        <div className="mt-2 flex items-center justify-center gap-1 h-4">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                            <div
-                              key={i}
-                              className="w-1 bg-amber-400 rounded-full animate-pulse"
-                              style={{
-                                height: `${Math.floor(Math.random() * 12) + 4}px`,
-                                animationDuration: `${0.3 + (i % 3) * 0.2}s`,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
+                <div className="gt-vm-list">
+                  {visibleMessages.map((msg) => renderRow(msg))}
+                </div>
               )}
-            </div>
-          ) : (
-            /* SEND VOICE MESSAGE TAB */
-            <div className="space-y-4">
-              {/* Microphone Recording Console */}
-              <div className="bg-[#091720] border-2 border-slate-700/80 rounded-2xl p-5 text-center space-y-4 shadow-inner">
-                <div className="space-y-1">
-                  <h3 className="font-game text-sm sm:text-base font-bold text-white flex items-center justify-center gap-2">
-                    <Mic className="w-4 h-4 text-rose-400" />
-                    {journalMode ? 'Bugününü Anlat' : 'Babama Ses Bırak'}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Önce konuş, sonra kaydı dinle; hazırsa kaydet.
-                  </p>
-                </div>
-
-                {journalMode && (
-                  <div className="space-y-3 text-left">
-                    <label className="block text-xs font-black text-slate-300" htmlFor="journal-title">Bugünün başlığı <span className="font-normal text-slate-500">(istersen)</span></label>
-                    <input
-                      id="journal-title"
-                      value={journalTitle}
-                      onChange={(event) => setJournalTitle(event.target.value)}
-                      placeholder="Örn. Parkta güzel bir gün"
-                      maxLength={45}
-                      className="min-h-11 w-full rounded-xl border border-slate-600 bg-slate-900 px-3 text-sm font-bold text-white placeholder:text-slate-500 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300/40"
-                    />
-                    <div>
-                      <p className="mb-1.5 text-xs font-black text-slate-300">Bugün kendini nasıl hissediyorsun?</p>
-                      <div className="grid grid-cols-5 gap-1.5">
-                        {moodOptions.map((mood) => (
-                          <button
-                            key={mood.value}
-                            type="button"
-                            onClick={() => setJournalMood(mood.value)}
-                            aria-label={mood.label}
-                            className={`min-h-14 rounded-xl border px-1 py-1 text-center text-[10px] font-black ${journalMood === mood.value ? 'border-amber-300 bg-amber-400/25 text-amber-100 ring-2 ring-amber-300/50' : 'border-slate-700 bg-slate-900 text-slate-300'}`}
-                          >
-                            <span className="block text-xl">{mood.emoji}</span>
-                            {mood.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {recordingError && (
-                  <div role="alert" className="rounded-xl border border-amber-300/70 bg-amber-950/70 px-3 py-2 text-left text-xs font-bold leading-relaxed text-amber-100">
-                    {recordingError}
-                  </div>
-                )}
-
-                {/* Clear 3-step recording flow */}
-                <div className="flex flex-col items-center justify-center gap-2">
-                  {!isRecording && !audioUrl && (
-                    <button
-                      onClick={startRecording}
-                      className="w-full min-h-14 rounded-2xl flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:brightness-110 border-2 border-sky-300 text-white font-game text-base font-black shadow-blue-600/30 shadow-xl active:scale-95"
-                    >
-                      <Mic className="w-6 h-6" />
-                      <span>Konuşmaya Başla</span>
-                    </button>
-                  )}
-                  {isRecording && (
-                    <button
-                      onClick={stopRecording}
-                      className="w-full min-h-14 rounded-2xl flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 border-2 border-rose-300 text-white font-game text-base font-black animate-pulse shadow-rose-600/50 shadow-xl active:scale-95"
-                    >
-                      <Square className="w-5 h-5 fill-current" />
-                      <span>Konuşmam Bitti</span>
-                    </button>
-                  )}
-
-                  <div className="font-game text-sm font-bold">
-                    {isRecording ? (
-                      <span className="text-rose-400 flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                        Kaydediliyor: {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
-                      </span>
-                    ) : audioUrl ? (
-                      <span className="text-emerald-400">Harika! Kaydın hazır. 🎉</span>
-                    ) : (
-                      <span className="text-slate-400">Büyük mavi düğmeye dokun.</span>
-                    )}
-                  </div>
-                </div>
-
-                {audioUrl && !isRecording && (
-                  <div className="space-y-2">
-                    <div className="rounded-xl border border-emerald-400/40 bg-emerald-950/35 p-2 text-left">
-                      <div className="mb-1 flex items-center gap-2 text-xs font-black text-emerald-100"><Headphones className="h-4 w-4" /> Kaydını önce dinle</div>
-                      <audio controls src={audioUrl} className="h-10 w-full" aria-label="Ses kaydı önizlemesi" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={handleRedoRecording}
-                        className="min-h-12 rounded-xl border-2 border-slate-500 bg-slate-800 px-2 text-xs font-black text-slate-100 active:scale-95"
-                      >
-                        <RotateCcw className="mx-auto mb-0.5 h-4 w-4" /> Yeniden Kaydet
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSend()}
-                        className="min-h-12 rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-500 to-teal-600 px-2 text-xs font-black text-white shadow-md active:scale-95"
-                      >
-                        <Send className="mx-auto mb-0.5 h-4 w-4" /> {journalMode ? 'Günlüğü Kaydet' : 'Babaya Gönder'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </div>
+            </section>
           )}
         </div>
+
+        {activeTab === 'inbox' && (
+          <div className="gt-vm-foot">
+            <button type="button" className="gt-big mor" onClick={() => { playPopSound(soundEnabled); setActiveTab('record'); }}>
+              <Mic aria-hidden="true" />{recordTitle}
+            </button>
+          </div>
+        )}
+
+        {savedToast && <div className="gt-toast" role="status">{savedToast}</div>}
+
+        {isParent && confirmMsg && (
+          <div className="gt-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="vm-del-title">
+            <div className="gt-sheet-bg" onClick={() => setConfirmDeleteId(null)} aria-hidden="true" />
+            <div className="gt-sheet">
+              <span className="gt-sheet-pic" aria-hidden="true">🗑️</span>
+              <h2 id="vm-del-title">Bu mesaj silinsin mi?</h2>
+              <p className="gt-hint">{whoLabel(confirmMsg)} · {time(confirmMsg.createdAt)}. Bütün cihazlardan silinir.</p>
+              <div className="gt-pair">
+                <button type="button" className="gt-ghost" onClick={() => setConfirmDeleteId(null)}>Vazgeç</button>
+                <button type="button" className="gt-big gt-danger" onClick={() => handleDeleteMessage(confirmMsg.id)}><Trash2 aria-hidden="true" />Sil</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
+
+  function renderRow(msg: VoiceMessage) {
+    const isPlaying = playingId === msg.id;
+    const incoming = msg.sender !== senderRole && msg.kind !== 'journal';
+    return (
+      <div key={msg.id} className={`gt-msg ${msg.isNew && incoming ? 'new' : ''} ${incoming ? 'in' : 'out'}`}>
+        <span className="gt-msg-av" aria-hidden="true">{avatar(msg)}</span>
+        <span className="gt-msg-t">
+          <b>{whoLabel(msg)}</b>
+          <small>{time(msg.createdAt)}{msg.durationSeconds ? ` · ${msg.durationSeconds} sn` : ''}</small>
+          {msg.isNew && incoming && <span className="gt-msg-new">YENİ</span>}
+        </span>
+        <button type="button" className={`gt-msg-play ${isPlaying ? 'on' : ''}`} onClick={() => (isPlaying ? handleStopMessage() : handlePlayMessage(msg))} aria-label={isPlaying ? 'Durdur' : 'Dinle'}>
+          {isPlaying ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
+          {isPlaying ? 'Durdur' : 'Dinle'}
+        </button>
+        {isParent && (
+          <button type="button" className="gt-msg-del" onClick={() => setConfirmDeleteId(msg.id)} aria-label="Mesajı sil">
+            <Trash2 aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    );
+  }
 };

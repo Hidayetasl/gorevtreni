@@ -126,7 +126,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
 
   // New Bonus Form State
   const [bonusTitle, setBonusTitle] = useState('Harika Yardımcı Bonusu! 🌟');
-  const [bonusMessage, setBonusMessage] = useState('Bugün gösterdiğin güzel çaba için sana özel sürpriz Tren Parası!');
+  const [bonusMessage, setBonusMessage] = useState('Bugün gösterdiğin güzel çaba için sana sürpriz puan!');
   const [bonusCoins, setBonusCoins] = useState(2);
   const [bonusIcon, setBonusIcon] = useState('🎁');
 
