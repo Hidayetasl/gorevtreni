@@ -204,6 +204,7 @@ export const INITIAL_SHOP: ShopItem[] = [
   { id: 'scenery-firestation', name: 'İtfaiye Aracı', category: 'scenery', price: 22, icon: '🚒', description: 'Sirenini çalarak koşan kırmızı itfaiye aracı', unlocked: false, type: 'decoration' },
   { id: 'scenery-firestation-building', name: 'İtfaiye İstasyonu', category: 'scenery', price: 25, icon: '🚒', description: 'Kırmızı çanlı kule ve iki garaj kapılı itfaiye binası', unlocked: false, type: 'decoration' },
   { id: 'scenery-squirrel-courier', name: 'Sincap Postacı', category: 'scenery', price: 18, icon: '🐿️', description: 'Elinde haritayla köyde koşan TCDD sincap postacısı', unlocked: false, type: 'decoration' },
+  { id: 'scenery-donkey', name: 'Sıpa Dostu', category: 'scenery', price: 15, icon: '🫏', description: 'Sincap Köy İstasyonu’nun neşeli sıpası', unlocked: false, type: 'decoration' },
 
   // Real World Rewards (Scaled to 1-Day, 2-Day, and 3-Day efforts)
   { id: 'reward-icecream', name: 'Dondurma Keyfi', category: 'rewards', price: 24, icon: '🍦', description: 'En sevdiğin 2 top dondurma ödülü! ⭐ (1 Günlük Başarı)', unlocked: false, type: 'real_reward' },
