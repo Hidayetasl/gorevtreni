@@ -3,7 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext } from '../utils/audio';
 import { ArrowLeft, Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
-import { HangarIcon } from './child/HangarIcon';
+import menuTren from '../assets/images/menu-tren.webp';
+import menuKasaba from '../assets/images/menu-kasaba.webp';
+import menuHangar from '../assets/images/menu-hangar.webp';
 import dunyamKapak from '../assets/images/dunyam-kapak.webp';
 import kumandaKalk from '../assets/images/kumanda-kalk.webp';
 import kumandaKorna from '../assets/images/kumanda-korna.webp';
@@ -47,9 +49,9 @@ interface TrainWorldViewProps {
 // menu = Dünya'nın giriş ekranı (üç büyük kutu); diğerleri tek başına açılır.
 type ViewMode = 'menu' | 'ride' | 'builder' | 'garage';
 const WORLD_SECTIONS: Array<{ id: Exclude<ViewMode, 'menu'>; label: string; detail: string; icon: React.ReactNode }> = [
-  { id: 'ride', label: 'Treni sür', detail: 'Kumandayı kullan', icon: <img className="gt-menu-img" src={kumandaNormal} alt="" draggable={false} /> },
-  { id: 'builder', label: 'Kasabayı kur', detail: 'Parçaları yerleştir', icon: '🗺️' },
-  { id: 'garage', label: 'Hangar', detail: 'Satın aldığın her şey', icon: <HangarIcon className="gt-hangar" /> },
+  { id: 'ride', label: 'Treni sür', detail: 'Kumandayı kullan', icon: <img className="gt-menu-img" src={menuTren} alt="" draggable={false} /> },
+  { id: 'builder', label: 'Kasabayı kur', detail: 'Parçaları yerleştir', icon: <img className="gt-menu-img" src={menuKasaba} alt="" draggable={false} /> },
+  { id: 'garage', label: 'Hangar', detail: 'Satın aldığın her şey', icon: <img className="gt-menu-img" src={menuHangar} alt="" draggable={false} /> },
 ];
 type EnvironmentTheme = 'farm' | 'mountains' | 'sunset' | 'night';
 

@@ -1,7 +1,12 @@
 import React from 'react';
-import { BookOpen, Lock, Map, Mic, ShoppingBag, TrainFront, Tv } from 'lucide-react';
+import { Lock, Mic } from 'lucide-react';
 import '../../design/child.css';
 import familyPhoto from '../../assets/images/rb-family.jpg';
+import navGorevler from '../../assets/images/nav-gorevler.webp';
+import navOgren from '../../assets/images/nav-ogren.webp';
+import navDunya from '../../assets/images/nav-dunya.webp';
+import navMagaza from '../../assets/images/nav-magaza.webp';
+import navIzle from '../../assets/images/nav-izle.webp';
 import type { TabType, UserProfile } from '../../types';
 
 interface ChildShellProps {
@@ -16,12 +21,12 @@ interface ChildShellProps {
   children: React.ReactNode;
 }
 
-const NAV: Array<{ tab: TabType; label: string; Icon: typeof TrainFront }> = [
-  { tab: 'tasks', label: 'Görevler', Icon: TrainFront },
-  { tab: 'learn', label: 'Öğren', Icon: BookOpen },
-  { tab: 'world', label: 'Dünya', Icon: Map },
-  { tab: 'shop', label: 'Mağaza', Icon: ShoppingBag },
-  { tab: 'videos', label: 'İzle', Icon: Tv },
+const NAV: Array<{ tab: TabType; label: string; icon: string }> = [
+  { tab: 'tasks', label: 'Görevler', icon: navGorevler },
+  { tab: 'learn', label: 'Öğren', icon: navOgren },
+  { tab: 'world', label: 'Dünya', icon: navDunya },
+  { tab: 'shop', label: 'Mağaza', icon: navMagaza },
+  { tab: 'videos', label: 'İzle', icon: navIzle },
 ];
 
 /**
@@ -63,7 +68,7 @@ export const ChildShell: React.FC<ChildShellProps> = ({
     <main className="gt-main">{children}</main>
 
     <nav className="gt-nav" aria-label="Menü">
-      {NAV.map(({ tab, label, Icon }) => (
+      {NAV.map(({ tab, label, icon }) => (
         <button
           key={tab}
           type="button"
@@ -71,7 +76,7 @@ export const ChildShell: React.FC<ChildShellProps> = ({
           aria-current={activeTab === tab ? 'page' : undefined}
           onClick={() => onChangeTab(tab)}
         >
-          <span className="ic"><Icon aria-hidden="true" /></span>
+          <span className="ic"><img src={icon} alt="" draggable={false} /></span>
           {label}
         </button>
       ))}
