@@ -32,7 +32,7 @@ yeni sürüm aynı aile kaydını okur (bkz. "Veri" bölümü).
 
 1. [ ] Ana dala birleştir ve gönder (`claude-yenileme` → `main`) → GitHub Actions yayınlar (~2 dk)
 2. [ ] Actions çalışması yeşil bitti; site açılıyor
-3. [ ] Hemen ardından kuralları yayınla: `firebase deploy --only firestore:rules,storage --project <proje>`
+3. [ ] Hemen ardından kuralları yayınla: `firebase deploy --only firestore:rules,storage --project gorev-treni-bagimsiz` (canlı veri bu projede; `ruzgar-rutin-oyunu-2026` eski bir kopya)
    - Fonksiyonlar (`functions/`) değişmediyse onları yayınlama; günlük rapor olduğu gibi çalışmaya devam eder.
 
 ## 3. Yayından hemen sonra (her yetişkin cihazında bir kez)

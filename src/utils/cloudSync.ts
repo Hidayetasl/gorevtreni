@@ -26,11 +26,12 @@ const firebaseConfig = usesEmulators
       appId: '1:000000000000:web:demo',
     }
   : {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-      appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+      // GitHub gizli değerlerinin sonunda kalan satır sonu (\n) giriş adresini bozar.
+      apiKey: (import.meta.env.VITE_FIREBASE_API_KEY || '').trim(),
+      authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '').trim(),
+      projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID || '').trim(),
+      storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '').trim(),
+      appId: (import.meta.env.VITE_FIREBASE_APP_ID || '').trim(),
     };
 
 // Emülatörde izinli yetişkin hesapları sabit test e-postalarıdır.
