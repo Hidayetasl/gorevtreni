@@ -142,26 +142,48 @@ const SCENE_ITEM_SIZE: Record<string, string> = {
   'scenery-squirrel-courier': 'text-2xl sm:text-4xl',
 };
 
-// Gerçek görseli olan eşyaların (SCENERY_IMAGES) ana sahnedeki piksel boyutu.
-// Binalar biraz daha büyük ve net görünsün; araçlar (ambulans/itfaiye) ise
-// binaların yaklaşık yarısı büyüklüğünde kalsın ki manzarayı kaplamasınlar.
-const SCENE_IMG_SIZE: Record<string, string> = {
-  'scenery-ambulance': 'w-12 h-12 sm:w-20 sm:h-20',
-  'scenery-firestation': 'w-12 h-12 sm:w-20 sm:h-20',
-  'scenery-squirrel-courier': 'w-10 h-10 sm:w-16 sm:h-16',
-  // Lunapark dönme dolabı + sinema birleşik yapısı, diğer binalardan belirgin
-  // şekilde daha yüksek bir görsel olduğu için kendi kutusunda daha uzun.
-  'scenery-ferris': 'w-16 h-24 sm:w-24 sm:h-36',
-  // Ev modelleri ve okul, diğer binalara göre hafifçe daha büyük görünsün.
-  'scenery-house': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-2': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-3': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-4': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-5': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-house-6': 'w-20 h-20 sm:w-28 sm:h-28',
-  'scenery-school': 'w-20 h-20 sm:w-28 sm:h-28',
+// Gerçek görseli olan eşyaların ana sahnedeki boyu: sahne yüksekliğinin yüzdesi
+// (cqh) ve üst sınır (px). Böylece yatay tam ekranda (kısa sahne) binalar treni
+// kaplamaz, dik tam ekranda da aşırı büyümez. [yükseklik cqh, en fazla px, en/boy]
+type SceneImgBox = [number, number, number?];
+const SCENE_IMG_BOX: Record<string, SceneImgBox> = {
+  'scenery-ambulance': [20, 80],
+  'scenery-firestation': [20, 80],
+  'scenery-squirrel-courier': [16, 64],
+  // Dönme dolap diğer binalardan belirgin şekilde yüksek.
+  'scenery-ferris': [42, 144, 0.66],
+  'scenery-house': [34, 112],
+  'scenery-house-2': [34, 112],
+  'scenery-house-3': [34, 112],
+  'scenery-house-4': [34, 112],
+  'scenery-house-5': [34, 112],
+  'scenery-house-6': [34, 112],
+  'scenery-school': [34, 112],
 };
-const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
+const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [30, 96];
+function sceneImgStyle(itemId: string): React.CSSProperties {
+  const [cqh, maxPx, ratio = 1] = SCENE_IMG_BOX[itemId] || DEFAULT_SCENE_IMG_BOX;
+  const height = `min(${cqh}cqh, ${maxPx}px)`;
+  return { height, width: ratio === 1 ? height : `calc(${height} * ${ratio})` };
+}
+
+// Arka plan resmindeki (bos-genis.webp, 1600x686) nehrin orta çizgisi:
+// [resim yüksekliği oranı, resim genişliği oranı]. Resim ekranın şekline göre
+// kırpıldığından köprü, nehrin rayı kestiği noktaya bu yolla oturtulur.
+const BG_SIZE = { w: 1600, h: 686 };
+const RIVER_PATH: Array<[number, number]> = [
+  [0.6, 0.259], [0.64, 0.183], [0.68, 0.183], [0.72, 0.217], [0.76, 0.271],
+  [0.8, 0.292], [0.84, 0.3], [0.9, 0.297], [0.96, 0.275], [1, 0.267],
+];
+function riverXAt(yFrac: number) {
+  const y = Math.min(Math.max(yFrac, RIVER_PATH[0][0]), 1);
+  for (let i = 1; i < RIVER_PATH.length; i += 1) {
+    const [y1, x1] = RIVER_PATH[i];
+    const [y0, x0] = RIVER_PATH[i - 1];
+    if (y <= y1) return x0 + ((y - y0) / (y1 - y0)) * (x1 - x0);
+  }
+  return RIVER_PATH[RIVER_PATH.length - 1][1];
+}
 
 // Izgara hücresini (0..7, 0..6) ana sahnenin güvenli görüntü alanına (bulut ve
 // ray şeridi hariç) eşleyen yardımcı fonksiyon.
@@ -317,6 +339,42 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const placedBridges = worldItems.filter((item) => item.itemId === 'track-bridge');
   const placedTunnel = worldItems.find((item) => item.itemId === 'track-tunnel');
   const tunnelLeftPercent = columnCenterPercent(placedTunnel?.x ?? 12);
+
+  // Köprü, nehrin rayı kestiği noktaya oturur (ekranın şekli ne olursa olsun).
+  const rideRailRef = useRef<HTMLDivElement | null>(null);
+  const [bridgeSpot, setBridgeSpot] = useState<{ left: number; width: number } | null>(null);
+  // Arka planın yatay kayması (px): resim genişse (dik tam ekran) nehir, trenin
+  // gidip geldiği görünür alana düşecek şekilde kaydırılır.
+  const [bgOffsetX, setBgOffsetX] = useState(0);
+  useEffect(() => {
+    const inner = rideCanvasRef.current?.firstElementChild as HTMLElement | null;
+    const rail = rideRailRef.current;
+    const canvas = rideCanvasRef.current;
+    if (!canvas || !inner || !rail || viewMode !== 'ride') return;
+    const measure = () => {
+      const box = inner.getBoundingClientRect();
+      const railBox = rail.getBoundingClientRect();
+      if (box.width <= 0 || box.height <= 0) return;
+      // object-cover: resim kutuyu dolduracak kadar büyütülür, dikeyde ortalanır.
+      const scale = Math.max(box.width / BG_SIZE.w, box.height / BG_SIZE.h);
+      const offsetY = (box.height - BG_SIZE.h * scale) / 2;
+      const railY = railBox.top - box.top + railBox.height * (30 / 64);
+      const riverFrac = riverXAt((railY - offsetY) / (BG_SIZE.h * scale));
+      // Nehir, görünür kutunun %30'una gelsin; resim kutunun dışına taşmasın.
+      const slack = box.width - BG_SIZE.w * scale; // <= 0
+      const offsetX = Math.min(0, Math.max(slack, canvas.clientWidth * 0.3 - riverFrac * BG_SIZE.w * scale));
+      setBgOffsetX(offsetX);
+      const riverX = offsetX + riverFrac * BG_SIZE.w * scale;
+      // Köprü nehri ayaklarıyla kucaklayacak kadar geniş olur.
+      const widthPx = Math.max(box.width * (2 / GRID_COLS), 0.125 * BG_SIZE.w * scale);
+      setBridgeSpot({ left: (riverX / box.width) * 100, width: (widthPx / box.width) * 100 });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(inner);
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [viewMode]);
 
   // Sahip olunan düz/viraj ray parçalarının sayısı koleksiyon etiketinde
   // gösterilir; çalışan tren her zaman ana düz hatta gidip gelir.
@@ -834,7 +892,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const renderSincapStation = (compact = false) => (
-    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : 'w-[95px] sm:w-[199px]'} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`}>
+    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(45cqh, 199px)' }}>
       <img
         src={merkezGarImg}
         alt="Sincap Köy Garı"
@@ -949,7 +1007,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
             <div ref={rideCanvasRef} className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-3xl">
-              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%` }}>
+              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%`, containerType: 'size' }}>
             {/* Background Illustration Image */}
             <img
               src={cartoonBg}
@@ -958,6 +1016,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 const image = event.currentTarget;
                 if (image.src !== stableCartoonBackground) image.src = stableCartoonBackground;
               }}
+              // Dik tam ekranda nehir görünür alana kaydırılır (bkz. bgOffsetX).
+              style={{ objectPosition: `${bgOffsetX}px 50%` }}
               className={`w-full h-full object-cover transition-all duration-700 ${
                 envTheme === 'sunset'
                   ? 'sepia hue-rotate-15 contrast-110'
@@ -1066,7 +1126,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   title={`${item.name} — dokun ve keşfet`}
                 >
                   {SCENERY_IMAGES[item.itemId] ? (
-                    <img src={SCENERY_IMAGES[item.itemId]} alt={item.name} className={`${SCENE_IMG_SIZE[item.itemId] || DEFAULT_SCENE_IMG_SIZE} object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.45)]`} draggable={false} />
+                    <img src={SCENERY_IMAGES[item.itemId]} alt={item.name} className="object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.45)]" style={sceneImgStyle(item.itemId)} draggable={false} />
                   ) : (
                     <span className={`${anchor.size} leading-none drop-shadow-[0_3px_3px_rgba(15,23,42,0.55)]`}>{item.icon}</span>
                   )}
@@ -1078,7 +1138,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             })}
 
             {/* 4. CLASSIC STRAIGHT TWO-WAY RAIL */}
-            <div className="straight-track absolute bottom-[13%] left-0 z-10 h-10 w-full pointer-events-none sm:h-14">
+            <div ref={rideRailRef} className="straight-track absolute bottom-[13%] left-0 z-10 h-10 w-full pointer-events-none sm:h-14">
               <svg className="h-full w-full" viewBox="0 0 1000 64" preserveAspectRatio="none" role="img" aria-label="Tek düz tren hattı, gidiş ve dönüş">
                 <defs>
                   <linearGradient id="straightRailSteelGradient" x1="0" y1="0" x2="0" y2="1">
@@ -1096,24 +1156,30 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <line x1="0" y1="19" x2="1000" y2="19" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
                 <line x1="0" y1="39" x2="1000" y2="39" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
               </svg>
-              {/* Köprüler rayın içinde çizilir: yandan görünen düz köprünün
-                  üstündeki ray, sahnedeki raya tam oturur; tren üstünden geçer. */}
-              {hasPlacedBridge && placedBridges.map((bridge) => (
+              {/* Köprü rayın içinde çizilir: yandan görünen düz köprünün üstündeki
+                  ray sahnedeki raya oturur, tren üstünden geçer. Birden çok köprü
+                  alınmış olsa da nehir tek olduğu için bir köprü çizilir. */}
+              {hasPlacedBridge && (
                 <button
-                  key={bridge.id}
                   type="button"
                   onClick={() => {
                     playPopSound(soundEnabled);
-                    setInteractiveMessage('Kırmızı Tren Köprüsü: Tren köprünün üstünden güvenle geçiyor! 🌉✨');
+                    setInteractiveMessage('Kırmızı Tren Köprüsü: Tren nehrin üstünden güvenle geçiyor! 🌉✨');
                     speakText('Kırmızı tren köprüsü!', speechEnabled);
                   }}
                   className="absolute cursor-pointer"
-                  style={{ top: '50%', left: `${columnCenterPercent(bridge.x)}%`, width: `${(2 / GRID_COLS) * 100}%`, transform: 'translate(-50%, -38%)', pointerEvents: 'auto' }}
+                  style={{
+                    top: '50%',
+                    left: `${bridgeSpot?.left ?? columnCenterPercent(placedBridges[0]?.x ?? 3)}%`,
+                    width: `${bridgeSpot?.width ?? (2 / GRID_COLS) * 100}%`,
+                    transform: 'translate(-50%, -38%)',
+                    pointerEvents: 'auto',
+                  }}
                   title="Kırmızı Tren Köprüsü"
                 >
                   <img src={kopruYanImg} alt="Kırmızı Tren Köprüsü" width={700} height={270} className="block w-full h-auto drop-shadow-[0_8px_8px_rgba(0,0,0,0.4)]" draggable={false} />
                 </button>
-              ))}
+              )}
               <div className="absolute left-[7%] top-0 rounded-full border border-sky-200/50 bg-slate-950/75 px-2 py-1 text-[8px] font-black text-sky-100 shadow-lg sm:text-[10px]">↔ TEK HAT · GİDİŞ / DÖNÜŞ{secondRailPieceCount > 0 ? ` · ${secondRailPieceCount} parça` : ''}</div>
             </div>
 
@@ -1167,8 +1233,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   setInteractiveMessage('Sıpa Sincap Ekspres\'i meraklı gözlerle izliyor! 🫏✨');
                   speakText('Sevimli sıpa treni izliyor!', speechEnabled);
                 }}
-                className="absolute bottom-[27%] z-20 w-[100px] sm:w-[140px] cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                style={{ left: `${stationLeftPercent}%`, transform: 'translateX(calc(-100% - 40px))' }}
+                className="absolute bottom-[27%] z-20 cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
+                style={{ left: `${stationLeftPercent}%`, width: 'min(45cqh, 140px)', transform: 'translateX(calc(-100% - 40px))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
