@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updatePassword, type User } from 'firebase/auth';
-import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
+import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages } from './syncMerge';
@@ -8,6 +8,10 @@ import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVi
 export { mergeById, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems } from './syncMerge';
 
 const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
+/** Davetle katılan yetişkinlerin adı (uid → ad); bu cihaz bir sonraki açılışta tanısın diye. */
+const ADULT_NAMES_KEY = 'ruzgar_adult_names_v1';
+/** Tek kullanımlık davet linkinin geçerlilik süresi. */
+export const JOIN_INVITE_DAYS = 7;
 const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || (
   typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : ''
 );
@@ -53,6 +57,8 @@ export type FamilyData = {
   inviteEnabled?: boolean;
   /** `undefined` korunur, `null` ise kullanıcı tarafından temizlenir. */
   activeChildDevice?: ActiveChildDevice | null;
+  /** Davetle katılan yetişkinlerin adı (uid → ad). */
+  adultNames?: Record<string, string>;
 };
 
 const adultAccountConfig: Array<{ name: AdultName; email: string; uid: string }> = [
@@ -100,6 +106,21 @@ export function getAdultName(user: User | null): AdultName | null {
     : null;
 }
 
+function readAdultNames(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(ADULT_NAMES_KEY) || '{}') || {}; } catch { return {}; }
+}
+
+/** Davetle katılan yetişkinin adını bu cihazda hatırlar. */
+export function rememberAdultName(uid: string, name: string) {
+  try { localStorage.setItem(ADULT_NAMES_KEY, JSON.stringify({ ...readAdultNames(), [uid]: name })); } catch { /* yoksay */ }
+}
+
+/** İzinli listedeki ad ya da daha önce davetle bu cihazda katılmış yetişkinin adı. */
+export function getKnownAdultName(user: User | null): AdultName | null {
+  if (!user || user.isAnonymous) return null;
+  return getAdultName(user) || readAdultNames()[user.uid] || null;
+}
+
 export function subscribeToAuth(
   onUser: (user: User | null) => void,
   onError?: (error: Error) => void,
@@ -139,9 +160,12 @@ export async function signInAdultWithGoogle(): Promise<User | null> {
     }
     throw error;
   }
-  if (!getAdultName(user)) {
+  // Davet linkiyle gelen kişi izin listesinde olmayabilir; aileye erişimi
+  // davetin kendisi (güvenlik kuralları) belirler. Daha önce davetle katılmış
+  // kişi yeni bir telefonda da aile kaydındaki adıyla tanınır.
+  if (!getKnownAdultName(user) && !getJoinInviteToken() && !(await recallInvitedAdult(user.uid))) {
     await signOut(auth);
-    throw new Error(`${user.email || 'Bu Google hesabı'} izinli aile hesaplarından biri değil.`);
+    throw new Error(`${user.email || 'Bu Google hesabı'} bu aileye bağlı değil. Aileden bir davet linki isteyin.`);
   }
   return user;
 }
@@ -149,9 +173,9 @@ export async function signInAdultWithGoogle(): Promise<User | null> {
 /** Yönlendirmeli Google girişi döndüğünde hatayı yakalar (başarı onAuthStateChanged ile gelir). */
 export async function completeGoogleRedirect() {
   const result = await getRedirectResult(firebaseAuth());
-  if (result?.user && !getAdultName(result.user)) {
+  if (result?.user && !getKnownAdultName(result.user) && !getJoinInviteToken() && !(await recallInvitedAdult(result.user.uid))) {
     await signOut(firebaseAuth());
-    throw new Error(`${result.user.email || 'Bu Google hesabı'} izinli aile hesaplarından biri değil.`);
+    throw new Error(`${result.user.email || 'Bu Google hesabı'} bu aileye bağlı değil. Aileden bir davet linki isteyin.`);
   }
 }
 
@@ -286,6 +310,10 @@ function familyInviteRef(code: string) {
   return doc(services!.db, 'familyInvites', code);
 }
 
+function joinInviteRef(token: string) {
+  return doc(services!.db, 'familyJoinInvites', token);
+}
+
 function adultProfileRef(uid: string) {
   return doc(services!.db, 'users', uid);
 }
@@ -407,6 +435,8 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
         : data.activeChildDevice,
       ownerUid,
       memberUids,
+      // Davetle katılanların adları başka cihazın yazmasıyla silinmesin.
+      adultNames: { ...((remoteData.adultNames as Record<string, string> | undefined) || {}), ...(data.adultNames || {}) },
       inviteEnabled: true,
       updatedAt: Date.now(),
       schemaVersion: 3,
@@ -449,6 +479,88 @@ export async function acceptFamilyInvite(code: string) {
   if (!alreadyMember) await updateDoc(familyRef(normalized), { memberUids: arrayUnion(uid), updatedAt: Date.now() });
   await rememberAdultFamily(normalized);
   return true;
+}
+
+/** Davetle katılmış yetişkinin adını hesabının ailesinden bulur ve bu cihazda hatırlar. */
+async function recallInvitedAdult(uid: string) {
+  try {
+    const services = await getServices();
+    const profile = await getDoc(doc(services.db, 'users', uid));
+    const code = profile.exists() ? String(profile.data().familyCode || '') : '';
+    if (!code) return '';
+    const family = await getDoc(doc(services.db, 'families', code));
+    const name = family.exists() ? String((family.data().adultNames || {})[uid] || '') : '';
+    if (name) rememberAdultName(uid, name);
+    return name;
+  } catch {
+    return '';
+  }
+}
+
+/** ?davet=... ile açılan tek kullanımlık davet. */
+export function getJoinInviteToken() {
+  if (typeof window === 'undefined') return '';
+  return (new URLSearchParams(window.location.search).get('davet') || '').replace(/[^A-Za-z0-9]/g, '');
+}
+
+/**
+ * Aile üyesi, belirli bir kişi için tek kullanımlık davet linki üretir
+ * (7 gün geçerli). Link açılıp Google ile girilince o kişi aileye katılır.
+ */
+export async function createJoinInvite(code: string, name: string) {
+  const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cleanName = name.trim().slice(0, 24);
+  if (!normalized || !cleanName) throw new Error('Davet için kişinin adı gerekli.');
+  const services = await getServices();
+  const uid = services.auth.currentUser?.uid;
+  if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) => alphabet[byte % alphabet.length]).join('');
+  const now = Date.now();
+  await setDoc(joinInviteRef(token), {
+    familyCode: normalized,
+    name: cleanName,
+    createdBy: uid,
+    createdAt: now,
+    expiresAt: now + JOIN_INVITE_DAYS * 24 * 60 * 60 * 1000,
+    usedBy: null,
+    usedAt: null,
+  });
+  const url = new URL(PUBLIC_APP_URL || window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('davet', token);
+  return url.toString();
+}
+
+/**
+ * Tek kullanımlık daveti kabul eder: davet "kullanıldı" işaretlenir ve kişi
+ * adıyla aileye eklenir — ikisi aynı anda (güvenlik kuralı ikisini birlikte ister).
+ */
+export async function acceptJoinInvite(token: string) {
+  const services = await getServices();
+  const uid = services.auth.currentUser?.uid;
+  if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
+  const snapshot = await getDoc(joinInviteRef(token));
+  if (!snapshot.exists()) throw new Error('Bu davet linki geçersiz. Aileden yeni bir link isteyin.');
+  const invite = snapshot.data() as { familyCode: string; name: string; expiresAt: number; usedBy: string | null };
+  if (invite.usedBy && invite.usedBy !== uid) throw new Error('Bu davet linki daha önce kullanılmış. Aileden yeni bir link isteyin.');
+  if (!invite.usedBy && invite.expiresAt < Date.now()) throw new Error('Bu davet linkinin süresi dolmuş. Aileden yeni bir link isteyin.');
+  const code = saveFamilyCode(invite.familyCode);
+  if (!invite.usedBy) {
+    const batch = writeBatch(services.db);
+    batch.update(joinInviteRef(token), { usedBy: uid, usedAt: Date.now() });
+    batch.update(familyRef(code), {
+      memberUids: arrayUnion(uid),
+      [`adultNames.${uid}`]: invite.name,
+      joinInvite: token,
+      updatedAt: Date.now(),
+    });
+    await batch.commit();
+  }
+  rememberAdultName(uid, invite.name);
+  await rememberAdultFamily(code);
+  return { code, name: invite.name };
 }
 
 export async function familyExists(code: string) {

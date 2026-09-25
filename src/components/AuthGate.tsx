@@ -3,16 +3,21 @@ import type { User } from 'firebase/auth';
 import './AuthGate.css';
 import {
   acceptFamilyInvite,
+  acceptJoinInvite,
   changeAdultPassword,
   completeGoogleRedirect,
   createFamily,
   describeAuthError,
   getAdultFamilyCode,
   getAdultName,
+  getCurrentUid,
   getFamilyCode,
   getFamilyData,
   getFamilyInviteLink,
   getInviteFamilyCode,
+  getJoinInviteToken,
+  getKnownAdultName,
+  rememberAdultName,
   resetAdultPassword,
   setFamilyPinHash,
   signInAdult,
@@ -77,6 +82,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [inviteCode] = useState(() => getInviteFamilyCode());
+  // Tek kullanımlık kişisel davet (?davet=...): Google ile girince doğrudan katılır.
+  const [joinToken] = useState(() => getJoinInviteToken());
   // Giriş formu kendi akışını yönetirken oturum olayının ikinci kez aile
   // araması başlatmasını engeller.
   const manualFlowRef = useRef(false);
@@ -85,7 +92,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
     const data = known || await getFamilyData(code);
     if (!data) throw new Error('Bu aile kaydı bulunamadı.');
     // Davet bağlantısı bir kez kullanıldı; adres çubuğunda kalıp tekrar işlenmesin.
-    if (inviteCode) window.history.replaceState(null, '', window.location.pathname);
+    if (inviteCode || joinToken) window.history.replaceState(null, '', window.location.pathname);
+    // Davetle katılan kişinin adı bu cihazda hatırlanır (izin listesinde değil).
+    const uid = getCurrentUid();
+    const invitedName = uid ? data.adultNames?.[uid] : '';
+    if (uid && invitedName) rememberAdultName(uid, invitedName);
     onReady(code, data);
   };
 
@@ -105,6 +116,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
     setError('');
     setPhase('resolving');
     try {
+      if (joinToken) {
+        const { code } = await acceptJoinInvite(joinToken);
+        const data = await getFamilyData(code);
+        if (needsNewParentPin(data?.parentConfig?.pinHash)) {
+          setPendingCode(code);
+          setPinMode('claim');
+          setPhase('pin');
+          return;
+        }
+        await finish(code, data);
+        return;
+      }
       // Öncelik: davet bağlantısı → hesabın ailesi → bu cihazda kayıtlı eski aile kodu.
       const candidate = inviteCode || await getAdultFamilyCode() || getFamilyCode();
       if (!candidate) {
@@ -126,7 +149,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
   useEffect(() => subscribeToAuth((user) => {
     setAuthUser(user);
     if (manualFlowRef.current) return;
-    if (user && getAdultName(user)) {
+    // İzinli hesap, daha önce davetle katılmış hesap ya da davet linkiyle gelen hesap.
+    if (user && (getKnownAdultName(user) || (!user.isAnonymous && joinToken))) {
       // Zayıf şifreyle girilmiş ve henüz değiştirilmemiş: önce yeni şifre.
       if (readMustChange() === user.uid) { setPhase('new-password'); return; }
       void resolveFamily();
@@ -264,14 +288,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
 
           {phase === 'login' && (
             <>
-              <h1>{inviteCode ? 'Aileye katılın' : 'Ebeveyn girişi'}</h1>
-              <p className="ag-sub">Bu cihaz bir kez yetişkin hesabıyla açılır. Sonra Rüzgar oyunu doğrudan açar; ebeveyn işlemleri aile PIN’i ister.</p>
+              <h1>{joinToken ? 'Rüzgar’ın ailesine davetlisiniz' : inviteCode ? 'Aileye katılın' : 'Ebeveyn girişi'}</h1>
+              <p className="ag-sub">{joinToken
+                ? 'Aşağıdaki düğmeye dokunup Google hesabınızı seçin; aileye kendiliğinden bağlanırsınız.'
+                : 'Bu cihaz bir kez yetişkin hesabıyla açılır. Sonra Rüzgar oyunu doğrudan açar; ebeveyn işlemleri aile PIN’i ister.'}</p>
               <button type="button" className="ag-google" onClick={handleGoogle} disabled={busy}>
                 <svg viewBox="0 0 48 48" aria-hidden="true" width="24" height="24"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.2 44 33 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
                 {busy ? 'Google açılıyor…' : 'Google ile giriş yap'}
               </button>
               {!showEmailForm && errorBox}
-              {!showEmailForm ? (
+              {joinToken ? null : !showEmailForm ? (
                 <button type="button" className="ag-link" onClick={() => { setError(''); setShowEmailForm(true); }}>E-posta ve şifreyle giriş</button>
               ) : (
                 <form onSubmit={handleLogin} noValidate className="ag-box">
@@ -330,7 +356,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
                 <button type="submit" className="ag-btn" disabled={busy}>{busy ? 'Bağlanıyor…' : 'Aileye katıl'}</button>
               </form>
               {errorBox}
-              {confirmNewFamily ? (
+              {/* Yeni aile yalnızca izinli (ilk kurulum yapan) hesaplarda. */}
+              {!getAdultName(authUser) ? null : confirmNewFamily ? (
                 <div className="ag-box">
                   <p className="ag-note" style={{ margin: 0 }}><b>Emin misiniz?</b> Yeni aile boş başlar; mevcut puanlar, kasaba ve günlükler orada görünmez. Aileniz zaten varsa yukarıya aile kodunu yazın.</p>
                   <div className="ag-row">

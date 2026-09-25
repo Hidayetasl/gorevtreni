@@ -170,3 +170,9 @@
 @media (prefers-reduced-motion: reduce) {
   .pp-wrap * { animation: none !important; transition: none !important; }
 }
+
+/* Aileye davet */
+.pp-invite { display: flex; flex-direction: column; gap: 10px; }
+.pp-invite .pp-chips button { min-height: 48px; font-weight: 800; font-size: 15px; }
+.pp-input { width: 100%; min-height: 48px; border-radius: 14px; border: 2px solid #d6e7ea; padding: 0 14px; font: 700 16px/1 inherit; background: #fff; color: var(--pp-ink); }
+.pp-code.small { font: 700 13px/1.4 ui-monospace, Menlo, monospace; letter-spacing: 0; text-align: left; word-break: break-all; user-select: all; }

@@ -104,7 +104,8 @@ export interface ParentConfig {
   pinHash?: string;
 }
 
-export type AdultName = 'Baba' | 'Anne' | 'Anneanne';
+/** Yetişkinin görünen adı: Baba, Anne, Anneanne ya da davetle eklenen biri (Dede, Teyze…). */
+export type AdultName = string;
 
 export interface ActiveChildDevice {
   deviceId: string;

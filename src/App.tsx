@@ -50,7 +50,7 @@ import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
 import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
-import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getAdultName, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
 import { validateYoutubeVideo } from './utils/youtubeValidation';
@@ -236,7 +236,7 @@ export default function App() {
         authUidRef.current = nextUid;
         setNetworkEpoch((value) => value + 1);
       }
-      const adultName = getAdultName(firebaseUser);
+      const adultName = getKnownAdultName(firebaseUser);
       setAdultUser(adultName && firebaseUser ? { uid: firebaseUser.uid, name: adultName } : null);
       setAuthChecked(true);
     }, () => {
@@ -1045,6 +1045,9 @@ export default function App() {
           setFamilyCode(code);
           const uid = getCurrentUid();
           localStorage.setItem(VERIFIED_UID_KEY, uid);
+          // Davetle katılan kişi izin listesinde değil; adı aile kaydından gelir.
+          const invitedName = familyData.adultNames?.[uid];
+          if (invitedName) setAdultUser((current) => current ?? { uid, name: invitedName });
           const syncedLedger = familyData.coinLedger || [];
           setUser({ ...INITIAL_USER, ...familyData.user, coins: calculateLedgerBalance(syncedLedger, familyData.user.coins) });
           setParentConfig(familyData.parentConfig || INITIAL_PARENT);
@@ -1165,6 +1168,7 @@ export default function App() {
           familyCode={familyCode}
           onCreateFamily={handleCreateFamily}
           onJoinFamily={handleJoinFamily}
+          onCreateInvite={familyCode ? (name) => createJoinInvite(familyCode, name) : undefined}
           activityLog={activityLog}
           voiceMessages={liveVoiceMessages}
           recentRewards={recentRewards}

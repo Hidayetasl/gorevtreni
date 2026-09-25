@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Check, Hand, LayoutGrid, Mic, TrainFront, Volume2 } from 'lucide-react';
 import type { AdultName, RoutineTask, TimeOfDay } from '../../types';
+import { withGenitive } from '../../utils/turkish';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
 
 type Station = TimeOfDay | 'all';
@@ -22,7 +23,6 @@ const STATIONS: Array<{ key: TimeOfDay; name: string; emoji: string }> = [
   { key: 'evening', name: 'Akşam', emoji: '🌙' },
 ];
 const JOURNAL_TASK_ID = 'task-8';
-const GENITIVE: Record<AdultName, string> = { Baba: 'Baba’nın', Anne: 'Anne’nin', Anneanne: 'Anneanne’nin' };
 
 function stationForNow(): TimeOfDay {
   const hour = new Date().getHours();
@@ -197,7 +197,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
             {pendingHere > 0 && (
               <div className="gt-waiting" role="status">
                 <span className="hg" aria-hidden="true">⏳</span>
-                <span>{pendingHere} görev {caregiver ? `${GENITIVE[caregiver]} onayını` : 'onay'} bekliyor</span>
+                <span>{pendingHere} görev {caregiver ? `${withGenitive(caregiver)} onayını` : 'onay'} bekliyor</span>
               </div>
             )}
             {upcoming.length > 0 && (

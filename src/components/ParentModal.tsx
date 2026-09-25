@@ -5,8 +5,8 @@ import { extractYoutubeId, hashParentPin, isWeakParentPin, needsNewParentPin } f
 
 /** PIN girildikten sonra panel bu süre boyunca yeniden PIN sormadan açılır. */
 const PARENT_UNLOCK_MS = 5 * 60 * 1000;
-import { getFamilyInviteLink } from '../utils/cloudSync';
 import { sortVideosNewestFirst } from '../utils/videoOrder';
+import { withGenitive } from '../utils/turkish';
 import { ArrowLeft, Check, ChevronRight, Gift, History, ListChecks, Lock, Mic, Plus, RefreshCw, RotateCcw, Settings, Trash2, Tv, TrendingUp, Volume2, VolumeX, X } from 'lucide-react';
 import '../design/parent.css';
 
@@ -40,6 +40,8 @@ interface ParentModalProps {
   familyCode: string;
   onCreateFamily: () => Promise<string>;
   onJoinFamily: (code: string) => Promise<void>;
+  /** Kişiye özel, tek kullanımlık davet linki üretir. */
+  onCreateInvite?: (name: string) => Promise<string>;
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
   weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
@@ -88,6 +90,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   familyCode,
   onCreateFamily,
   onJoinFamily,
+  onCreateInvite,
   activityLog = [],
   voiceMessages = [],
   weeklyStats = [],
@@ -100,6 +103,14 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
   const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteName, setInviteName] = useState('Anneanne');
+  // Hazır seçenekler az; ebeveynin daha önce davet ettiği kişiler de seçenek olur.
+  const [savedInviteNames, setSavedInviteNames] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('ruzgar_invite_names_v1') || '[]'); } catch { return []; }
+  });
+  const [inviteOther, setInviteOther] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
   // null = panelin ana sayfası (kimin yanında + onaylar + bölüm kartları).
   type Section = 'tasks' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings';
   const [section, setSection] = useState<Section | null>(null);
@@ -338,16 +349,6 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Aileye bağlanılamadı.'); }
   };
 
-  // Türkçe iyelik eki isme göre değişir (Baba’nın, Anne’nin); bilinmeyen isimde ünlü uyumuna bakılır.
-  const withGenitive = (name: string) => {
-    const known: Record<string, string> = { Baba: 'Baba’nın', Anne: 'Anne’nin', Anneanne: 'Anneanne’nin' };
-    if (known[name]) return known[name];
-    const vowels = name.toLocaleLowerCase('tr-TR').match(/[aeıioöuü]/g) || [];
-    const last = vowels[vowels.length - 1] || 'e';
-    const suffix = { a: 'ın', ı: 'ın', e: 'in', i: 'in', o: 'un', u: 'un', ö: 'ün', ü: 'ün' }[last] || 'in';
-    const endsWithVowel = /[aeıioöuü]$/i.test(name);
-    return `${name}’${endsWithVowel ? 'n' : ''}${suffix}`;
-  };
   const TIME_LABEL: Record<string, string> = { morning: 'Sabah', afternoon: 'Öğle', evening: 'Akşam' };
   const liveTasks = tasks.filter((t) => !t.deletedAt);
   const SECTIONS: Array<{ id: Section; label: string; detail: string; Icon: typeof Plus; tone: string }> = [
@@ -770,21 +771,63 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                     <p className="pp-muted">Bulut bağlantısı yapılandırılmadı.</p>
                   ) : familyCode ? (
                     <>
-                      <p className="pp-muted">Aile kodu (diğer yetişkinlerin telefonu için):</p>
-                      <div className="pp-code">{familyCode}</div>
-                      <button
-                        type="button"
-                        className="pp-wide mavi"
-                        onClick={async () => {
-                          const inviteLink = getFamilyInviteLink(familyCode);
-                          try {
-                            await navigator.clipboard.writeText(inviteLink);
-                            setInviteMessage('Davet bağlantısı kopyalandı. WhatsApp ile gönderebilirsiniz.');
-                          } catch {
-                            setInviteMessage(`Davet bağlantısı: ${inviteLink}`);
-                          }
-                        }}
-                      >Davet bağlantısını kopyala</button>
+                      {onCreateInvite && (
+                        <div className="pp-invite">
+                          <p className="pp-muted">Kimi davet ediyorsunuz? Link tek kullanımlıktır ve 7 gün geçerlidir.</p>
+                          <div className="pp-chips" role="radiogroup" aria-label="Davet edilen kişi">
+                            {[...new Set(['Anne', 'Anneanne', 'Babaanne', ...savedInviteNames]), 'Başka biri'].map((name) => (
+                              <button key={name} type="button" role="radio" aria-checked={inviteName === name} className={inviteName === name ? 'on' : ''} onClick={() => { setInviteName(name); setInviteLink(''); setInviteMessage(''); }}>{name}</button>
+                            ))}
+                          </div>
+                          {inviteName === 'Başka biri' && (
+                            <input className="pp-input" value={inviteOther} maxLength={24} onChange={(e) => { setInviteOther(e.target.value); setInviteLink(''); }} placeholder="Adı (örn. Dede, Ayşe Teyze)" />
+                          )}
+                          {!inviteLink ? (
+                            <button
+                              type="button"
+                              className="pp-wide mavi"
+                              disabled={inviteBusy || (inviteName === 'Başka biri' && !inviteOther.trim())}
+                              onClick={async () => {
+                                setInviteBusy(true);
+                                setInviteMessage('');
+                                try {
+                                  const name = inviteName === 'Başka biri' ? inviteOther.trim() : inviteName;
+                                  setInviteLink(await onCreateInvite(name));
+                                  if (inviteName === 'Başka biri') {
+                                    const next = [...new Set([...savedInviteNames, name])].slice(-6);
+                                    setSavedInviteNames(next);
+                                    setInviteName(name);
+                                    setInviteOther('');
+                                    try { localStorage.setItem('ruzgar_invite_names_v1', JSON.stringify(next)); } catch { /* yoksay */ }
+                                  }
+                                } catch (error) {
+                                  setInviteMessage(error instanceof Error ? error.message : 'Davet linki oluşturulamadı.');
+                                } finally { setInviteBusy(false); }
+                              }}
+                            >{inviteBusy ? 'Hazırlanıyor…' : 'Davet linki oluştur'}</button>
+                          ) : (
+                            <>
+                              <div className="pp-code small">{inviteLink}</div>
+                              <div className="pp-cols two">
+                                {typeof navigator.share === 'function' && (
+                                  <button type="button" className="pp-wide mavi" onClick={() => {
+                                    void navigator.share({ title: 'Rüzgar’ın Görev Treni', text: 'Rüzgar’ın Görev Treni’ne davetlisin. Linke dokun, Google ile giriş yap:', url: inviteLink }).catch(() => {});
+                                  }}>Paylaş (WhatsApp…)</button>
+                                )}
+                                <button type="button" className="pp-wide soft" onClick={async () => {
+                                  try { await navigator.clipboard.writeText(inviteLink); setInviteMessage('Link kopyalandı.'); } catch { setInviteMessage('Linki basılı tutup kopyalayın.'); }
+                                }}>Kopyala</button>
+                              </div>
+                              <p className="pp-muted">Davet edilen kişi linke dokunur, “Google ile giriş yap” der; kod veya PIN gerekmez.</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <details className="pp-more">
+                        <summary>Aile kodu</summary>
+                        <p className="pp-muted">Eski yöntem: kodu bilen izinli hesap aileye katılabilir.</p>
+                        <div className="pp-code">{familyCode}</div>
+                      </details>
                       {inviteMessage && <p role="status" className="pp-note">{inviteMessage}</p>}
                       <details className="pp-more">
                         <summary>Bu cihazı başka bir aileye bağla</summary>
