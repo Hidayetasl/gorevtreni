@@ -146,21 +146,23 @@ const SCENE_ITEM_SIZE: Record<string, string> = {
 // (cqh) ve üst sınır (px). Böylece yatay tam ekranda (kısa sahne) binalar treni
 // kaplamaz, dik tam ekranda da aşırı büyümez. [yükseklik cqh, en fazla px, en/boy]
 type SceneImgBox = [number, number, number?];
+// Yeni 3D görseller kenar boşluksuz olduğundan eskisinden büyük görünüyordu;
+// binalar lokomotiften küçük kalsın, birbirine binmesin diye ölçüler küçük tutulur.
 const SCENE_IMG_BOX: Record<string, SceneImgBox> = {
-  'scenery-ambulance': [20, 80],
-  'scenery-firestation': [20, 80],
-  'scenery-squirrel-courier': [16, 64],
+  'scenery-ambulance': [14, 56],
+  'scenery-firestation': [14, 56],
+  'scenery-squirrel-courier': [12, 44],
   // Dönme dolap diğer binalardan belirgin şekilde yüksek.
-  'scenery-ferris': [42, 144, 0.66],
-  'scenery-house': [34, 112],
-  'scenery-house-2': [34, 112],
-  'scenery-house-3': [34, 112],
-  'scenery-house-4': [34, 112],
-  'scenery-house-5': [34, 112],
-  'scenery-house-6': [34, 112],
-  'scenery-school': [34, 112],
+  'scenery-ferris': [30, 104, 0.66],
+  'scenery-house': [24, 84],
+  'scenery-house-2': [24, 84],
+  'scenery-house-3': [24, 84],
+  'scenery-house-4': [24, 84],
+  'scenery-house-5': [24, 84],
+  'scenery-house-6': [24, 84],
+  'scenery-school': [24, 84],
 };
-const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [30, 96];
+const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [21, 72];
 function sceneImgStyle(itemId: string): React.CSSProperties {
   const [cqh, maxPx, ratio = 1] = SCENE_IMG_BOX[itemId] || DEFAULT_SCENE_IMG_BOX;
   const height = `min(${cqh}cqh, ${maxPx}px)`;
@@ -294,6 +296,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const trainAssemblyRef = useRef<HTMLDivElement | null>(null);
   // Katarın gerçek genişliği ölçülerek sağ uçta ekrandan taşması önlenir.
   const [assemblyWidthPercent, setAssemblyWidthPercent] = useState(45);
+  // Tren sabit piksel boyunda çizilir; kısa sahnede (yatay telefon) binalarla
+  // orantılı kalsın diye sahne yüksekliğine göre küçültülür (en az %55).
+  const [trainScale, setTrainScale] = useState(1);
   useEffect(() => {
     const canvasEl = rideCanvasRef.current;
     const assemblyEl = trainAssemblyRef.current;
@@ -302,8 +307,10 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     const measure = () => {
       const canvasWidth = canvasEl.offsetWidth;
       const assemblyWidth = assemblyEl.offsetWidth;
+      const scale = Math.min(1, Math.max(0.55, canvasEl.offsetHeight / 440));
+      setTrainScale(scale);
       if (canvasWidth > 0 && assemblyWidth > 0) {
-        setAssemblyWidthPercent((assemblyWidth / canvasWidth) * 100);
+        setAssemblyWidthPercent(((assemblyWidth * scale) / canvasWidth) * 100);
       }
     };
 
@@ -382,7 +389,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     (item) => item.itemId === 'track-straight' || item.itemId === 'track-curve',
   ).length;
   // Ana ray üzerindeki V4 ping-pong hareketi; satın alınan parça sayısından bağımsızdır.
-  const trainTransform = trainDirection === 'left' ? 'scaleX(-1)' : 'none';
+  const trainTransform = `scale(${trainDirection === 'left' ? -trainScale : trainScale}, ${trainScale})`;
 
   // Mağazadan "Dünyana Ekle" ile bırakılan her dekor ana manzarada da görünür.
   // Ray yapıları kendi, raya hizalı katmanlarında çizilir.
@@ -892,7 +899,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const renderSincapStation = (compact = false) => (
-    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(45cqh, 199px)' }}>
+    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(34cqh, 150px)' }}>
       <img
         src={merkezGarImg}
         alt="Sincap Köy Garı"
@@ -1191,8 +1198,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   setInteractiveMessage('Dağ Tüneli: Tren dağın altındaki tünelden çuf çuf geçiyor! 🕳️⛰️');
                   speakText('Dağ tüneli aktif!', speechEnabled);
                 }}
-                className="absolute bottom-[9.5%] w-32 sm:w-48 h-20 sm:h-28 z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
-                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)' }}
+                className="absolute bottom-[9.5%] z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
+                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)', height: 'min(28cqh, 100px)', width: 'min(40cqh, 144px)' }}
                 title="Dağ Tüneli"
               >
                 <div className="group/tunnel relative w-full h-full flex items-end justify-center">
@@ -1234,7 +1241,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   speakText('Sevimli sıpa treni izliyor!', speechEnabled);
                 }}
                 className="absolute bottom-[27%] z-20 cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                style={{ left: `${stationLeftPercent}%`, width: 'min(45cqh, 140px)', transform: 'translateX(calc(-100% - 40px))' }}
+                style={{ left: `${stationLeftPercent}%`, width: 'min(28cqh, 96px)', transform: 'translateX(calc(-100% - 36px))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
