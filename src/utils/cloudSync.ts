@@ -1,7 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updatePassword, type User } from 'firebase/auth';
 import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
-import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { connectStorageEmulator, deleteObject, getMetadata, getStorage, listAll, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages } from './syncMerge';
 // Uygulama bu birleştirme kurallarını cloudSync üzerinden de kullanır.
@@ -14,6 +14,9 @@ const ADULT_NAMES_KEY = 'ruzgar_adult_names_v1';
 export const JOIN_INVITE_DAYS = 7;
 /** Süreli erişimi biten cihaz, giriş ekranında bunu söylesin diye. */
 export const ACCESS_ENDED_KEY = 'ruzgar_access_ended_v1';
+/** Sesli mesaj alanı: Firebase'in ücretsiz depolama sınırı ve uyarı eşiği. */
+export const VOICE_STORAGE_LIMIT_BYTES = 5 * 1024 * 1024 * 1024;
+export const VOICE_STORAGE_WARN_RATIO = 0.8;
 /** Süreli davette en uzun erişim (gün). */
 export const MAX_ACCESS_DAYS = 365;
 const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || (
@@ -343,6 +346,23 @@ export async function getAdultFamilyCode() {
 async function rememberAdultFamily(code: string) {
   const { auth } = await getServices();
   await setDoc(adultProfileRef(auth.currentUser!.uid), { familyCode: code, updatedAt: Date.now() }, { merge: true });
+}
+
+/** Ailenin ses klasöründeki gerçek dosyaların toplam boyutu (silinmişlerden kalanlar dahil). */
+export async function getVoiceStorageUsage(code: string) {
+  const { storage } = await getServices();
+  const list = await listAll(ref(storage, `families/${code}/voice`));
+  const sizes = await Promise.all(list.items.map((item) => getMetadata(item).then((meta) => meta.size).catch(() => 0)));
+  return { bytes: sizes.reduce((sum, size) => sum + size, 0), files: list.items.length };
+}
+
+/** Silinen mesajın ses dosyasını depodan da kaldırır (yer açılsın). Hata olursa sessizce geçer. */
+export async function deleteVoiceFile(url?: string) {
+  if (!url || url.startsWith('data:')) return;
+  try {
+    const { storage } = await getServices();
+    await deleteObject(ref(storage, url));
+  } catch { /* dosya zaten yoksa ya da çevrimdışıysa mesaj yine silinmiş sayılır */ }
 }
 
 /** Aile PIN'i tüm cihazlarda ortaktır; yalnızca giriş yapmış yetişkin değiştirir. */

@@ -24,7 +24,8 @@ service firebase.storage {
     }
 
     match /families/{familyCode}/voice/{fileName} {
-      allow read: if isFamilyMember(familyCode);
+      // list: ebeveyn panelindeki "sesli mesaj alanı" göstergesi için.
+      allow read, list: if isFamilyMember(familyCode);
       allow create, update: if isFamilyMember(familyCode)
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('audio/.*');

@@ -13,6 +13,7 @@
     "test:sync": "tsx scripts/test-sync.ts",
     "test:password": "tsx scripts/test-password.ts",
     "test:invite": "tsx scripts/test-invite.ts",
+    "test:storage": "tsx scripts/test-storage.ts",
     "emulators": "JAVA_TOOL_OPTIONS=-Xmx2g firebase emulators:start --only auth,firestore,storage --project demo-gorevtreni --export-on-exit=.emulator-data $([ -f .emulator-data/firebase-export-metadata.json ] && echo --import=.emulator-data)",
     "dev:yerel": "VITE_USE_EMULATORS=true vite --port=3001 --host=0.0.0.0"
   },

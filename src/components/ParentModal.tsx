@@ -7,6 +7,7 @@ import { extractYoutubeId, hashParentPin, isWeakParentPin, needsNewParentPin } f
 const PARENT_UNLOCK_MS = 5 * 60 * 1000;
 import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { withGenitive } from '../utils/turkish';
+import { VOICE_STORAGE_LIMIT_BYTES, VOICE_STORAGE_WARN_RATIO } from '../utils/cloudSync';
 import { ArrowLeft, Check, ChevronRight, Gift, History, ListChecks, Lock, Mic, Plus, RefreshCw, RotateCcw, Settings, Trash2, Tv, TrendingUp, Volume2, VolumeX, X } from 'lucide-react';
 import '../design/parent.css';
 
@@ -42,6 +43,8 @@ interface ParentModalProps {
   onJoinFamily: (code: string) => Promise<void>;
   /** Kişiye özel, tek kullanımlık davet linki üretir. */
   onCreateInvite?: (name: string, accessDays: number) => Promise<string>;
+  /** Sesli mesaj dosyalarının depoda kapladığı alan. */
+  onLoadStorageUsage?: () => Promise<{ bytes: number; files: number }>;
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
   weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
@@ -93,6 +96,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onCreateFamily,
   onJoinFamily,
   onCreateInvite,
+  onLoadStorageUsage,
   activityLog = [],
   voiceMessages = [],
   weeklyStats = [],
@@ -121,6 +125,38 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   // null = panelin ana sayfası (kimin yanında + onaylar + bölüm kartları).
   type Section = 'tasks' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings';
   const [section, setSection] = useState<Section | null>(null);
+  // Sesli mesaj alanı: panel her açıldığında bir kez ölçülür.
+  const [storageUsage, setStorageUsage] = useState<{ bytes: number; files: number } | null>(null);
+  const [storageError, setStorageError] = useState(false);
+  useEffect(() => {
+    if (!isOpen || !isAuthenticated || !onLoadStorageUsage) return;
+    let cancelled = false;
+    setStorageError(false);
+    onLoadStorageUsage()
+      .then((usage) => { if (!cancelled) setStorageUsage(usage); })
+      .catch(() => { if (!cancelled) setStorageError(true); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isAuthenticated]);
+  const storageRatio = storageUsage ? storageUsage.bytes / VOICE_STORAGE_LIMIT_BYTES : 0;
+  const storageWarn = storageRatio >= VOICE_STORAGE_WARN_RATIO;
+  const formatBytes = (bytes: number) => bytes >= 1024 ** 3
+    ? `${(bytes / 1024 ** 3).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} GB`
+    : `${Math.max(0.1, bytes / 1024 ** 2).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} MB`;
+  const storageCard = storageUsage && (
+    <section className={`pp-card ${storageWarn ? 'pp-storage-warn' : ''}`}>
+      <p className="pp-label">SESLİ MESAJ ALANI</p>
+      <p className="pp-big">{formatBytes(storageUsage.bytes)} <small>/ {formatBytes(VOICE_STORAGE_LIMIT_BYTES)}</small></p>
+      <div className="pp-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(storageRatio * 100)} aria-label="Sesli mesaj alanı doluluğu">
+        <i style={{ width: `${Math.min(100, Math.max(1, storageRatio * 100))}%` }} />
+      </div>
+      <p className="pp-muted">
+        {storageWarn
+          ? `Alan %${Math.round(storageRatio * 100)} dolu. Eski sesli mesajları yedeklemeyi ya da daha büyük bir depolamaya geçmeyi düşünün.`
+          : `${storageRatio < 0.01 ? '%1’den az' : `%${Math.round(storageRatio * 100)}`} dolu · ${storageUsage.files} ses dosyası. Mesajlar kalıcıdır; yalnızca siz silerseniz silinir.`}
+      </p>
+    </section>
+  );
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [taskMessage, setTaskMessage] = useState('');
@@ -418,6 +454,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
         ) : section === null ? (
           /* Ana sayfa */
           <div className="pp-body">
+            {storageWarn && storageCard}
             {deviceControls && (
               <section className={`pp-card pp-who ${deviceControls.isActiveDevice ? 'here' : ''}`}>
                 <div className="pp-row">
@@ -723,6 +760,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
             {/* AYARLAR */}
             {section === 'settings' && (
               <>
+                {storageCard}
+                {storageError && <p className="pp-note">Sesli mesaj alanı şu an ölçülemedi (internet bağlantısını kontrol edin).</p>}
                 {deviceControls && (
                   <section className="pp-card">
                     <p className="pp-label">BU CİHAZ{deviceControls.adultName ? ` · ${deviceControls.adultName.toLocaleUpperCase('tr-TR')}` : ''}</p>
