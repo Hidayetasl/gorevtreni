@@ -41,7 +41,7 @@ interface ParentModalProps {
   onCreateFamily: () => Promise<string>;
   onJoinFamily: (code: string) => Promise<void>;
   /** Kişiye özel, tek kullanımlık davet linki üretir. */
-  onCreateInvite?: (name: string) => Promise<string>;
+  onCreateInvite?: (name: string, accessDays: number) => Promise<string>;
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
   weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
@@ -50,6 +50,8 @@ interface ParentModalProps {
   /** Eski üst çubuktan taşınan yetişkin işleri (çocuk ekranında artık görünmez). */
   deviceControls?: {
     adultName?: string;
+    /** Süreli davetle katılan hesabın erişim bitişi (ms). */
+    accessUntil?: number | null;
     onToggleSound: () => void;
     onManualSync: () => void;
     isSyncing: boolean;
@@ -111,6 +113,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [inviteOther, setInviteOther] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
+  // Davet edilenin erişim süresi: süresiz ya da yazılan gün sayısı kadar.
+  const [inviteTimed, setInviteTimed] = useState(false);
+  const [inviteDays, setInviteDays] = useState('15');
+  const inviteDayCount = Number(inviteDays);
+  const inviteDaysValid = Number.isInteger(inviteDayCount) && inviteDayCount >= 1 && inviteDayCount <= 365;
   // null = panelin ana sayfası (kimin yanında + onaylar + bölüm kartları).
   type Section = 'tasks' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings';
   const [section, setSection] = useState<Section | null>(null);
@@ -719,6 +726,9 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 {deviceControls && (
                   <section className="pp-card">
                     <p className="pp-label">BU CİHAZ{deviceControls.adultName ? ` · ${deviceControls.adultName.toLocaleUpperCase('tr-TR')}` : ''}</p>
+                    {deviceControls.accessUntil ? (
+                      <p className="pp-note">Bu hesabın erişimi {new Date(deviceControls.accessUntil).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} tarihine kadar açık.</p>
+                    ) : null}
                     <div className="pp-cols two">
                       <button type="button" className="pp-wide soft" onClick={deviceControls.onToggleSound}>
                         {soundEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}{soundEnabled ? 'Ses açık' : 'Ses kapalı'}
@@ -782,17 +792,29 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                           {inviteName === 'Başka biri' && (
                             <input className="pp-input" value={inviteOther} maxLength={24} onChange={(e) => { setInviteOther(e.target.value); setInviteLink(''); }} placeholder="Adı (örn. Dede, Ayşe Teyze)" />
                           )}
+                          <p className="pp-muted" style={{ margin: 0 }}>Ne kadar süre erişebilsin?</p>
+                          <div className="pp-chips two" role="radiogroup" aria-label="Erişim süresi">
+                            <button type="button" role="radio" aria-checked={!inviteTimed} className={!inviteTimed ? 'on' : ''} onClick={() => { setInviteTimed(false); setInviteLink(''); }}>Süresiz</button>
+                            <button type="button" role="radio" aria-checked={inviteTimed} className={inviteTimed ? 'on' : ''} onClick={() => { setInviteTimed(true); setInviteLink(''); }}>Belirli gün</button>
+                          </div>
+                          {inviteTimed && (
+                            <label className="pp-days">
+                              <input className="pp-input" type="number" inputMode="numeric" min={1} max={365} value={inviteDays} onChange={(e) => { setInviteDays(e.target.value.replace(/[^0-9]/g, '').slice(0, 3)); setInviteLink(''); }} aria-label="Gün sayısı" />
+                              <span>gün</span>
+                            </label>
+                          )}
+                          {inviteTimed && !inviteDaysValid && <p className="pp-note">1 ile 365 arasında bir gün sayısı yazın.</p>}
                           {!inviteLink ? (
                             <button
                               type="button"
                               className="pp-wide mavi"
-                              disabled={inviteBusy || (inviteName === 'Başka biri' && !inviteOther.trim())}
+                              disabled={inviteBusy || (inviteName === 'Başka biri' && !inviteOther.trim()) || (inviteTimed && !inviteDaysValid)}
                               onClick={async () => {
                                 setInviteBusy(true);
                                 setInviteMessage('');
                                 try {
                                   const name = inviteName === 'Başka biri' ? inviteOther.trim() : inviteName;
-                                  setInviteLink(await onCreateInvite(name));
+                                  setInviteLink(await onCreateInvite(name, inviteTimed ? inviteDayCount : 0));
                                   if (inviteName === 'Başka biri') {
                                     const next = [...new Set([...savedInviteNames, name])].slice(-6);
                                     setSavedInviteNames(next);
@@ -818,16 +840,21 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                                   try { await navigator.clipboard.writeText(inviteLink); setInviteMessage('Link kopyalandı.'); } catch { setInviteMessage('Linki basılı tutup kopyalayın.'); }
                                 }}>Kopyala</button>
                               </div>
-                              <p className="pp-muted">Davet edilen kişi linke dokunur, “Google ile giriş yap” der; kod veya PIN gerekmez.</p>
+                              <p className="pp-muted">Davet edilen kişi linke dokunur, “Google ile giriş yap” der; kod veya PIN gerekmez. {inviteTimed ? `Erişimi katıldığı andan itibaren ${inviteDayCount} gün sürer, sonra kendiliğinden kapanır.` : 'Erişimi süresizdir.'}</p>
                             </>
                           )}
                         </div>
                       )}
-                      <details className="pp-more">
-                        <summary>Aile kodu</summary>
-                        <p className="pp-muted">Eski yöntem: kodu bilen izinli hesap aileye katılabilir.</p>
-                        <div className="pp-code">{familyCode}</div>
-                      </details>
+                      {/* Kalıcı aile kodu yalnızca yöneticiye görünür (süreli misafir görmesin). */}
+                      {onCreateInvite ? (
+                        <details className="pp-more">
+                          <summary>Aile kodu</summary>
+                          <p className="pp-muted">Eski yöntem: kodu bilen izinli hesap aileye katılabilir.</p>
+                          <div className="pp-code">{familyCode}</div>
+                        </details>
+                      ) : (
+                        <p className="pp-muted">Bu telefon aileye bağlı. Yeni kişileri aile yöneticisi davet eder.</p>
+                      )}
                       {inviteMessage && <p role="status" className="pp-note">{inviteMessage}</p>}
                       <details className="pp-more">
                         <summary>Bu cihazı başka bir aileye bağla</summary>

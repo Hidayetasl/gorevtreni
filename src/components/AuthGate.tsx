@@ -4,6 +4,7 @@ import './AuthGate.css';
 import {
   acceptFamilyInvite,
   acceptJoinInvite,
+  ACCESS_ENDED_KEY,
   changeAdultPassword,
   completeGoogleRedirect,
   createFamily,
@@ -79,7 +80,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
   const [confirmNewFamily, setConfirmNewFamily] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(() => {
+    try {
+      if (localStorage.getItem(ACCESS_ENDED_KEY) !== '1') return '';
+      localStorage.removeItem(ACCESS_ENDED_KEY);
+      return 'Bu hesabın aileye erişim süresi doldu. Yeniden erişim için yeni bir davet linki isteyin.';
+    } catch { return ''; }
+  });
   const [busy, setBusy] = useState(false);
   const [inviteCode] = useState(() => getInviteFamilyCode());
   // Tek kullanımlık kişisel davet (?davet=...): Google ile girince doğrudan katılır.
@@ -297,6 +304,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
                 {busy ? 'Google açılıyor…' : 'Google ile giriş yap'}
               </button>
               {!showEmailForm && errorBox}
+              {!showEmailForm && notice && <p className="ag-msg ok" role="status">{notice}</p>}
               {joinToken ? null : !showEmailForm ? (
                 <button type="button" className="ag-link" onClick={() => { setError(''); setShowEmailForm(true); }}>E-posta ve şifreyle giriş</button>
               ) : (

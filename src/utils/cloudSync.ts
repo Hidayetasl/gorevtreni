@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updatePassword, type User } from 'firebase/auth';
-import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
 import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages } from './syncMerge';
@@ -12,6 +12,10 @@ const FAMILY_CODE_KEY = 'ruzgar_family_code_v1';
 const ADULT_NAMES_KEY = 'ruzgar_adult_names_v1';
 /** Tek kullanımlık davet linkinin geçerlilik süresi. */
 export const JOIN_INVITE_DAYS = 7;
+/** Süreli erişimi biten cihaz, giriş ekranında bunu söylesin diye. */
+export const ACCESS_ENDED_KEY = 'ruzgar_access_ended_v1';
+/** Süreli davette en uzun erişim (gün). */
+export const MAX_ACCESS_DAYS = 365;
 const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || (
   typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : ''
 );
@@ -59,6 +63,10 @@ export type FamilyData = {
   activeChildDevice?: ActiveChildDevice | null;
   /** Davetle katılan yetişkinlerin adı (uid → ad). */
   adultNames?: Record<string, string>;
+  /** Davet oluşturabilen hesaplar (yalnızca aile yöneticisi). */
+  adminUids?: string[];
+  /** Süreli davetle katılanların erişim bitişi (uid → ms). */
+  memberExpiry?: Record<string, number>;
 };
 
 const adultAccountConfig: Array<{ name: AdultName; email: string; uid: string }> = [
@@ -113,6 +121,13 @@ function readAdultNames(): Record<string, string> {
 /** Davetle katılan yetişkinin adını bu cihazda hatırlar. */
 export function rememberAdultName(uid: string, name: string) {
   try { localStorage.setItem(ADULT_NAMES_KEY, JSON.stringify({ ...readAdultNames(), [uid]: name })); } catch { /* yoksay */ }
+}
+
+/** Süresi biten davetli bu cihazda artık tanınmaz; yeniden katılmak için yeni davet gerekir. */
+export function forgetAdultName(uid: string) {
+  const names = readAdultNames();
+  delete names[uid];
+  try { localStorage.setItem(ADULT_NAMES_KEY, JSON.stringify(names)); } catch { /* yoksay */ }
 }
 
 /** İzinli listedeki ad ya da daha önce davetle bu cihazda katılmış yetişkinin adı. */
@@ -437,6 +452,10 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
       memberUids,
       // Davetle katılanların adları başka cihazın yazmasıyla silinmesin.
       adultNames: { ...((remoteData.adultNames as Record<string, string> | undefined) || {}), ...(data.adultNames || {}) },
+      // Yönetici ve erişim süreleri yalnızca buluttan gelir; cihazlar değiştiremez.
+      // Yeni kurulan ailede kuran kişi yönetici olur.
+      adminUids: snapshot.exists() ? remoteData.adminUids : [uid],
+      memberExpiry: remoteData.memberExpiry,
       inviteEnabled: true,
       updatedAt: Date.now(),
       schemaVersion: 3,
@@ -507,10 +526,12 @@ export function getJoinInviteToken() {
  * Aile üyesi, belirli bir kişi için tek kullanımlık davet linki üretir
  * (7 gün geçerli). Link açılıp Google ile girilince o kişi aileye katılır.
  */
-export async function createJoinInvite(code: string, name: string) {
+export async function createJoinInvite(code: string, name: string, accessDays = 0) {
   const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   const cleanName = name.trim().slice(0, 24);
   if (!normalized || !cleanName) throw new Error('Davet için kişinin adı gerekli.');
+  const days = Math.round(accessDays);
+  if (!Number.isFinite(days) || days < 0 || days > MAX_ACCESS_DAYS) throw new Error(`Süre 1 ile ${MAX_ACCESS_DAYS} gün arasında olmalı (ya da süresiz).`);
   const services = await getServices();
   const uid = services.auth.currentUser?.uid;
   if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
@@ -523,6 +544,7 @@ export async function createJoinInvite(code: string, name: string) {
     createdBy: uid,
     createdAt: now,
     expiresAt: now + JOIN_INVITE_DAYS * 24 * 60 * 60 * 1000,
+    accessDays: days,
     usedBy: null,
     usedAt: null,
   });
@@ -543,7 +565,7 @@ export async function acceptJoinInvite(token: string) {
   if (!uid) throw new Error('Firebase kullanıcı oturumu bulunamadı.');
   const snapshot = await getDoc(joinInviteRef(token));
   if (!snapshot.exists()) throw new Error('Bu davet linki geçersiz. Aileden yeni bir link isteyin.');
-  const invite = snapshot.data() as { familyCode: string; name: string; expiresAt: number; usedBy: string | null };
+  const invite = snapshot.data() as { familyCode: string; name: string; expiresAt: number; accessDays?: number; usedBy: string | null };
   if (invite.usedBy && invite.usedBy !== uid) throw new Error('Bu davet linki daha önce kullanılmış. Aileden yeni bir link isteyin.');
   if (!invite.usedBy && invite.expiresAt < Date.now()) throw new Error('Bu davet linkinin süresi dolmuş. Aileden yeni bir link isteyin.');
   const code = saveFamilyCode(invite.familyCode);
@@ -553,6 +575,8 @@ export async function acceptJoinInvite(token: string) {
     batch.update(familyRef(code), {
       memberUids: arrayUnion(uid),
       [`adultNames.${uid}`]: invite.name,
+      // Süreli davet: erişim katılınca başlar; süresizse eski bir süre kaldırılır.
+      [`memberExpiry.${uid}`]: invite.accessDays ? Date.now() + invite.accessDays * 24 * 60 * 60 * 1000 : deleteField(),
       joinInvite: token,
       updatedAt: Date.now(),
     });

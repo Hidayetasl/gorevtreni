@@ -11,10 +11,16 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/families/$(familyCode));
     }
 
+    // Süreli davetle katılanın erişimi süre bitince kapanır (Firestore kuralıyla aynı).
+    function accessOpen(familyCode) {
+      return familyDoc(familyCode).data.get('memberExpiry', {}).get(request.auth.uid, 0) == 0
+        || familyDoc(familyCode).data.get('memberExpiry', {}).get(request.auth.uid, 0) > request.time.toMillis();
+    }
+
     function isFamilyMember(familyCode) {
       return signedIn()
         && (familyDoc(familyCode).data.ownerUid == request.auth.uid
-          || familyDoc(familyCode).data.memberUids.hasAny([request.auth.uid]));
+          || (familyDoc(familyCode).data.memberUids.hasAny([request.auth.uid]) && accessOpen(familyCode)));
     }
 
     match /families/{familyCode}/voice/{fileName} {

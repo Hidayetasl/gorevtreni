@@ -50,7 +50,7 @@ import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
 import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
-import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, forgetAdultName, ACCESS_ENDED_KEY, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
 import { validateYoutubeVideo } from './utils/youtubeValidation';
@@ -201,6 +201,9 @@ export default function App() {
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
   const [activeChildDevice, setActiveChildDevice] = useState<ActiveChildDevice | null | undefined>(undefined);
   const [adultUser, setAdultUser] = useState<{ uid: string; name: AdultName } | null>(null);
+  // Aile kaydından: bu hesap davet oluşturabilir mi, süreli erişimi ne zaman biter.
+  const [isInviteAdmin, setIsInviteAdmin] = useState(false);
+  const [accessUntil, setAccessUntil] = useState<number | null>(null);
   // Firebase oturumu diskten geri yüklenene kadar giriş ekranını gösterme.
   const [authChecked, setAuthChecked] = useState(!isCloudConfigured);
   const [cloudStatus, setCloudStatus] = useState(isCloudConfigured ? 'Bağlantı hazırlanıyor…' : 'Firebase yapılandırması bekleniyor');
@@ -342,6 +345,9 @@ export default function App() {
             return;
           }
           setActiveChildDevice(remote.activeChildDevice ?? null);
+          const myUid = getCurrentUid();
+          setIsInviteAdmin(Boolean(remote.adminUids?.includes(myUid)));
+          setAccessUntil(remote.memberExpiry?.[myUid] || null);
           // Bu callback yalnızca familyCode/cloudEnabled/networkEpoch değişince yeniden
           // kurulur (effect deps'e bakın), bu yüzden `tasks`/`shop`/`bonuses`/`coinLedger`
           // React state değişkenleri burada donmuş kalır. Onaylanan bir görev, birleştirme
@@ -611,6 +617,7 @@ export default function App() {
   };
 
   const handleSwitchAccount = async () => {
+    setIsInviteAdmin(false);
     if (isCloudConfigured) {
       try { await signOutAdult(); } catch (error) { setCloudStatus(getCloudErrorMessage(error, 'Hesaptan çıkış yapılamadı.')); }
     }
@@ -619,6 +626,24 @@ export default function App() {
     localStorage.removeItem(VERIFIED_UID_KEY);
     setVerifiedUid('');
   };
+
+  // Süreli davetle katılan hesabın süresi bitince bu cihaz çıkış yapar ve
+  // giriş ekranında "erişim süresi doldu" der (bulut kuralları da erişimi kapatır).
+  useEffect(() => {
+    if (!accessUntil) return;
+    const check = () => {
+      if (Date.now() < accessUntil) return;
+      try { localStorage.setItem(ACCESS_ENDED_KEY, '1'); } catch { /* yoksay */ }
+      forgetAdultName(getCurrentUid());
+      setAccessUntil(null);
+      void handleSwitchAccount();
+    };
+    check();
+    const timer = window.setInterval(check, 60 * 1000);
+    document.addEventListener('visibilitychange', check);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', check); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessUntil]);
 
   const handleJoinFamily = async (code: string) => {
     const normalized = saveFamilyCode(code);
@@ -1048,6 +1073,8 @@ export default function App() {
           // Davetle katılan kişi izin listesinde değil; adı aile kaydından gelir.
           const invitedName = familyData.adultNames?.[uid];
           if (invitedName) setAdultUser((current) => current ?? { uid, name: invitedName });
+          setIsInviteAdmin(Boolean(familyData.adminUids?.includes(uid)));
+          setAccessUntil(familyData.memberExpiry?.[uid] || null);
           const syncedLedger = familyData.coinLedger || [];
           setUser({ ...INITIAL_USER, ...familyData.user, coins: calculateLedgerBalance(syncedLedger, familyData.user.coins) });
           setParentConfig(familyData.parentConfig || INITIAL_PARENT);
@@ -1168,12 +1195,13 @@ export default function App() {
           familyCode={familyCode}
           onCreateFamily={handleCreateFamily}
           onJoinFamily={handleJoinFamily}
-          onCreateInvite={familyCode ? (name) => createJoinInvite(familyCode, name) : undefined}
+          onCreateInvite={familyCode && isInviteAdmin ? (name, days) => createJoinInvite(familyCode, name, days) : undefined}
           activityLog={activityLog}
           voiceMessages={liveVoiceMessages}
           recentRewards={recentRewards}
           deviceControls={{
             adultName: adultUser?.name,
+            accessUntil,
             onToggleSound: handleToggleSound,
             onManualSync: () => void handleManualSync(),
             isSyncing: isManualSyncing,

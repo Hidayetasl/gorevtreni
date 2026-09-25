@@ -13,22 +13,25 @@ service cloud.firestore {
       return /databases/$(database)/documents/families/$(familyCode);
     }
 
+    // Süreli davetle katılanın erişimi süre bitince kapanır.
+    function accessOpen(data) {
+      return data.get('memberExpiry', {}).get(request.auth.uid, 0) == 0
+        || data.get('memberExpiry', {}).get(request.auth.uid, 0) > request.time.toMillis();
+    }
+
     function isFamilyMember(familyCode) {
       return signedIn()
         && (resource.data.get('ownerUid', '') == request.auth.uid
-          || resource.data.get('memberUids', []).hasAny([request.auth.uid]));
+          || (resource.data.get('memberUids', []).hasAny([request.auth.uid]) && accessOpen(resource.data)));
     }
 
     function invitePath(token) {
       return /databases/$(database)/documents/familyJoinInvites/$(token);
     }
 
-    // Aile belgesini okumadan üyelik kontrolü (davet oluştururken).
-    function isMemberOf(familyCode) {
-      let family = get(familyPath(familyCode)).data;
-      return signedIn()
-        && (family.get('ownerUid', '') == request.auth.uid
-          || family.get('memberUids', []).hasAny([request.auth.uid]));
+    // Davet oluşturma yetkisi yalnızca aile yöneticisinde (adminUids).
+    function isAdminOf(familyCode) {
+      return signedIn() && get(familyPath(familyCode)).data.get('adminUids', []).hasAny([request.auth.uid]);
     }
 
     function isFamilyOwner() {
@@ -62,14 +65,16 @@ service cloud.firestore {
       allow list: if false;
       allow create: if signedIn()
         && token.size() >= 20
-        && request.resource.data.keys().hasOnly(['familyCode', 'name', 'createdBy', 'createdAt', 'expiresAt', 'usedBy', 'usedAt'])
+        && request.resource.data.keys().hasOnly(['familyCode', 'name', 'createdBy', 'createdAt', 'expiresAt', 'accessDays', 'usedBy', 'usedAt'])
+        && request.resource.data.accessDays is int
+        && request.resource.data.accessDays >= 0 && request.resource.data.accessDays <= 365
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 24
         && request.resource.data.expiresAt is int
         && request.resource.data.expiresAt <= request.time.toMillis() + 8 * 24 * 60 * 60 * 1000
         && request.resource.data.usedBy == null
-        && isMemberOf(request.resource.data.familyCode);
+        && isAdminOf(request.resource.data.familyCode);
       allow update: if signedIn()
         && resource.data.usedBy == null
         && resource.data.expiresAt > request.time.toMillis()
@@ -80,21 +85,32 @@ service cloud.firestore {
 
     // Davetle katılım: davet aynı anda (toplu yazmada) bu kişi adına
     // "kullanıldı" işaretlenmeli, bu aileye ait ve süresi dolmamış olmalı.
+    // Süreli davette erişim bitişi davetteki gün sayısına uymalı; süresi
+    // bitmiş bir üye yeni davetle yeniden açılabilir.
     function joinsWithInvite(familyCode) {
+      let uid = request.auth.uid;
       let token = request.resource.data.get('joinInvite', '');
       let before = get(invitePath(token)).data;
       let after = getAfter(invitePath(token)).data;
+      let oldMembers = resource.data.get('memberUids', []);
+      let newMembers = request.resource.data.memberUids;
+      let expiry = request.resource.data.get('memberExpiry', {});
+      let target = request.time.toMillis() + after.accessDays * 24 * 60 * 60 * 1000;
       return token is string && token.size() >= 20
         && before.usedBy == null
-        && after.usedBy == request.auth.uid
+        && after.usedBy == uid
         && after.familyCode == familyCode
         && after.expiresAt > request.time.toMillis()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'updatedAt', 'adultNames', 'joinInvite'])
-        && request.resource.data.memberUids.hasAll(resource.data.get('memberUids', []))
-        && request.resource.data.memberUids.hasAny([request.auth.uid])
-        && request.resource.data.memberUids.size() == resource.data.get('memberUids', []).size() + 1
-        && request.resource.data.adultNames.diff(resource.data.get('adultNames', {})).affectedKeys().hasOnly([request.auth.uid])
-        && request.resource.data.adultNames[request.auth.uid] == after.name;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'updatedAt', 'adultNames', 'joinInvite', 'memberExpiry'])
+        && newMembers.hasAll(oldMembers)
+        && newMembers.hasAny([uid])
+        && newMembers.size() == oldMembers.size() + (oldMembers.hasAny([uid]) ? 0 : 1)
+        && request.resource.data.adultNames.diff(resource.data.get('adultNames', {})).affectedKeys().hasOnly([uid])
+        && request.resource.data.adultNames[uid] == after.name
+        && expiry.diff(resource.data.get('memberExpiry', {})).affectedKeys().hasOnly([uid])
+        && (after.accessDays == 0
+          ? !(uid in expiry)
+          : (expiry.get(uid, 0) > target - 600000 && expiry.get(uid, 0) < target + 600000));
     }
 
     match /families/{familyCode} {
@@ -121,6 +137,9 @@ service cloud.firestore {
         )
         || (
           isFamilyMember(familyCode)
+          // Yönetici listesi ve erişim süreleri eşitlemeyle değiştirilemez.
+          && request.resource.data.get('adminUids', []) == resource.data.get('adminUids', [])
+          && request.resource.data.get('memberExpiry', {}) == resource.data.get('memberExpiry', {})
           && request.resource.data.get('ownerUid', '') == resource.data.get('ownerUid', '')
           && request.resource.data.get('memberUids', []) == resource.data.get('memberUids', [])
           && request.resource.data.get('inviteEnabled', false) == resource.data.get('inviteEnabled', false)
