@@ -1557,7 +1557,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 kaydırılarak keşfedilir. Köşedeki sabit etiketler bu kaydırılabilir
                 katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
             <div className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-[2rem]">
-              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%` }}>
+              {/* En az ~54px'lik kareler: küçük telefonda da parmakla rahat dokunulur (harita yana kayar). */}
+              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%`, minWidth: GRID_COLS * 54 }}>
             <img
               src={stableCartoonBackground}
               alt="Harita çizimi kasaba arka planı"

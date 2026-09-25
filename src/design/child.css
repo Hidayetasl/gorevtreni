@@ -488,7 +488,8 @@
   .gt-nv { min-width: 0; min-height: 76px; font-size: 15px; }
   .gt-nv .ic { width: 72px; height: 50px; border-radius: 18px; }
   .gt-nv .ic img { max-width: 56px; max-height: 46px; }
-  .gt-top { background: #fff; border-radius: 24px; margin: 18px 28px 0; padding: 14px 18px; box-shadow: 0 2px 0 var(--gt-line); gap: 14px; }
+  /* Üst çubuk <main> dışında: sabit sol menünün altında kalmasın. */
+  .gt-top { background: #fff; border-radius: 24px; margin: 18px 28px 0 calc(var(--gt-nav-w) + 28px); padding: 14px 18px; box-shadow: 0 2px 0 var(--gt-line); gap: 14px; }
   .gt-avatar { width: 76px; height: 76px; font-size: 36px; }
   .gt-name { font-size: 26px; }
   .gt-who small { font-size: 15px; }
@@ -568,9 +569,13 @@
   .gt-player-frame iframe { max-width: min(100%, calc((100dvh - 100px) * 16 / 9)); }
   .gt-toast { left: 50%; right: auto; transform: translateX(-50%); bottom: 28px; min-width: 320px; }
 }
+/* Dik tablet (720–999px): görev kartı iki sütuna sığmaz; "Sıradaki" alta iner. */
+@container gt (min-width: 720px) and (max-width: 999px) {
+  .gt-grid2 { grid-template-columns: minmax(0, 1fr); }
+}
 @container gt (min-width: 1100px) {
   .gt-grid2, .gt-top { max-width: 1080px; margin-left: auto; margin-right: auto; }
-  .gt-top { max-width: 1024px; }
+  .gt-top { max-width: 1024px; margin-left: max(calc(var(--gt-nav-w) + 28px), calc(var(--gt-nav-w) + (100% - var(--gt-nav-w) - 1024px) / 2)); }
   .gt-all { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1024px; margin-left: auto; margin-right: auto; }
   .gt-menu.shop { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .gt-shop > .gt-head, .gt-shop .gt-subhead { padding-left: 0; padding-right: 0; }
@@ -600,4 +605,149 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .gt *, .gt-cele, .gt-cele * { animation: none !important; transition: none !important; }
+}
+
+/* ---------- küçük dikey telefon (≤380px): üst çubukta ad kesilmesin ---------- */
+@container gt (max-width: 380px) {
+  .gt-top { gap: 6px; padding-left: 12px; padding-right: 12px; }
+  .gt-avatar { width: 44px; height: 44px; }
+  .gt-name { font-size: 18px; }
+  .gt-who small { font-size: 12px; }
+  .gt-coin { min-height: 46px; padding: 0 10px 0 6px; gap: 4px; }
+  .gt-coin-dot { width: 24px; height: 24px; }
+  .gt-coin b { font-size: 19px; }
+  .gt-ib { width: 46px; height: 46px; }
+  .gt-ib.kilit { width: 36px; }
+  .gt-world .gt-subhead h1 { font-size: 18px; white-space: nowrap; }
+  .gt-world .gt-subhead h1 .gt-menu-img { height: 28px; }
+}
+
+/* ---------- yatay telefon (alçak ekran): menü solda, üst çubuk ince ----------
+   Dikey düzende üst çubuk + alt menü ekranın yarısını kaplıyordu; yatayda
+   içerik (görev, sahne, oyun) görünür alana sığsın diye her şey sıkılaşır. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .gt { --gt-nav-w: calc(84px + env(safe-area-inset-left, 0px)); }
+  .gt-nav { top: 0; bottom: 0; right: auto; width: var(--gt-nav-w); flex-direction: column; justify-content: space-evenly; gap: 2px; padding: 6px 6px 6px calc(6px + env(safe-area-inset-left, 0px)); border-top: 0; border-right: 1px solid #d6e7ea; }
+  .gt .gt-nv { min-width: 0; min-height: 0; flex: 1; max-height: 72px; gap: 2px; font-size: 12px; }
+  .gt .gt-nv .ic { width: 56px; height: 34px; border-radius: 14px; }
+  .gt .gt-nv .ic img { max-width: 38px; max-height: 30px; }
+  .gt .gt-main { margin-left: var(--gt-nav-w); padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding-right: env(safe-area-inset-right, 0px); }
+
+  .gt .gt-top { margin: 0 0 0 var(--gt-nav-w); padding: 6px 14px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); background: transparent; box-shadow: none; border-radius: 0; gap: 8px; max-width: none; }
+  .gt .gt-avatar { width: 40px; height: 40px; box-shadow: 0 0 0 2px var(--gt-turkuaz); border-width: 2px; }
+  .gt .gt-name { font-size: 18px; }
+  .gt .gt-who small { font-size: 12px; }
+  .gt .gt-coin { min-height: 40px; padding: 0 10px 0 6px; background: #fff; box-shadow: 0 2px 0 var(--gt-line); }
+  .gt .gt-coin-dot { width: 24px; height: 24px; }
+  .gt .gt-coin b { font-size: 19px; }
+  .gt .gt-coin small { display: none; }
+  .gt .gt-ib, .gt .gt-ib.mor { width: 42px; height: 42px; border-radius: 14px; }
+  .gt .gt-ib.kilit { width: 36px; }
+
+  /* Görevler: resim solda, ad ve "Bitti!" sağda; hepsi ekrana sığar. */
+  .gt .gt-track { margin: 0 auto 6px; width: calc(100% - 28px); max-width: 520px; }
+  .gt .gt-track::before { top: 19px; }
+  .gt .gt-st { min-height: 0; gap: 2px; font-size: 13px; width: 64px; }
+  .gt .gt-st .dot { width: 42px; height: 42px; font-size: 20px; }
+  .gt .gt-grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; padding: 0 14px; align-items: start; max-width: none; }
+  .gt .gt-grid2 .gt-now, .gt .gt-grid2 .gt-waiting, .gt .gt-grid2 .gt-next { margin: 0; }
+  .gt .gt-now { flex-direction: row; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 22px; }
+  .gt .gt-illu { width: clamp(110px, calc(100dvh - 190px), 190px); height: clamp(110px, calc(100dvh - 190px), 190px); border-width: 4px; }
+  .gt .gt-now-body { align-items: stretch; gap: 8px; }
+  .gt .gt-now h2 { font-size: 20px; text-align: left; }
+  .gt .gt-big { min-height: 58px; font-size: 21px !important; border-radius: 20px; }
+  .gt .gt-big svg { width: 26px; height: 26px; }
+  .gt .gt-mid { min-height: 46px; font-size: 16px !important; }
+  .gt .gt-next { gap: 8px; }
+  .gt .gt-nx { min-height: 52px; font-size: 16px; }
+  .gt .gt-nx img, .gt .gt-nx .emo { width: 44px; height: 44px; }
+  .gt .gt-all { margin: 0 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: none; }
+  .gt .gt-tc .pic { width: 84px; height: 84px; }
+  /* Dar yatay ekranda (640px gibi) "Sıradaki" listesi görevin altına iner. */
+  @container gt (max-width: 719px) {
+    .gt .gt-grid2 { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* Başlıklar ve menüler */
+  .gt .gt-head { padding: 4px 14px 0; max-width: none; }
+  .gt .gt-head h1 { font-size: 22px; }
+  .gt .gt-menu-hint { margin: 2px 14px 0; font-size: 15px; max-width: none; }
+  .gt .gt-menu { margin: 8px 14px 0; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: none; }
+  .gt .gt-menu-card { min-height: 108px; padding: 8px; gap: 4px; }
+  .gt .gt-menu-card .e { font-size: 40px; }
+  .gt .gt-menu-card .t { font-size: 16px; }
+  .gt .gt-menu-img { height: 52px; }
+  .gt .gt-menu.shop { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .gt .gt-menu.shop .gt-menu-card:first-child { grid-column: auto; flex-direction: column; min-height: 108px; }
+  .gt .gt-menu.shop .gt-menu-card:first-child .t { text-align: center; }
+  .gt .gt-subhead { padding-top: 4px; flex-wrap: nowrap; }
+  .gt .gt-subhead h1 { font-size: 20px; }
+  .gt .gt-back { min-height: 46px; }
+
+  /* Öğren oyunları */
+  .gt .gt-lcard { margin: 8px 14px 0; padding: 10px 14px; gap: 8px; max-width: none; }
+  .gt .gt-letters { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  .gt .gt-picture { width: 76px; height: 76px; font-size: 44px; }
+  .gt .gt-q { font-size: 17px; }
+  .gt .gt-lvl { padding: 3px 12px; font-size: 12px; }
+  .gt .gt-slots span { min-height: 48px; min-width: 64px; }
+  .gt .gt-balloons { grid-template-columns: repeat(6, minmax(0, 1fr)); max-width: none; gap: 8px; }
+  .gt .gt-balloon { min-height: 54px; }
+  .gt .gt-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: none; }
+
+  /* Dünya: kapak solda, üç büyük düğme sağda */
+  .gt .gt-world { padding: 0 14px; gap: 8px; max-width: none; }
+  .gt .gt-world > .gt-head { padding: 4px 0 0; }
+  .gt .gt-wmenu { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+  .gt .gt-wcover { max-height: calc(100dvh - 130px); border-radius: 18px; border-width: 3px; }
+  .gt .gt-wmenu-side { display: flex; flex-direction: column; gap: 6px; }
+  .gt .gt-wmenu .gt-menu.world { grid-template-columns: 1fr; margin: 0; gap: 8px; }
+  .gt .gt-wmenu .gt-menu.world .gt-menu-card, .gt .gt-wmenu .gt-menu.world .gt-menu-card:first-child { grid-column: auto; flex-direction: row; justify-content: flex-start; min-height: 0; padding: 6px 12px; gap: 12px; }
+  .gt .gt-wmenu .gt-menu.world .gt-menu-card .t { text-align: left; }
+  .gt .gt-wmenu .gt-menu-img { height: 46px; }
+  .gt .gt-world .gt-subhead { padding-top: 4px; }
+  .gt .gt-world .gt-subhead h1 { font-size: 20px; }
+  .gt .gt-world .gt-back { min-height: 44px; }
+  .gt .gt-world .gt-back .ar { width: 36px; height: 36px; }
+
+  /* Treni sür: sahne solda ekran boyu, kumanda sağda */
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 10px; align-items: start; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .world-ride-canvas-shell { aspect-ratio: auto !important; height: max(170px, calc(100dvh - 118px)); min-height: 0 !important; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wc { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wc > .gt-wpanel:first-child { grid-row: auto; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wpanel { padding: 8px; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wbtns { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wbtn { min-height: 64px; font-size: 13px !important; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wbtn .pic { height: 34px; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-wbtn .pic img { max-height: 34px; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-speed button { min-height: 50px; font-size: 11px !important; letter-spacing: -.01em; }
+  .gt .gt-world .world-ride-layout:not(.is-fullscreen) .gt-speed button img { height: 24px; }
+  .gt .gt-wide-only { display: none !important; }
+
+  /* Mağaza, hangar, videolar */
+  .gt .gt-shop .gt-subhead, .gt .gt-shop > .gt-head { padding: 4px 14px 0; }
+  .gt .gt-shop-grid { margin: 8px 14px 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: none; }
+  .gt .gt-sitem .pic { height: 96px; }
+  .gt .gt-wgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .gt .gt-wtools.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  /* Hediye kartı ve alt sayfalar: yatayda ekrana sığar, gerekirse kayar. */
+  .gt-sheet-wrap.gt-center { padding: 8px; }
+  .gt-sheet { max-height: calc(100dvh - 16px); overflow-y: auto; padding: 12px 16px; gap: 6px; }
+  .gt-sheet-wrap:not(.gt-center) .gt-sheet { max-height: 100dvh; }
+  .gt-gift-box { width: 84px; height: 84px; font-size: 48px; flex: none; }
+  .gt-sheet .gt-big { min-height: 54px; }
+
+  /* Günümü anlat / ses kaydı: duygular ve mikrofon aynı ekranda */
+  .gt-vm-body { padding: 8px 14px 10px; }
+  .gt-vm-rec, .gt-vm-inbox { gap: 8px; }
+  .gt-moods button { min-height: 60px; }
+  .gt-moods button .e { font-size: 26px; }
+  .gt-mic { width: 112px; height: 112px; }
+  .gt-mic svg { width: 52px; height: 52px; }
+  @container gt (max-width: 719px) {
+    .gt .gt-menu.shop { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  .gt .gt-vgrid { margin: 8px 14px 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: none; }
 }
