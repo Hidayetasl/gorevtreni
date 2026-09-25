@@ -34,6 +34,8 @@ import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
+// Sahnede rayla aynı hizada duran, yandan görünen köprü (mağazada 3D görsel kalır).
+import kopruYanImg from '../assets/images/kopru-yan.webp';
 
 interface TrainWorldViewProps {
   worldItems: PlacedWorldItem[];
@@ -163,10 +165,14 @@ const DEFAULT_SCENE_IMG_SIZE = 'w-16 h-16 sm:w-24 sm:h-24';
 
 // Izgara hücresini (0..7, 0..6) ana sahnenin güvenli görüntü alanına (bulut ve
 // ray şeridi hariç) eşleyen yardımcı fonksiyon.
+// Kasabayı kur ızgarasındaki sütunun ortası (%). Sahnedeki her şey (bina,
+// gar, köprü, tünel) bu tek hesapla yerleşir; seçilen kare ile sahne eşleşir.
+function columnCenterPercent(x: number) {
+  return ((Math.min(Math.max(x, 0), GRID_COLS - 1) + 0.5) / GRID_COLS) * 100;
+}
+
 function gridCellToScenePercent(x: number, y: number) {
-  // Öğeleri güvenli iç çerçevede merkezliyoruz; böylece kenar hücrelerde
-  // görseller kesilmez ve mobilde rastgele üst üste binme azalır.
-  const left = 8 + (x / Math.max(GRID_COLS - 1, 1)) * 84; // %8 .. %92
+  const left = columnCenterPercent(x);
   const top = 8 + (y / Math.max(GRID_ROWS - 1, 1)) * 76; // %8 .. %84
   return { left: `${left}%`, top: `${top}%` };
 }
@@ -304,22 +310,13 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Gar, Harita Çizimi'nde seçilen sütuna (x) göre ray hattı üzerinde kayar;
   // ray hep aynı yükseklikte kaldığından dikey konum sabit tutulur.
   const placedStation = worldItems.find((item) => item.itemId === 'track-station');
-  const stationLeftPercent = placedStation
-    ? Math.min(88, Math.max(8, 8 + (placedStation.x / Math.max(GRID_COLS - 1, 1)) * 80))
-    : 42;
-  const sipaLeftPercent = Math.min(90, Math.max(2, stationLeftPercent - 6));
+  const stationLeftPercent = columnCenterPercent(placedStation?.x ?? 6);
 
-  // Köprü ve tünel de artık Harita Çizimi'nde seçilen gerçek x konumuna göre
-  // kayar; önceden sabit bir yüzdede duruyorlardı (gar için yapılan düzeltmenin
-  // aynısı burada da uygulanıyor).
-  const placedBridge = worldItems.find((item) => item.itemId === 'track-bridge');
-  const bridgeLeftPercent = placedBridge
-    ? Math.min(70, Math.max(4, 4 + (placedBridge.x / Math.max(GRID_COLS - 1, 1)) * 80))
-    : 26;
+  // Köprü ve tünel de Kasabayı kur'da seçilen sütunun ortasına oturur.
+  // Birden çok köprü yerleştirilebilir; her biri rayın üstünde çizilir.
+  const placedBridges = worldItems.filter((item) => item.itemId === 'track-bridge');
   const placedTunnel = worldItems.find((item) => item.itemId === 'track-tunnel');
-  const tunnelLeftPercent = placedTunnel
-    ? Math.min(85, Math.max(4, 4 + (placedTunnel.x / Math.max(GRID_COLS - 1, 1)) * 90))
-    : 88;
+  const tunnelLeftPercent = columnCenterPercent(placedTunnel?.x ?? 12);
 
   // Sahip olunan düz/viraj ray parçalarının sayısı koleksiyon etiketinde
   // gösterilir; çalışan tren her zaman ana düz hatta gidip gelir.
@@ -1099,34 +1096,26 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 <line x1="0" y1="19" x2="1000" y2="19" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
                 <line x1="0" y1="39" x2="1000" y2="39" stroke="#ffffff" strokeWidth="0.8" opacity="0.9" />
               </svg>
+              {/* Köprüler rayın içinde çizilir: yandan görünen düz köprünün
+                  üstündeki ray, sahnedeki raya tam oturur; tren üstünden geçer. */}
+              {hasPlacedBridge && placedBridges.map((bridge) => (
+                <button
+                  key={bridge.id}
+                  type="button"
+                  onClick={() => {
+                    playPopSound(soundEnabled);
+                    setInteractiveMessage('Kırmızı Tren Köprüsü: Tren köprünün üstünden güvenle geçiyor! 🌉✨');
+                    speakText('Kırmızı tren köprüsü!', speechEnabled);
+                  }}
+                  className="absolute cursor-pointer"
+                  style={{ top: '50%', left: `${columnCenterPercent(bridge.x)}%`, width: `${(2 / GRID_COLS) * 100}%`, transform: 'translate(-50%, -38%)', pointerEvents: 'auto' }}
+                  title="Kırmızı Tren Köprüsü"
+                >
+                  <img src={kopruYanImg} alt="Kırmızı Tren Köprüsü" width={700} height={270} className="block w-full h-auto drop-shadow-[0_8px_8px_rgba(0,0,0,0.4)]" draggable={false} />
+                </button>
+              ))}
               <div className="absolute left-[7%] top-0 rounded-full border border-sky-200/50 bg-slate-950/75 px-2 py-1 text-[8px] font-black text-sky-100 shadow-lg sm:text-[10px]">↔ TEK HAT · GİDİŞ / DÖNÜŞ{secondRailPieceCount > 0 ? ` · ${secondRailPieceCount} parça` : ''}</div>
             </div>
-
-            {/* Red Steel Bridge Overlay when unlocked or placed */}
-            {hasPlacedBridge && (
-              <div
-                onClick={() => {
-                  playPopSound(soundEnabled);
-                  setInteractiveMessage('Kırmızı Tren Köprüsü: Tren köprünün altından güvenle geçiyor! 🌉✨');
-                  speakText('Kırmızı tren köprüsü aktif!', speechEnabled);
-                }}
-                className="absolute bottom-[11%] w-[21%] h-12 sm:h-16 z-25 cursor-pointer hover:scale-105 transition-transform"
-                style={{ left: `${bridgeLeftPercent}%` }}
-                title="Kırmızı Tren Köprüsü"
-              >
-                <div className="group/bridge relative w-full h-full flex items-end justify-center">
-                  <img
-                    src={SCENERY_IMAGES['track-bridge']}
-                    alt="Kırmızı Tren Köprüsü"
-                    className="w-full h-full object-contain drop-shadow-[0_8px_8px_rgba(0,0,0,0.4)]"
-                    draggable={false}
-                  />
-                  <span className="pointer-events-none absolute -top-2 bg-red-950/90 text-red-200 border border-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg opacity-0 transition-opacity duration-150 group-hover/bridge:opacity-100 group-focus/bridge:opacity-100 group-active/bridge:opacity-100">
-                    Kırmızı Tren Köprüsü 🌉
-                  </span>
-                </div>
-              </div>
-            )}
 
             {/* Mountain Tunnel Overlay when unlocked or placed */}
             {hasPlacedTunnel && (
@@ -1137,7 +1126,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   speakText('Dağ tüneli aktif!', speechEnabled);
                 }}
                 className="absolute bottom-[9.5%] w-32 sm:w-48 h-20 sm:h-28 z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
-                style={{ left: `${tunnelLeftPercent}%` }}
+                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)' }}
                 title="Dağ Tüneli"
               >
                 <div className="group/tunnel relative w-full h-full flex items-end justify-center">
@@ -1163,7 +1152,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   speakText('Sincap Köy Garı yolcuları treni bekliyor!', speechEnabled);
                 }}
                 className="absolute bottom-[20.2%] z-20 cursor-pointer transition-transform hover:scale-105"
-                style={{ left: `${stationLeftPercent}%` }}
+                style={{ left: `${stationLeftPercent}%`, transform: 'translateX(-50%)' }}
                 title="Sincap Köy Garı"
               >
                 {renderSincapStation()}
@@ -1179,7 +1168,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   speakText('Sevimli sıpa treni izliyor!', speechEnabled);
                 }}
                 className="absolute bottom-[27%] z-20 w-[100px] sm:w-[140px] cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                style={{ left: `${sipaLeftPercent}%` }}
+                style={{ left: `${stationLeftPercent}%`, transform: 'translateX(calc(-100% - 40px))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
@@ -1529,7 +1518,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             {hasPlacedStation && (
               <div
                 className="absolute bottom-[18%] z-[15] pointer-events-none opacity-95"
-                style={{ left: `${stationLeftPercent}%` }}
+                style={{ left: `${stationLeftPercent}%`, transform: 'translateX(-50%)' }}
               >
                 {renderSincapStation(true)}
               </div>
