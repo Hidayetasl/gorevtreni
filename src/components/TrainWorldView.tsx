@@ -177,7 +177,8 @@ const SCENE_IMG_BOX: Record<string, SceneImgBox> = {
 const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [21, 112];
 function sceneImgStyle(itemId: string): React.CSSProperties {
   const [cqh, maxPx, ratio = 1] = SCENE_IMG_BOX[itemId] || DEFAULT_SCENE_IMG_BOX;
-  const height = `min(${cqh}cqh, ${maxPx}px)`;
+  // --gt-obj-scale: dik ekranda yapılar küçülür (bkz. child.css .gt-game).
+  const height = `calc(min(${cqh}cqh, ${maxPx}px) * var(--gt-obj-scale, 1))`;
   return { height, width: ratio === 1 ? height : `calc(${height} * ${ratio})` };
 }
 
@@ -319,7 +320,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     const measure = () => {
       const canvasWidth = canvasEl.offsetWidth;
       const assemblyWidth = assemblyEl.offsetWidth;
-      const scale = Math.min(1.5, Math.max(0.72, canvasEl.offsetHeight / 320));
+      // Dik ekranda tren de yapılarla birlikte küçülür.
+      const portrait = window.matchMedia?.('(orientation: portrait)').matches;
+      const scale = Math.min(1.5, Math.max(0.6, (canvasEl.offsetHeight / 320) * (portrait ? 0.75 : 1)));
       setTrainScale(scale);
       if (canvasWidth > 0 && assemblyWidth > 0) {
         setAssemblyWidthPercent(((assemblyWidth * scale) / canvasWidth) * 100);
@@ -995,7 +998,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const renderSincapStation = (compact = false) => (
-    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(46cqh, 250px)' }}>
+    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'calc(min(46cqh, 250px) * var(--gt-obj-scale, 1))' }}>
       <img
         src={merkezGarImg}
         alt="Sincap Köy Garı"
@@ -1296,7 +1299,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   sayWord('track-tunnel');
                 }}
                 className="absolute bottom-[9.5%] z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
-                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)', height: 'min(28cqh, 150px)', width: 'min(40cqh, 216px)' }}
+                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)', height: 'calc(min(28cqh, 150px) * var(--gt-obj-scale, 1))', width: 'calc(min(40cqh, 216px) * var(--gt-obj-scale, 1))' }}
                 title="Dağ Tüneli"
               >
                 <div className="group/tunnel relative w-full h-full flex items-end justify-center">

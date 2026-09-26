@@ -774,7 +774,7 @@
 @media (orientation: portrait) {
   .gt .gt-world .gt-game .world-ride-canvas-shell { top: auto; height: min(calc(80% - var(--hud)), 100vw) !important; overflow: visible !important; }
   /* Dik ekranda sıpa evlerin arasında büyük kalıyordu. */
-  .gt .gt-game { --gt-sipa-w: min(22cqh, 110px); }
+  .gt .gt-game { --gt-sipa-w: min(18cqh, 90px); --gt-obj-scale: .74; }
   .gt .gt-game .world-ride-canvas-shell img[alt="Cartoon Train Scene"] { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%); mask-image: linear-gradient(to bottom, transparent 0, #000 14%); }
 }
 .gt-gbar { position: absolute; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 14px max(12px, env(safe-area-inset-left, 0px)); background: linear-gradient(rgba(12, 40, 50, .38), rgba(12, 40, 50, 0)); pointer-events: none; }
