@@ -154,13 +154,20 @@ const SCENE_IMG_BOX: Record<string, SceneImgBox> = {
   'scenery-squirrel-courier': [12, 44],
   // Dönme dolap diğer binalardan belirgin şekilde yüksek.
   'scenery-ferris': [30, 104, 0.66],
-  'scenery-house': [24, 84],
-  'scenery-house-2': [24, 84],
-  'scenery-house-3': [24, 84],
-  'scenery-house-4': [24, 84],
-  'scenery-house-5': [24, 84],
-  'scenery-house-6': [24, 84],
-  'scenery-school': [24, 84],
+  'scenery-house': [20, 70],
+  'scenery-house-2': [20, 70],
+  'scenery-house-3': [20, 70],
+  'scenery-house-4': [20, 70],
+  'scenery-house-5': [20, 70],
+  'scenery-house-6': [20, 70],
+  // Kamu binaları evlerden belirgin şekilde büyük.
+  'scenery-school': [28, 96],
+  'scenery-hospital': [28, 96],
+  'scenery-market': [26, 90],
+  'scenery-bakery': [26, 90],
+  'scenery-cinema': [26, 90],
+  'scenery-train-repair': [26, 90],
+  'scenery-firestation-building': [26, 90],
 };
 const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [21, 72];
 function sceneImgStyle(itemId: string): React.CSSProperties {
@@ -899,7 +906,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const renderSincapStation = (compact = false) => (
-    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(34cqh, 150px)' }}>
+    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(46cqh, 190px)' }}>
       <img
         src={merkezGarImg}
         alt="Sincap Köy Garı"
