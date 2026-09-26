@@ -55,9 +55,17 @@ export function StartupScreen() {
 }
 
 /** Uygulamanın herhangi bir yerinde hata olursa beyaz ekran yerine açıklama ve "Yeniden dene". */
-export class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {
-  state = { error: null as string | null };
-  static getDerivedStateFromError(error: unknown) {
+type BoundaryProps = { children: React.ReactNode };
+type BoundaryState = { error: string | null };
+export class AppErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
+  // Alanlar açıkça bildirilir: CI'da React tip paketi olmadan da derlensin.
+  declare props: BoundaryProps;
+  declare state: BoundaryState;
+  constructor(props: BoundaryProps) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: unknown): BoundaryState {
     return { error: String((error as { message?: string })?.message || error) };
   }
   render() {
