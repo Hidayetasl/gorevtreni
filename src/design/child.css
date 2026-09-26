@@ -755,3 +755,77 @@
   }
   .gt .gt-vgrid { margin: 8px 14px 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: none; }
 }
+
+/* ---------- Treni sür: oyun ekranı ----------
+   Sahne tüm ekranı kaplar (alt menü ve sayfa başlığı gizli); üstte ince yüzen
+   şerit, altta oyun kumandası. Işık, motor ve kaptan görevleri "⋯" ile açılan
+   alt sayfada. Dik telefonda kasaba ekranın alt ~%74'ünde, üstü gökyüzü. */
+.gt .gt-world .world-ride-layout.gt-game { --hud: 124px; position: fixed !important; inset: 0; z-index: 60; display: block !important; margin: 0 !important; padding: 0 !important; overflow: hidden;
+  /* üstte gökyüzü, altta kumandanın durduğu çimen şerit (sahnenin alt kenarıyla aynı renk) */
+  background: linear-gradient(to bottom, #2f93e6 0%, #3a9eea 45%, #44691b 45.01%, #35561a 100%) !important; }
+@media (orientation: landscape) and (max-height: 500px) { .gt .gt-world .world-ride-layout.gt-game { --hud: 72px; } }
+@media (orientation: landscape) and (min-height: 501px) { .gt .gt-world .world-ride-layout.gt-game { --hud: 128px; } }
+.gt .gt-world .world-ride-layout.gt-game > * { margin: 0 !important; }
+.gt .gt-world .gt-game .world-ride-canvas-shell { position: absolute !important; left: 0; right: 0; top: 0; bottom: var(--hud); width: 100% !important; height: auto !important; min-height: 0 !important; aspect-ratio: auto !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+.gt .gt-game .world-ride-canvas-shell > .overflow-x-auto { border-radius: 0; scrollbar-width: none; }
+.gt .gt-game .world-ride-canvas-shell > .overflow-x-auto::-webkit-scrollbar { display: none; }
+.gt .gt-game .straight-track > div { display: none; }
+.gt .gt-game .world-ride-canvas-shell::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18px; background: linear-gradient(rgba(58, 95, 25, 0), #3a5f19); pointer-events: none; z-index: 35; }
+@media (orientation: portrait) {
+  .gt .gt-world .gt-game .world-ride-canvas-shell { top: auto; height: min(calc(80% - var(--hud)), 100vw) !important; overflow: visible !important; }
+  .gt .gt-game .world-ride-canvas-shell img[alt="Cartoon Train Scene"] { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%); mask-image: linear-gradient(to bottom, transparent 0, #000 14%); }
+}
+.gt-gbar { position: absolute; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 14px max(12px, env(safe-area-inset-left, 0px)); background: linear-gradient(rgba(12, 40, 50, .38), rgba(12, 40, 50, 0)); pointer-events: none; }
+.gt-gbar > * { pointer-events: auto; }
+.gt .gt-gchip { position: relative; height: 46px; min-width: 46px; border-radius: 23px; background: rgba(255, 252, 245, .95) !important; color: var(--gt-ink) !important; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; font: 900 17px/1 var(--gt-font); box-shadow: 0 2px 8px rgba(0, 0, 0, .18); white-space: nowrap; flex: none; }
+.gt .gt-gchip.back, .gt .gt-gchip.icon { padding: 0; width: 46px; }
+.gt .gt-gchip.back { color: var(--gt-turkuaz-d) !important; }
+.gt .gt-gchip svg { width: 24px; height: 24px; }
+.gt .gt-gchip.title img { height: 30px; }
+.gt .gt-gchip.coin { margin-left: auto; }
+.gt .gt-gchip.coin i { width: 24px; height: 24px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe8a3, #f59e0b 70%); box-shadow: inset 0 -2px 0 #c47a06; }
+.gt .gt-gchip.lang { color: var(--gt-mavi-d) !important; font-size: 15px; }
+.gt .gt-gchip.lang.en { background: var(--gt-mavi) !important; color: #fff !important; }
+.gt .gt-gchip.more span { font-size: 26px; line-height: 0; margin-top: -8px; color: var(--gt-ink-2); }
+.gt .gt-gchip.more .stars { position: absolute; top: -8px; right: -10px; background: var(--gt-turuncu-s); color: #7a4a00; border-radius: 10px; padding: 3px 6px; font-size: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); }
+@container gt (max-width: 430px) { .gt .gt-gchip.title { display: none; } .gt-gbar { gap: 6px; } }
+.gt .gt-gbubble { position: absolute; top: calc(70px + env(safe-area-inset-top, 0px)); left: 50%; right: auto; z-index: 45; width: max-content; max-width: calc(100% - 32px); margin: 0; transform: translate(-50%, -6px); white-space: normal; }
+.gt .gt-gbubble.show { transform: translate(-50%, 0); }
+.gt .gt-grotate { display: none; position: absolute; z-index: 44; left: 50%; top: calc(122px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); align-items: center; gap: 8px; padding: 10px 14px; border-radius: 18px; background: rgba(255, 252, 245, .95) !important; color: var(--gt-ink) !important; font: 800 15px/1.2 var(--gt-font); box-shadow: 0 3px 10px rgba(0, 0, 0, .18); white-space: nowrap; }
+.gt .gt-grotate b { color: var(--gt-ink-2); font-size: 18px; margin-left: 4px; }
+@media (orientation: portrait) { .gt .gt-grotate { display: inline-flex; } }
+.gt-gpad { position: absolute; z-index: 50; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: flex-end; }
+.gt .gt-gpad.left { left: max(14px, env(safe-area-inset-left, 0px)); gap: 5px; padding: 5px; border-radius: 24px; background: rgba(255, 252, 245, .95); box-shadow: 0 4px 0 rgba(10, 60, 70, .3), 0 6px 14px rgba(0, 0, 0, .18); }
+.gt .gt-gpad.left button { width: 54px; height: 50px; border-radius: 18px; display: grid; place-items: center; background: transparent !important; }
+.gt .gt-gpad.left button img { height: 34px; max-width: 48px; object-fit: contain; }
+.gt .gt-gpad.left button.on { background: var(--gt-turkuaz-s) !important; box-shadow: inset 0 0 0 3px var(--gt-turkuaz); }
+.gt .gt-gpad.right { right: max(14px, env(safe-area-inset-right, 0px)); gap: 14px; }
+.gt .gt-gbtn { position: relative; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 252, 245, .97) !important; box-shadow: 0 5px 0 rgba(10, 60, 70, .35), 0 8px 18px rgba(0, 0, 0, .22); transition: transform .08s; }
+.gt .gt-gbtn:active { transform: translateY(3px); }
+.gt .gt-gbtn img { width: 72%; height: 72%; object-fit: contain; }
+.gt .gt-gbtn.horn { width: 68px; height: 68px; }
+.gt .gt-gbtn.horn.toot { animation: gt-bump .5s; }
+.gt .gt-gbtn.go { width: 88px; height: 88px; background: var(--gt-mavi) !important; box-shadow: 0 5px 0 var(--gt-mavi-d), 0 8px 18px rgba(0, 0, 0, .25); }
+.gt .gt-gbtn.go.stop { background: rgba(255, 252, 245, .97) !important; box-shadow: inset 0 0 0 4px var(--gt-mavi), 0 5px 0 rgba(10, 60, 70, .3); }
+.gt .gt-gbtn .pause { position: absolute; right: 2px; bottom: 6px; width: 28px; height: 28px; border-radius: 50%; background: var(--gt-mavi); color: #fff; display: grid; place-items: center; box-shadow: 0 0 0 2px #fff; }
+.gt .gt-gbtn .pause svg { width: 15px; height: 15px; }
+.gt .gt-gbtn span { position: absolute; bottom: -23px; left: 50%; transform: translateX(-50%); font: 900 14px/1 var(--gt-font); color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .75); white-space: nowrap; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .gt .gt-gchip { height: 40px; min-width: 40px; font-size: 15px; }
+  .gt .gt-gchip.back, .gt .gt-gchip.icon { width: 40px; }
+  .gt .gt-gbubble { top: 60px; }
+  .gt .gt-gbtn.go { width: 62px; height: 62px; }
+  .gt .gt-gbtn.horn { width: 52px; height: 52px; }
+  .gt .gt-gbtn span { display: none; }
+  .gt .gt-gpad.left button { width: 46px; height: 42px; }
+  .gt .gt-gpad.left button img { height: 28px; }
+  .gt-gpad { bottom: calc(5px + env(safe-area-inset-bottom, 0px)); }
+}
+/* "⋯" alt sayfası: Işık, Motor, Dur/Kalk, Korna, hız ve kaptan görevleri */
+.gt .gt-world .gt-game .world-control-sidebar { display: none !important; }
+.gt .gt-world .gt-game.cockpit-open .world-control-sidebar { display: flex !important; flex-direction: column; gap: 10px; position: absolute; left: 0; right: 0; bottom: 0; z-index: 70; max-width: 640px; max-height: 86%; margin: 0 auto !important; overflow-y: auto; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 24px 24px 0 0; background: var(--gt-sky) !important; box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); }
+.gt .gt-world .gt-game.cockpit-open .gt-wmissions { display: flex !important; position: static !important; box-shadow: 0 3px 0 var(--gt-line) !important; }
+.gt .gt-game .gt-wmis-backdrop { display: none !important; }
+.gt .gt-game .gt-gsheet-bg { position: absolute; inset: 0; z-index: 65; background: rgba(10, 30, 40, .35); }
+/* Yapılar zemine basar: altlarında yumuşak toprak/gölge */
+.gt .gt-lot::before { content: ""; position: absolute; left: 50%; bottom: 2px; width: 92%; height: 16%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(70, 55, 30, .5) 0%, rgba(96, 120, 45, .28) 55%, rgba(96, 120, 45, 0) 75%); z-index: -1; pointer-events: none; }

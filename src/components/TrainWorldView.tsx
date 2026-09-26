@@ -154,27 +154,27 @@ type SceneImgBox = [number, number, number?];
 // Yeni 3D görseller kenar boşluksuz olduğundan eskisinden büyük görünüyordu;
 // binalar lokomotiften küçük kalsın, birbirine binmesin diye ölçüler küçük tutulur.
 const SCENE_IMG_BOX: Record<string, SceneImgBox> = {
-  'scenery-ambulance': [14, 56],
-  'scenery-firestation': [14, 56],
-  'scenery-squirrel-courier': [12, 44],
+  'scenery-ambulance': [14, 84],
+  'scenery-firestation': [14, 84],
+  'scenery-squirrel-courier': [12, 66],
   // Dönme dolap diğer binalardan belirgin şekilde yüksek.
-  'scenery-ferris': [30, 104, 0.66],
-  'scenery-house': [20, 70],
-  'scenery-house-2': [20, 70],
-  'scenery-house-3': [20, 70],
-  'scenery-house-4': [20, 70],
-  'scenery-house-5': [20, 70],
-  'scenery-house-6': [20, 70],
+  'scenery-ferris': [30, 170, 0.66],
+  'scenery-house': [20, 110],
+  'scenery-house-2': [20, 110],
+  'scenery-house-3': [20, 110],
+  'scenery-house-4': [20, 110],
+  'scenery-house-5': [20, 110],
+  'scenery-house-6': [20, 110],
   // Kamu binaları evlerden belirgin şekilde büyük.
-  'scenery-school': [28, 96],
-  'scenery-hospital': [28, 96],
-  'scenery-market': [26, 90],
-  'scenery-bakery': [26, 90],
-  'scenery-cinema': [26, 90],
-  'scenery-train-repair': [26, 90],
-  'scenery-firestation-building': [26, 90],
+  'scenery-school': [28, 150],
+  'scenery-hospital': [28, 150],
+  'scenery-market': [26, 140],
+  'scenery-bakery': [26, 140],
+  'scenery-cinema': [26, 140],
+  'scenery-train-repair': [26, 140],
+  'scenery-firestation-building': [26, 140],
 };
-const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [21, 72];
+const DEFAULT_SCENE_IMG_BOX: SceneImgBox = [21, 112];
 function sceneImgStyle(itemId: string): React.CSSProperties {
   const [cqh, maxPx, ratio = 1] = SCENE_IMG_BOX[itemId] || DEFAULT_SCENE_IMG_BOX;
   const height = `min(${cqh}cqh, ${maxPx}px)`;
@@ -319,7 +319,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     const measure = () => {
       const canvasWidth = canvasEl.offsetWidth;
       const assemblyWidth = assemblyEl.offsetWidth;
-      const scale = Math.min(1.1, Math.max(0.72, canvasEl.offsetHeight / 320));
+      const scale = Math.min(1.5, Math.max(0.72, canvasEl.offsetHeight / 320));
       setTrainScale(scale);
       if (canvasWidth > 0 && assemblyWidth > 0) {
         setAssemblyWidthPercent(((assemblyWidth * scale) / canvasWidth) * 100);
@@ -520,11 +520,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Sahte (CSS) tam ekran modundayken arkadaki sayfanın kaymasını engeller —
   // native Fullscreen API zaten bunu kendisi hallediyor, ekstra zararı yok.
   useEffect(() => {
-    if (!isFullScreen) return;
+    if (!isFullScreen && viewMode !== 'ride') return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previousOverflow; };
-  }, [isFullScreen]);
+  }, [isFullScreen, viewMode]);
 
   // Tam ekranda kokpit paneli varsayılan olarak KAPALI — ekranda sadece oyun
   // alanı görünür. 🎛️ düğmesiyle alttan açılan bir panel olarak belirir, oyun
@@ -532,8 +532,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // bir dahaki girişte yine sadece oyun alanıyla başlansın.
   const [showCockpitOverlay, setShowCockpitOverlay] = useState(false);
   useEffect(() => {
-    if (!isFullScreen) setShowCockpitOverlay(false);
-  }, [isFullScreen]);
+    if (viewMode !== 'ride') setShowCockpitOverlay(false);
+  }, [viewMode]);
+  // Dik telefonda "yan çevir" ipucu; bir kez kapatılınca bu oturumda gösterilmez.
+  const [rotateHintClosed, setRotateHintClosed] = useState(() => {
+    try { return sessionStorage.getItem('ruzgar_rotate_hint_closed') === '1'; } catch { return false; }
+  });
 
   // Korna/düdük eylemi: kokpit düğmesi doğrudan ses üretir; kapalıysa açık bir durum mesajı verir.
   const handleWhistleBlow = () => {
@@ -965,7 +969,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const renderSincapStation = (compact = false) => (
-    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(46cqh, 190px)' }}>
+    <div className={`relative ${compact ? 'w-[80px] sm:w-[150px]' : ''} drop-shadow-[0_7px_7px_rgba(0,0,0,0.35)]`} style={compact ? undefined : { width: 'min(46cqh, 250px)' }}>
       <img
         src={merkezGarImg}
         alt="Sincap Köy Garı"
@@ -1012,18 +1016,13 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             </div>
           </div>
         </>
-      ) : (
+      ) : viewMode === 'ride' ? null : (
         <>
           <div className="gt-head gt-subhead">
             <button type="button" className="gt-back" onClick={backToMenu} aria-label="Dünya menüsüne geri dön">
               <span className="ar" aria-hidden="true"><ArrowLeft strokeWidth={3.5} /></span>Geri
             </button>
             <h1 className="gt-wtitle">{WORLD_SECTIONS.find((section) => section.id === viewMode)?.icon} {WORLD_SECTIONS.find((section) => section.id === viewMode)?.label}</h1>
-            {viewMode === 'ride' && (
-              <button type="button" className="gt-goal gt-wstarbtn" aria-expanded={showMissions} aria-controls="world-missions" onClick={() => { playPopSound(soundEnabled); setShowMissions((open) => !open); }}>
-                ⭐ <b>{cockpitProgress.score}/25</b>
-              </button>
-            )}
           </div>
         </>
       )}
@@ -1032,61 +1031,56 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* MODE 1: HIGH-QUALITY CARTOON RIDE GAME CANVAS (MATCHING USER PHOTO)   */}
       {/* ===================================================================== */}
       {viewMode === 'ride' && (
-        <div ref={fullScreenStageRef} className={`world-ride-layout space-y-4 ${isFullScreen ? 'is-fullscreen' : ''} ${showCockpitOverlay ? 'cockpit-open' : ''}`}>
-          {/* Main Graphic Canvas Box */}
-          <div
-            className="world-ride-canvas-shell relative w-full aspect-[16/9] min-h-[300px] overflow-hidden rounded-3xl border-4 border-slate-700 shadow-2xl group select-none sm:min-h-[420px]"
-          >
-            {/* Oyun ekranının köşesinde her zaman görünür tam ekran düğmesi — kokpit
-                paneline kaydırmaya gerek kalmadan tek dokunuşla giriş/çıkış. */}
-            <button
-              type="button"
-              onClick={toggleFullScreen}
-              className="gt-wfab right"
-              aria-pressed={isFullScreen}
-              aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}
-              title={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekranı aç'}
-            >
-              {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+        <div ref={fullScreenStageRef} className={`world-ride-layout gt-game ${showCockpitOverlay ? 'cockpit-open' : ''}`}>
+          {/* Oyun ekranı: sahne tüm ekranı kaplar; üstte ince şerit, altta oyun kumandası. */}
+          <div className="gt-gbar">
+            <button type="button" className="gt-gchip back" onClick={backToMenu} aria-label="Dünya menüsüne geri dön">
+              <ArrowLeft strokeWidth={3.5} aria-hidden="true" />
             </button>
-            {!isFullScreen && onToggleSound && (
-              <button
-                type="button"
-                onPointerDown={unlockAudioContext}
-                onClick={onToggleSound}
-                className="gt-wfab left gt-phone-only"
-                aria-pressed={soundEnabled}
-                aria-label={soundEnabled ? 'Sesi kapat' : 'Sesi aç'}
-              >
-                {soundEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
-              </button>
-            )}
-            {/* Yapı adları: Türkçe + İngilizce ya da sadece İngilizce. */}
+            <span className="gt-gchip title"><img src={menuTren} alt="" draggable={false} />Treni sür</span>
+            <span className="gt-gchip coin" aria-label={`${user.coins} puan`}><i aria-hidden="true" />{user.coins}</span>
             <button
               type="button"
               onPointerDown={unlockAudioContext}
               onClick={toggleWordLang}
-              className={`gt-wfab lang ${wordLang === 'en' ? 'en' : ''}`}
+              className={`gt-gchip lang ${wordLang === 'en' ? 'en' : ''}`}
               aria-label={wordLang === 'en' ? 'Yapı adları: sadece İngilizce. Türkçe ve İngilizceye geç' : 'Yapı adları: Türkçe ve İngilizce. Sadece İngilizceye geç'}
               title="Yapı adlarının dili"
             >
-              {wordLang === 'en' ? <b>EN</b> : <><b>TR</b><span aria-hidden="true">+</span><b>EN</b></>}
+              {wordLang === 'en' ? 'EN' : 'TR+EN'}
             </button>
-            <p className={`gt-wbubble ${bubbleVisible ? 'show' : ''}`} role="status" aria-live="polite">{interactiveMessage}</p>
-            {/* Tam ekranda kokpit varsayılan olarak gizli olduğu için, onu açmaya
-                yarayan ayrı bir köşe düğmesi — sadece tam ekran modunda görünür. */}
-            {isFullScreen && (
-              <button
-                type="button"
-                onClick={() => setShowCockpitOverlay((current) => !current)}
-                className="gt-wfab left wide"
-                aria-pressed={showCockpitOverlay}
-                title={showCockpitOverlay ? 'Kumandayı kapat' : 'Kumandayı aç'}
-              >
-                <span aria-hidden="true">🎛️</span>
-                {showCockpitOverlay ? 'Kapat' : 'Kumanda'}
-              </button>
-            )}
+            <button type="button" className="gt-gchip icon" onClick={toggleFullScreen} aria-pressed={isFullScreen} aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekran'}>
+              {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+            </button>
+            <button type="button" className="gt-gchip icon more" aria-expanded={showCockpitOverlay} onClick={() => { playPopSound(soundEnabled); setShowCockpitOverlay((open) => !open); }} aria-label="Diğer kumandalar ve kaptan görevleri">
+              <span aria-hidden="true">⋯</span>{cockpitProgress.score > 0 && <b className="stars">⭐{cockpitProgress.score}</b>}
+            </button>
+          </div>
+          <p className={`gt-wbubble gt-gbubble ${bubbleVisible ? 'show' : ''}`} role="status" aria-live="polite">{interactiveMessage}</p>
+          {!rotateHintClosed && (
+            <button type="button" className="gt-grotate" onClick={() => { setRotateHintClosed(true); try { sessionStorage.setItem('ruzgar_rotate_hint_closed', '1'); } catch { /* yoksay */ } }}>
+              <span aria-hidden="true">📱↻</span> Telefonu yan çevir, kasaba büyüsün <b aria-hidden="true">×</b>
+            </button>
+          )}
+          <div className="gt-gpad left" role="group" aria-label="Hız">
+            <button type="button" className={trainSpeed === 'slow' ? 'on' : ''} aria-pressed={trainSpeed === 'slow'} aria-label="Yavaş" onClick={() => { playPopSound(soundEnabled); setTrainSpeed('slow'); }}><img src={kumandaYavas} alt="" draggable={false} /></button>
+            <button type="button" className={trainSpeed === 'normal' ? 'on' : ''} aria-pressed={trainSpeed === 'normal'} aria-label="Normal hız" onClick={() => { playPopSound(soundEnabled); setTrainSpeed('normal'); }}><img src={kumandaNormal} alt="" draggable={false} /></button>
+            <button type="button" className={trainSpeed === 'fast' ? 'on' : ''} aria-pressed={trainSpeed === 'fast'} aria-label="Hızlı" onClick={() => { playPopSound(soundEnabled); setTrainSpeed('fast'); }}><img src={kumandaHizli} alt="" draggable={false} /></button>
+          </div>
+          <div className="gt-gpad right">
+            <button type="button" className={`gt-gbtn horn ${isWhistling ? 'toot' : ''}`} onClick={handleWhistleBlow} onPointerDown={unlockAudioContext} aria-label="Korna çal">
+              <img src={kumandaKorna} alt="" draggable={false} /><span>Korna</span>
+            </button>
+            <button type="button" className={`gt-gbtn go ${isTrainRunning ? 'stop' : ''}`} onClick={handleTrainRunToggle} onPointerDown={unlockAudioContext} aria-pressed={isTrainRunning} aria-label={isTrainRunning ? 'Treni durdur' : 'Treni başlat'}>
+              <img src={kumandaKalk} alt="" draggable={false} />
+              {isTrainRunning && <b className="pause" aria-hidden="true"><Pause strokeWidth={3} /></b>}
+              <span>{isTrainRunning ? 'Dur' : 'Başla'}</span>
+            </button>
+          </div>
+          {/* Main Graphic Canvas Box */}
+          <div
+            className="world-ride-canvas-shell relative w-full aspect-[16/9] min-h-[300px] overflow-hidden rounded-3xl border-4 border-slate-700 shadow-2xl group select-none sm:min-h-[420px]"
+          >
             {/* Kasaba artık daha geniş bir alanda: bu iç kaydırılabilir katman görünür
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
@@ -1205,7 +1199,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   key={item.id}
                   type="button"
                   onClick={() => handleTileClick(item.x, item.y)}
-                  className="group/item absolute flex flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  className="gt-lot group/item absolute flex flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-300"
                   style={{ left: anchor.left, top: anchor.top, zIndex: 20 + item.y, transform: `translate(-50%, -50%) scale(${getSceneDepthScale(item.y)})` }}
                   title={`${item.name} — dokun ve keşfet`}
                 >
@@ -1274,7 +1268,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   sayWord('track-tunnel');
                 }}
                 className="absolute bottom-[9.5%] z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
-                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)', height: 'min(28cqh, 100px)', width: 'min(40cqh, 144px)' }}
+                style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)', height: 'min(28cqh, 150px)', width: 'min(40cqh, 216px)' }}
                 title="Dağ Tüneli"
               >
                 <div className="group/tunnel relative w-full h-full flex items-end justify-center">
@@ -1315,7 +1309,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 }}
                 className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
                 // Garın hemen solunda, rayın arkasındaki çimende: tren önünden geçerken de başı görünür.
-                style={{ zIndex: 29, bottom: "calc(13% + 17cqh)", left: `${stationLeftPercent}%`, width: 'min(34cqh, 128px)', transform: 'translateX(calc(-100% - min(19cqh, 78px)))' }}
+                style={{ zIndex: 29, bottom: "calc(13% + 17cqh)", left: `${stationLeftPercent}%`, width: 'min(34cqh, 170px)', transform: 'translateX(calc(-100% - min(19cqh, 104px)))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
@@ -1473,25 +1467,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             </div>
 
-            {/* Overlay Round Whistle Action Button on Bottom Right (Matching Screenshot Style) */}
-            <div className="absolute bottom-4 right-4 z-40">
-              <button
-                type="button"
-                onClick={handleWhistleBlow}
-                onPointerDown={unlockAudioContext}
-                className="cockpit-floating-horn gt-whorn"
-                title="Düdük Çal!"
-                aria-label="Düdük çal"
-              >
-                <img src={kumandaKorna} alt="" draggable={false} />
-              </button>
-            </div>
           </div>
 
           {/* Kokpit açıkken oyun alanına dokununca paneli kapatan görünmez katman. */}
-          {isFullScreen && showCockpitOverlay && (
+          {showCockpitOverlay && (
             <div
-              className="cockpit-overlay-backdrop"
+              className="cockpit-overlay-backdrop gt-gsheet-bg"
               onClick={() => setShowCockpitOverlay(false)}
               aria-hidden="true"
             />
@@ -1588,7 +1569,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   );
                 })}
               </div>
-              <button type="button" className="gt-ghost gt-phone-only" onClick={() => setShowMissions(false)}>Tamam</button>
+              <button type="button" className="gt-ghost" onClick={() => { setShowMissions(false); setShowCockpitOverlay(false); }}>Tamam</button>
             </section>
 
           </div>
