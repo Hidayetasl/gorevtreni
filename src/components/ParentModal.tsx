@@ -68,7 +68,10 @@ interface ParentModalProps {
 /** Ebeveyn paneli > Nasıl kullanılır: yetişkinler için kısa rehber. */
 const HELP_SECTIONS: Array<{ title: string; items: string[] }> = [
   { title: 'GİRİŞ VE ANA EKRAN', items: [
-    'Google hesabınla bir kez gir; telefon seni hatırlar.',
+    'İlk kez katılıyorsan: aileden gelen davet linkine dokun. WhatsApp içinde açılırsa ⋯ ile Safari’de (Android’de Chrome’da) aç.',
+    'Açılan sayfada “Google ile giriş yap” → Gmail hesabını seç. Kod ya da PIN gerekmez; aileye kendiliğinden katılırsın.',
+    'Davet linki tek kullanımlıktır ve 7 gün geçerlidir; çalışmazsa aileden yenisini iste.',
+    'Sonraki girişlerde sadece Google hesabınla gir; telefon seni hatırlar.',
     'iPhone: Safari’de Paylaş ↑ → “Ana Ekrana Ekle”. Android: Chrome ⋮ → “Ana ekrana ekle”.',
     'Oyunu hep ana ekrandaki tren simgesinden aç; tam ekran olur.',
   ] },
@@ -93,6 +96,7 @@ const HELP_SECTIONS: Array<{ title: string; items: string[] }> = [
   ] },
   { title: 'DİĞER', items: [
     'Bonus gönder: sürpriz puan kartı. Videolar: izleyeceği videoları ekle ve onayla.',
+    'Yeni kişi eklemek (yalnızca aile yöneticisi): Ayarlar → Aile eşitlemesi → kişiyi ve süreyi seç → “Davet linki oluştur” → Paylaş.',
     'İstatistik ve Geçmiş: hangi gün ne yapıldı.',
     'Bir şey takılırsa uygulamayı kapatıp aç; olmazsa ekranın fotoğrafını aileye gönder.',
   ] },
