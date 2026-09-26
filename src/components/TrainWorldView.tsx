@@ -337,7 +337,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const [bubbleVisible, setBubbleVisible] = useState(true);
   useEffect(() => {
     setBubbleVisible(true);
-    const timer = window.setTimeout(() => setBubbleVisible(false), 4500);
+    // Uzun mesajlar (ör. tam ekran tarifi) okunabilsin diye daha uzun kalır.
+    const timer = window.setTimeout(() => setBubbleVisible(false), interactiveMessage.length > 60 ? 9000 : 4500);
     return () => window.clearTimeout(timer);
   }, [interactiveMessage]);
   // Telefonda kaptan görevleri üstteki yıldız rozetine dokununca açılır.
@@ -484,17 +485,35 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     return () => clearInterval(interval);
   }, [isTrainRunning, trainSpeed, trainDirection, viewMode, trainImagesReady, assemblyWidthPercent, movementSoundEnabled, soundEnabled]);
 
+  // Ana ekrandan açılmış uygulama zaten tam ekrandır; tarayıcı tam ekranı destekliyor mu?
+  const isStandaloneApp = typeof window !== 'undefined' && (
+    window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+  const canNativeFullScreen = typeof document !== 'undefined' && Boolean(
+    document.fullscreenEnabled || (document as Document & { webkitFullscreenEnabled?: boolean }).webkitFullscreenEnabled
+  );
+
   // iOS Safari (ve bazı gömülü tarayıcılar) Fullscreen API'yi hiç desteklemez
   // (requestFullscreen tanımsızdır) — bu yüzden mobilde düğme tepki vermiyordu.
   // Native API yoksa veya reddedilirse, saf CSS ile tüm ekranı kaplayan
   // "sahte tam ekran"a (bkz. index.css: .is-fullscreen:not(:fullscreen)) düşülür.
   const toggleFullScreen = async () => {
-    const stage = fullScreenStageRef.current;
+    const stage = fullScreenStageRef.current as (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> | void }) | null;
     if (!stage) return;
-    if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch { /* yoksay, state zaten kapanacak */ }
+    const doc = document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> | void };
+    if (document.fullscreenElement || doc.webkitFullscreenElement) {
+      try { await (document.exitFullscreen ? document.exitFullscreen() : doc.webkitExitFullscreen?.()); } catch { /* yoksay, state zaten kapanacak */ }
       setIsFullScreen(false);
       return;
+    }
+    // iPhone Safari web sayfalarında tam ekranı desteklemez; ana ekrana ekleyince uygulama tam ekran açılır.
+    if (!canNativeFullScreen) {
+      playPopSound(soundEnabled);
+      setInteractiveMessage('Tam ekran için: Safari’de Paylaş ↑ → “Ana Ekrana Ekle”, sonra uygulamayı ana ekrandan aç 📲');
+      return;
+    }
+    if (!stage.requestFullscreen && stage.webkitRequestFullscreen) {
+      try { await stage.webkitRequestFullscreen(); setIsFullScreen(true); return; } catch { /* aşağıya düş */ }
     }
     if (isFullScreen) {
       setIsFullScreen(false);
@@ -512,9 +531,16 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   useEffect(() => {
-    const syncFullScreenState = () => setIsFullScreen(document.fullscreenElement === fullScreenStageRef.current);
+    const syncFullScreenState = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      setIsFullScreen((document.fullscreenElement || doc.webkitFullscreenElement || null) === fullScreenStageRef.current);
+    };
     document.addEventListener('fullscreenchange', syncFullScreenState);
-    return () => document.removeEventListener('fullscreenchange', syncFullScreenState);
+    document.addEventListener('webkitfullscreenchange', syncFullScreenState);
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullScreenState);
+      document.removeEventListener('webkitfullscreenchange', syncFullScreenState);
+    };
   }, []);
 
   // Sahte (CSS) tam ekran modundayken arkadaki sayfanın kaymasını engeller —
@@ -1049,9 +1075,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             >
               {wordLang === 'en' ? 'EN' : 'TR+EN'}
             </button>
-            <button type="button" className="gt-gchip icon" onClick={toggleFullScreen} aria-pressed={isFullScreen} aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekran'}>
-              {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
-            </button>
+            {!isStandaloneApp && (
+              <button type="button" className="gt-gchip icon" onClick={toggleFullScreen} aria-pressed={isFullScreen} aria-label={isFullScreen ? 'Tam ekrandan çık' : 'Tam ekran'}>
+                {isFullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+              </button>
+            )}
             <button type="button" className="gt-gchip icon more" aria-expanded={showCockpitOverlay} onClick={() => { playPopSound(soundEnabled); setShowCockpitOverlay((open) => !open); }} aria-label="Diğer kumandalar ve kaptan görevleri">
               <span aria-hidden="true">⋯</span>{cockpitProgress.score > 0 && <b className="stars">⭐{cockpitProgress.score}</b>}
             </button>
