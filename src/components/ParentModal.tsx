@@ -8,7 +8,7 @@ const PARENT_UNLOCK_MS = 5 * 60 * 1000;
 import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { withGenitive } from '../utils/turkish';
 import { VOICE_STORAGE_LIMIT_BYTES, VOICE_STORAGE_WARN_RATIO } from '../utils/cloudSync';
-import { ArrowLeft, Check, ChevronRight, Gift, History, ListChecks, Lock, Mic, Plus, RefreshCw, RotateCcw, Settings, Trash2, Tv, TrendingUp, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, HelpCircle, Gift, History, ListChecks, Lock, Mic, Plus, RefreshCw, RotateCcw, Settings, Trash2, Tv, TrendingUp, Volume2, VolumeX, X } from 'lucide-react';
 import '../design/parent.css';
 
 interface ParentModalProps {
@@ -64,6 +64,39 @@ interface ParentModalProps {
     onSetActiveDevice: (checked: boolean) => void;
   };
 }
+
+/** Ebeveyn paneli > Nasıl kullanılır: yetişkinler için kısa rehber. */
+const HELP_SECTIONS: Array<{ title: string; items: string[] }> = [
+  { title: 'GİRİŞ VE ANA EKRAN', items: [
+    'Google hesabınla bir kez gir; telefon seni hatırlar.',
+    'iPhone: Safari’de Paylaş ↑ → “Ana Ekrana Ekle”. Android: Chrome ⋮ → “Ana ekrana ekle”.',
+    'Oyunu hep ana ekrandaki tren simgesinden aç; tam ekran olur.',
+  ] },
+  { title: 'GÖREVLER', items: [
+    'Rüzgar görevi yapınca “Bitti!”e dokunur; görev burada onay bekler.',
+    'Ana sayfadaki “Onay bekleyen görevler”den Onayla: puanı o zaman alır. “Tekrar yapsın” geri gönderir.',
+    '“Rüzgar şu anda kimin yanında?” anahtarını Rüzgar yanındayken aç: onaylar sana düşer.',
+  ] },
+  { title: 'DÜNYA', items: [
+    'Treni sür: Başla/Dur, Korna ve hız altta; ⋯ ile Işık, Motor ve kaptan görevleri.',
+    'Bir binaya dokununca adı Türkçe ve İngilizce söylenir; TR+EN düğmesi sadece İngilizceye çevirir.',
+    'Telefonu yan çevirince kasaba büyür.',
+    'Kasabayı kur: binaya dokun, sonra boş bir yere dokun → taşınır.',
+  ] },
+  { title: 'MAĞAZA VE ÖDÜLLER', items: [
+    'Rüzgar puanıyla tren, vagon ve bina alır.',
+    'Gerçek ödüller (dondurma, park…) tekrar tekrar alınabilir; alınınca ana sayfada “Rüzgar ödül aldı” görünür. Ödülü vermeyi unutmayalım.',
+  ] },
+  { title: 'MESAJLAR VE GÜNLÜK', items: [
+    'Üstteki 🎙️ ile Rüzgar’a sesli mesaj gönder; o da sana gönderebilir.',
+    '“Günümü anlat” ile Rüzgar sesli günlük tutar; Geçmiş ve Mesajlar’dan dinlenir.',
+  ] },
+  { title: 'DİĞER', items: [
+    'Bonus gönder: sürpriz puan kartı. Videolar: izleyeceği videoları ekle ve onayla.',
+    'İstatistik ve Geçmiş: hangi gün ne yapıldı.',
+    'Bir şey takılırsa uygulamayı kapatıp aç; olmazsa ekranın fotoğrafını aileye gönder.',
+  ] },
+];
 
 export const ParentModal: React.FC<ParentModalProps> = ({
   isOpen,
@@ -123,7 +156,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const inviteDayCount = Number(inviteDays);
   const inviteDaysValid = Number.isInteger(inviteDayCount) && inviteDayCount >= 1 && inviteDayCount <= 365;
   // null = panelin ana sayfası (kimin yanında + onaylar + bölüm kartları).
-  type Section = 'tasks' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings';
+  type Section = 'tasks' | 'bonus' | 'videos' | 'stats' | 'activity' | 'settings' | 'help';
   const [section, setSection] = useState<Section | null>(null);
   // Sesli mesaj alanı: panel her açıldığında bir kez ölçülür.
   const [storageUsage, setStorageUsage] = useState<{ bytes: number; files: number } | null>(null);
@@ -401,6 +434,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     { id: 'stats', label: 'İstatistik', detail: 'Hafta ve seri', Icon: TrendingUp, tone: 'turkuaz' },
     { id: 'activity', label: 'Geçmiş', detail: 'Ne zaman ne yapıldı', Icon: History, tone: 'turuncu' },
     { id: 'settings', label: 'Ayarlar', detail: 'PIN, aile, cihaz', Icon: Settings, tone: 'gri' },
+    { id: 'help', label: 'Nasıl kullanılır', detail: 'Kısa rehber', Icon: HelpCircle, tone: 'turkuaz' },
   ];
   const currentSection = SECTIONS.find((item) => item.id === section);
 
@@ -735,6 +769,19 @@ export const ParentModal: React.FC<ParentModalProps> = ({
             )}
 
             {/* GEÇMİŞ */}
+            {section === 'help' && (
+              <>
+                {HELP_SECTIONS.map((part) => (
+                  <section key={part.title} className="pp-card pp-help">
+                    <p className="pp-label">{part.title}</p>
+                    <ul>
+                      {part.items.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </section>
+                ))}
+              </>
+            )}
+
             {section === 'activity' && (
               <section className="pp-card">
                 <p className="pp-muted">Uygulama açılışları, onaylanan görevler, alışverişler ve günlükler; en yeni en üstte.</p>

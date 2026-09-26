@@ -186,3 +186,7 @@
 .pp-storage-warn { box-shadow: inset 0 0 0 3px #f59e0b; }
 .pp-storage-warn .pp-meter i { background: #f59e0b; }
 .pp-big small { font-size: 60%; font-weight: 800; color: var(--pp-ink-2); }
+
+/* Nasıl kullanılır */
+.pp-help ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.pp-help li { font-size: 16px; font-weight: 700; line-height: 1.45; color: var(--pp-ink); }
