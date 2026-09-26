@@ -40,6 +40,7 @@ import {
   START_LEVEL_VERSION,
 } from './utils/storage';
 import { TrainWorldView } from './components/TrainWorldView';
+import { StartupScreen } from './components/StartupScreen';
 import { ShopView } from './components/ShopView';
 import { VideosView } from './components/VideosView';
 import { LearnView } from './components/LearnView';
@@ -1058,7 +1059,7 @@ export default function App() {
   const unclaimedBonus = bonuses.find((b) => !b.claimed) || null;
 
   if (isCloudConfigured && !authChecked) {
-    return <main className="min-h-screen bg-[#EAF5F7]" aria-busy="true" />;
+    return <StartupScreen />;
   }
 
   // Cihaz yalnızca izinli bir yetişkin hesabıyla açıkken ve aileye bağlıyken
