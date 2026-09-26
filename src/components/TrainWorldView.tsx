@@ -1309,7 +1309,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 }}
                 className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
                 // Garın hemen solunda, rayın arkasındaki çimende: tren önünden geçerken de başı görünür.
-                style={{ zIndex: 29, bottom: "calc(13% + 17cqh)", left: `${stationLeftPercent}%`, width: 'min(34cqh, 170px)', transform: 'translateX(calc(-100% - min(19cqh, 104px)))' }}
+                style={{ zIndex: 29, bottom: "calc(13% + 17cqh)", left: `${stationLeftPercent}%`, width: 'var(--gt-sipa-w, min(34cqh, 170px))', transform: 'translateX(calc(-100% - min(19cqh, 104px)))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
