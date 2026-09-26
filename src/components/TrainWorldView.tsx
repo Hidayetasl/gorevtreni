@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 // Tasarım: Pastel Tren Rotası — kokpit görevleri beyaz/uyarıcı sarı yüzeylerle, başarılar canlı yeşille görünür.
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext, speakTurkishThenEnglish } from '../utils/audio';
+
+/** Dünya'da yapıya dokununca: 'both' = Türkçe + İngilizce, 'en' = sadece İngilizce. Cihazda hatırlanır. */
+const WORD_LANG_KEY = 'ruzgar_world_word_lang_v1';
+type WordLang = 'both' | 'en';
 import { ArrowLeft, Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 import menuTren from '../assets/images/menu-tren.webp';
 import menuKasaba from '../assets/images/menu-kasaba.webp';
@@ -607,11 +611,28 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
   // Interactive item tap handlers in cartoon mode
   // Yapıya/nesneye dokununca adı önce Türkçe, sonra İngilizce söylenir.
+  const [wordLang, setWordLang] = useState<WordLang>(() => {
+    try { return localStorage.getItem(WORD_LANG_KEY) === 'en' ? 'en' : 'both'; } catch { return 'both'; }
+  });
+  const toggleWordLang = () => {
+    playPopSound(soundEnabled);
+    const next: WordLang = wordLang === 'both' ? 'en' : 'both';
+    setWordLang(next);
+    try { localStorage.setItem(WORD_LANG_KEY, next); } catch { /* yoksay */ }
+    setInteractiveMessage(next === 'en' ? '🇬🇧 Sadece İngilizce: bir yapıya dokun!' : '🇹🇷 🇬🇧 Türkçe ve İngilizce: bir yapıya dokun!');
+    if (next === 'en') speakText('English', speechEnabled, 0.8, 'en-US', 1.0);
+    else speakText('Türkçe ve İngilizce', speechEnabled);
+  };
   const sayWord = (itemId: string) => {
     const word = sceneWord(itemId);
     if (!word) return false;
-    setInteractiveMessage(`${word.emoji} ${word.tr} = ${word.en}`);
-    speakTurkishThenEnglish(word.tr, word.en, speechEnabled);
+    if (wordLang === 'en') {
+      setInteractiveMessage(`${word.emoji} ${word.en}`);
+      speakText(word.en, speechEnabled, 0.7, 'en-US', 1.0);
+    } else {
+      setInteractiveMessage(`${word.emoji} ${word.tr} = ${word.en}`);
+      speakTurkishThenEnglish(word.tr, word.en, speechEnabled);
+    }
     return true;
   };
 
@@ -1014,6 +1035,17 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 {soundEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
               </button>
             )}
+            {/* Yapı adları: Türkçe + İngilizce ya da sadece İngilizce. */}
+            <button
+              type="button"
+              onPointerDown={unlockAudioContext}
+              onClick={toggleWordLang}
+              className={`gt-wfab lang ${wordLang === 'en' ? 'en' : ''}`}
+              aria-label={wordLang === 'en' ? 'Yapı adları: sadece İngilizce. Türkçe ve İngilizceye geç' : 'Yapı adları: Türkçe ve İngilizce. Sadece İngilizceye geç'}
+              title="Yapı adlarının dili"
+            >
+              {wordLang === 'en' ? <b>EN</b> : <><b>TR</b><span aria-hidden="true">+</span><b>EN</b></>}
+            </button>
             <p className={`gt-wbubble ${bubbleVisible ? 'show' : ''}`} role="status" aria-live="polite">{interactiveMessage}</p>
             {/* Tam ekranda kokpit varsayılan olarak gizli olduğu için, onu açmaya
                 yarayan ayrı bir köşe düğmesi — sadece tam ekran modunda görünür. */}
