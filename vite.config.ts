@@ -3,8 +3,16 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Ekranda görünen sürüm: GitHub Actions'ta commit kısaltması, yerelde "yerel".
+const APP_VERSION = (process.env.GITHUB_SHA || '').slice(0, 7) || 'yerel';
+const BUILD_TIME = new Date().toISOString();
+
 export default defineConfig(() => {
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(APP_VERSION),
+      __BUILD_TIME__: JSON.stringify(BUILD_TIME),
+    },
     base: process.env.GITHUB_PAGES === 'true' ? '/gorevtreni/' : '/',
     plugins: [
       react(),

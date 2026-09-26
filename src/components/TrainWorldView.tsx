@@ -168,8 +168,8 @@ const SCENE_IMG_BOX: Record<string, SceneImgBox> = {
   // Kamu binaları evlerden belirgin şekilde büyük.
   'scenery-school': [28, 150],
   'scenery-hospital': [28, 150],
-  'scenery-market': [26, 140],
-  'scenery-bakery': [26, 140],
+  'scenery-market': [22, 120],
+  'scenery-bakery': [22, 120],
   'scenery-cinema': [26, 140],
   'scenery-train-repair': [26, 140],
   'scenery-firestation-building': [26, 140],
@@ -179,7 +179,8 @@ function sceneImgStyle(itemId: string): React.CSSProperties {
   const [cqh, maxPx, ratio = 1] = SCENE_IMG_BOX[itemId] || DEFAULT_SCENE_IMG_BOX;
   // --gt-obj-scale: dik ekranda yapılar küçülür (bkz. child.css .gt-game).
   const height = `calc(min(${cqh}cqh, ${maxPx}px) * var(--gt-obj-scale, 1))`;
-  return { height, width: ratio === 1 ? height : `calc(${height} * ${ratio})` };
+  // Genişlik bir ızgara karesini geçmez (%92): yan yana yapılar üst üste binmez.
+  return { height, width: ratio === 1 ? height : `calc(${height} * ${ratio})`, maxWidth: `calc(100cqw / ${GRID_COLS} * 0.92)` };
 }
 
 // Arka plan resmindeki (bos-genis.webp, 1600x686) nehrin orta çizgisi:
@@ -1611,6 +1612,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
               <button type="button" className="gt-ghost" onClick={() => { setShowMissions(false); setShowCockpitOverlay(false); }}>Tamam</button>
             </section>
+            <p className="gt-gversion">Sürüm {__APP_VERSION__} · {new Date(__BUILD_TIME__).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
 
           </div>
         </div>

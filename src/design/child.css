@@ -831,3 +831,4 @@
 .gt .gt-game .gt-gsheet-bg { position: absolute; inset: 0; z-index: 65; background: rgba(10, 30, 40, .35); }
 /* Yapılar zemine basar: altlarında yumuşak toprak/gölge */
 .gt .gt-lot::before { content: ""; position: absolute; left: 50%; bottom: 2px; width: 92%; height: 16%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(70, 55, 30, .5) 0%, rgba(96, 120, 45, .28) 55%, rgba(96, 120, 45, 0) 75%); z-index: -1; pointer-events: none; }
+.gt .gt-gversion { margin: 2px 0 0; text-align: center; font: 700 12px var(--gt-font); color: var(--gt-ink-2); }
