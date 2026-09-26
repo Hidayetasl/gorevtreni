@@ -297,7 +297,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Katarın gerçek genişliği ölçülerek sağ uçta ekrandan taşması önlenir.
   const [assemblyWidthPercent, setAssemblyWidthPercent] = useState(45);
   // Tren sabit piksel boyunda çizilir; kısa sahnede (yatay telefon) binalarla
-  // orantılı kalsın diye sahne yüksekliğine göre küçültülür (en az %55).
+  // orantılı kalsın diye sahne yüksekliğine göre ölçeklenir (%72–%110).
   const [trainScale, setTrainScale] = useState(1);
   useEffect(() => {
     const canvasEl = rideCanvasRef.current;
@@ -307,7 +307,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     const measure = () => {
       const canvasWidth = canvasEl.offsetWidth;
       const assemblyWidth = assemblyEl.offsetWidth;
-      const scale = Math.min(1, Math.max(0.55, canvasEl.offsetHeight / 440));
+      const scale = Math.min(1.1, Math.max(0.72, canvasEl.offsetHeight / 320));
       setTrainScale(scale);
       if (canvasWidth > 0 && assemblyWidth > 0) {
         setAssemblyWidthPercent(((assemblyWidth * scale) / canvasWidth) * 100);
