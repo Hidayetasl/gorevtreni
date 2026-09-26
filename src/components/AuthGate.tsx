@@ -148,6 +148,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ getLocalFamilyData, onReady 
     }
   };
 
+  // "Aile bilgisi yükleniyor…" sonsuza kadar dönmesin: 20 sn'de gelmezse hata ve Tekrar dene.
+  useEffect(() => {
+    if (phase !== 'resolving') return;
+    const timer = window.setTimeout(() => {
+      setError(navigator.onLine
+        ? 'Aile bilgisi 20 saniyede gelmedi. Bağlantı yavaş olabilir; Tekrar dene’ye dokunun.'
+        : 'İnternet bağlantısı yok. Bağlanınca Tekrar dene’ye dokunun.');
+      setPhase('error');
+    }, 20000);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
   // Yönlendirmeli Google girişinden dönüldüyse olası hatayı göster.
   useEffect(() => {
     completeGoogleRedirect().catch((reason) => setError(describeAuthError(reason)));
