@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 // Tasarım: Pastel Tren Rotası — kokpit görevleri beyaz/uyarıcı sarı yüzeylerle, başarılar canlı yeşille görünür.
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
-import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext } from '../utils/audio';
+import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext, speakTurkishThenEnglish } from '../utils/audio';
 import { ArrowLeft, Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 import menuTren from '../assets/images/menu-tren.webp';
 import menuKasaba from '../assets/images/menu-kasaba.webp';
@@ -34,6 +34,7 @@ import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
+import { sceneWord } from '../utils/sceneWords';
 // Sahnede rayla aynı hizada duran, yandan görünen köprü (mağazada 3D görsel kalır).
 import kopruYanImg from '../assets/images/kopru-yan.webp';
 
@@ -605,27 +606,33 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const currentTrainTrack = trackItems[trainPositionIndex] || trackItems[0] || { x: 4, y: 3 };
 
   // Interactive item tap handlers in cartoon mode
+  // Yapıya/nesneye dokununca adı önce Türkçe, sonra İngilizce söylenir.
+  const sayWord = (itemId: string) => {
+    const word = sceneWord(itemId);
+    if (!word) return false;
+    setInteractiveMessage(`${word.emoji} ${word.tr} = ${word.en}`);
+    speakTurkishThenEnglish(word.tr, word.en, speechEnabled);
+    return true;
+  };
+
   const handleCowClick = () => {
     playPopSound(soundEnabled);
     setCowMooing(true);
-    setInteractiveMessage('İnek: Möööö! Taze ot yiyor 🐄🌾');
-    speakText('İnek möö diyor!', speechEnabled);
+    sayWord('scenery-cow');
     setTimeout(() => setCowMooing(false), 2000);
   };
 
   const handleWindmillClick = () => {
     playPopSound(soundEnabled);
     setWindmillSpinningFast(true);
-    setInteractiveMessage('Rüzgar türbini süper hızlı dönüyor! 🌬️⚡');
-    speakText('Rüzgar türbini hızlı dönüyor!', speechEnabled);
+    sayWord('scenery-windmill');
     setTimeout(() => setWindmillSpinningFast(false), 3000);
   };
 
   const handleAppleTreeClick = () => {
     playPopSound(soundEnabled);
     setApplesFalling(true);
-    setInteractiveMessage('Ağaçtan taze kırmızı elmalar düştü! 🍎🍏');
-    speakText('Ağaçtan elmalar düştü!', speechEnabled);
+    sayWord('scenery-tree');
     setTimeout(() => setApplesFalling(false), 2500);
   };
 
@@ -651,6 +658,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     }
 
     const clickedItem = worldItems.find((i) => i.x === x && i.y === y);
+    // Elma ağacı ve inek kendi animasyonlarıyla birlikte adlarını söyler.
+    if (clickedItem && viewMode === 'ride' && sceneWord(clickedItem.itemId) && !clickedItem.icon.includes('🌳') && !clickedItem.icon.includes('🐄')) {
+      sayWord(clickedItem.itemId);
+      return;
+    }
     if (clickedItem) {
       if (clickedItem.icon.includes('🌳')) {
         handleAppleTreeClick();
@@ -1178,8 +1190,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   type="button"
                   onClick={() => {
                     playPopSound(soundEnabled);
-                    setInteractiveMessage('Kırmızı Tren Köprüsü: Tren nehrin üstünden güvenle geçiyor! 🌉✨');
-                    speakText('Kırmızı tren köprüsü!', speechEnabled);
+                    sayWord('track-bridge');
                   }}
                   className="absolute cursor-pointer"
                   style={{
@@ -1202,8 +1213,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
-                  setInteractiveMessage('Dağ Tüneli: Tren dağın altındaki tünelden çuf çuf geçiyor! 🕳️⛰️');
-                  speakText('Dağ tüneli aktif!', speechEnabled);
+                  sayWord('track-tunnel');
                 }}
                 className="absolute bottom-[9.5%] z-25 -rotate-3 cursor-pointer hover:scale-105 transition-transform"
                 style={{ left: `${tunnelLeftPercent}%`, transform: 'translateX(-50%)', height: 'min(28cqh, 100px)', width: 'min(40cqh, 144px)' }}
@@ -1228,8 +1238,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
-                  setInteractiveMessage('Sincap Köy Garı: Yolcular treni neşeyle bekliyor! 🚉🎟️');
-                  speakText('Sincap Köy Garı yolcuları treni bekliyor!', speechEnabled);
+                  sayWord('track-station');
                 }}
                 className="absolute bottom-[20.2%] z-20 cursor-pointer transition-transform hover:scale-105"
                 style={{ left: `${stationLeftPercent}%`, transform: 'translateX(-50%)' }}
@@ -1244,8 +1253,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
-                  setInteractiveMessage('Sıpa Sincap Ekspres\'i meraklı gözlerle izliyor! 🫏✨');
-                  speakText('Sevimli sıpa treni izliyor!', speechEnabled);
+                  sayWord('scenery-donkey');
                 }}
                 className="absolute bottom-[27%] z-20 cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
                 style={{ left: `${stationLeftPercent}%`, width: 'min(28cqh, 96px)', transform: 'translateX(calc(-100% - 36px))' }}

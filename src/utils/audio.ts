@@ -285,6 +285,27 @@ function pickVoice(lang: string): SpeechSynthesisVoice | null {
  * kelime öğretiminde netlik için genelde 1.0 (doğal) geçiriliyor — aşırı
  * pitch kayması sentezlenmiş sesi anlaşılmaz/bozuk hale getirebiliyor.
  */
+/** Önce Türkçe, ardından İngilizce söyler (Dünya'da yapıya dokununca: "Hastane… Hospital"). */
+export function speakTurkishThenEnglish(turkish: string, english: string, enabled: boolean = true) {
+  if (!enabled || !('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const say = (text: string, lang: string, rate: number, pitch: number) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      const voice = pickVoice(lang);
+      if (voice) utterance.voice = voice;
+      utterance.rate = rate;
+      utterance.pitch = pitch;
+      window.speechSynthesis.speak(utterance);
+    };
+    say(turkish, 'tr-TR', 0.9, 1.2);
+    say(english, 'en-US', 0.7, 1.0);
+  } catch (e) {
+    console.debug('TTS error', e);
+  }
+}
+
 export function speakText(text: string, enabled: boolean = true, rate: number = 0.95, lang: string = 'tr-TR', pitch: number = 1.2) {
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
