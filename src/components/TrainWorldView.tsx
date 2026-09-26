@@ -424,7 +424,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
   // Builder grid states
   const [isBuildMode, setIsBuildMode] = useState(false);
+  // Kasabayı kur: haritadaki bir yapıya dokununca seçilir, boş kareye dokununca oraya taşınır.
+  const [movingItem, setMovingItem] = useState<PlacedWorldItem | null>(null);
+  const [lastMoved, setLastMoved] = useState('');
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<ShopItem | null>(null);
+  useEffect(() => { if (selectedInventoryItem) setMovingItem(null); }, [selectedInventoryItem]);
   const [draggedInventoryItem, setDraggedInventoryItem] = useState<ShopItem | null>(null);
   const [placementRotation, setPlacementRotation] = useState(0);
   const [previewCell, setPreviewCell] = useState<{ x: number; y: number } | null>(null);
@@ -879,19 +883,41 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   };
 
   const handleMapCellClick = (x: number, y: number) => {
+    const placed = placedByCell.get(`${x}:${y}`);
+    // Taşıma: önce yapıya dokun (seçilir), sonra boş bir kareye dokun (taşınır).
+    if (movingItem) {
+      if (placed?.id === movingItem.id) {
+        setMovingItem(null);
+        playPopSound(soundEnabled);
+        setInteractiveMessage('Taşıma iptal edildi.');
+        return;
+      }
+      if (placed) {
+        // Dolu kareye dokununca üzerine yazılmaz (yanlışlıkla silinmesin); o yapı seçilir.
+        setMovingItem(placed);
+        playPopSound(soundEnabled);
+        setInteractiveMessage(`${placed.name} seçildi 👆 Şimdi boş bir yere dokun.`);
+        return;
+      }
+      rememberPlacement();
+      const { id: _id, ...rest } = movingItem;
+      onRemoveItem(movingItem.id);
+      onPlaceItem({ ...rest, x, y });
+      setMovingItem(null);
+      setLastMoved(movingItem.name);
+      playPopSound(soundEnabled);
+      setInteractiveMessage(`${movingItem.name} taşındı! ✨`);
+      return;
+    }
     if (selectedInventoryItem) {
       placeInventoryOnMap(selectedInventoryItem, x, y);
       return;
     }
-    const placed = placedByCell.get(`${x}:${y}`);
-    if (isBuildMode && placed) {
-      const sourceItem = builderItems.find((item) => item.id === placed.itemId);
-      if (sourceItem) {
-        setSelectedInventoryItem(sourceItem);
-        setPlacementRotation(placed.rotation || 0);
-        setInteractiveMessage(`${placed.name} seçildi. Yeni hücreye dokunarak taşıyabilirsin.`);
-        return;
-      }
+    if (placed) {
+      setMovingItem(placed);
+      playPopSound(soundEnabled);
+      setInteractiveMessage(`${placed.name} seçildi 👆 Taşımak istediğin boş yere dokun.`);
+      return;
     }
     handleTileClick(x, y);
   };
@@ -1287,8 +1313,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   playPopSound(soundEnabled);
                   sayWord('scenery-donkey');
                 }}
-                className="absolute bottom-[27%] z-20 cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                style={{ left: `${stationLeftPercent}%`, width: 'min(28cqh, 96px)', transform: 'translateX(calc(-100% - 36px))' }}
+                className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
+                // Garın hemen solunda, peronda: gar genişliğinin yarısı kadar sola yaslanır.
+                style={{ zIndex: 21, bottom: "21%", left: `${stationLeftPercent}%`, width: 'min(34cqh, 128px)', transform: 'translateX(calc(-100% - min(19cqh, 78px)))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
@@ -1573,10 +1600,14 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       {/* ===================================================================== */}
       {viewMode === 'builder' && (
         <div className="gt-wbuild">
-          <p className="gt-result info">
-            {selectedInventoryItem
+          <p className="gt-result info" role="status" aria-live="polite">
+            {movingItem
+              ? `${movingItem.name} seçildi 👆 Taşımak istediğin boş yere dokun. (Vazgeçmek için yine ona dokun.)`
+              : selectedInventoryItem
               ? `${selectedInventoryItem.name} seçili. Haritada bir yere dokun.`
-              : 'Aşağıdan bir parça seç, sonra haritada bir yere dokun.'}
+              : lastMoved
+              ? `${lastMoved} taşındı! ✨ Başka bir şeyi taşımak için ona dokun.`
+              : 'Haritadaki bir yapıya dokun, sonra boş bir yere dokun: taşınır. Yeni parça için aşağıdan seç.'}
           </p>
           <div className="gt-wtools four" aria-label="Harita kolaylıkları">
             <button
@@ -1677,7 +1708,11 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                         setPreviewCell(null);
                       }}
                       className={`relative rounded-2xl border transition-all focus:outline-none focus:ring-4 focus:ring-amber-300/70 ${
-                        previewCell?.x === c && previewCell?.y === r && selectedInventoryItem
+                        movingItem && placed?.id === movingItem.id
+                          ? 'border-amber-300 bg-amber-300/35 ring-4 ring-amber-400 animate-pulse'
+                          : movingItem && !placed
+                          ? 'border-white/60 border-dashed bg-white/15 hover:bg-amber-200/20'
+                          : previewCell?.x === c && previewCell?.y === r && selectedInventoryItem
                           ? 'border-amber-200 bg-amber-200/30 ring-4 ring-amber-300/40'
                           : placed && isBuildMode
                           ? 'border-emerald-300/70 bg-emerald-400/10 hover:border-amber-200 hover:bg-amber-200/20'
