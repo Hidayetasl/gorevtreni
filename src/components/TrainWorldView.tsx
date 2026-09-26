@@ -322,7 +322,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       const assemblyWidth = assemblyEl.offsetWidth;
       // Dik ekranda tren de yapılarla birlikte küçülür.
       const portrait = window.matchMedia?.('(orientation: portrait)').matches;
-      const scale = Math.min(1.5, Math.max(0.6, (canvasEl.offsetHeight / 320) * (portrait ? 0.75 : 1)));
+      const scale = Math.min(1.5, Math.max(0.6, (canvasEl.offsetHeight / 320) * (portrait ? 0.95 : 1)));
       setTrainScale(scale);
       if (canvasWidth > 0 && assemblyWidth > 0) {
         setAssemblyWidthPercent(((assemblyWidth * scale) / canvasWidth) * 100);
@@ -366,6 +366,22 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Köprü, nehrin rayı kestiği noktaya oturur (ekranın şekli ne olursa olsun).
   const rideRailRef = useRef<HTMLDivElement | null>(null);
   const [bridgeSpot, setBridgeSpot] = useState<{ left: number; width: number } | null>(null);
+  // Kasaba katmanının genişliği: resmin oranında (yükseklik × 1600/686), ekrandan dar
+  // kalırsa ekran genişliği. CSS aspect-ratio + min-width Safari'de güvenilir değildi.
+  const [worldWidth, setWorldWidth] = useState(0);
+  useEffect(() => {
+    const canvas = rideCanvasRef.current;
+    if (!canvas || viewMode !== 'ride') return;
+    const measure = () => {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (w > 0 && h > 0) setWorldWidth(Math.max(w, Math.round((h * BG_SIZE.w) / BG_SIZE.h)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [viewMode]);
   useEffect(() => {
     const inner = rideCanvasRef.current?.firstElementChild as HTMLElement | null;
     const rail = rideRailRef.current;
@@ -1109,7 +1125,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
             <div ref={rideCanvasRef} className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-3xl">
               {/* Kasaba her zaman arka plan resminin oranında (1600:686) çizilir: yapılar dikeyde
                   de yatayda da resmin aynı noktasında durur. Ekran daha genişse hafifçe yayılır. */}
-              <div className="relative h-full" style={{ aspectRatio: `${BG_SIZE.w} / ${BG_SIZE.h}`, minWidth: '100%', containerType: 'size' }}>
+              <div className="relative h-full" style={{ width: worldWidth ? `${worldWidth}px` : `${WORLD_WIDE_PERCENT}%`, containerType: 'size' }}>
             {/* Background Illustration Image */}
             <img
               src={cartoonBg}
