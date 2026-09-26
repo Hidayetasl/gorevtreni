@@ -366,9 +366,6 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Köprü, nehrin rayı kestiği noktaya oturur (ekranın şekli ne olursa olsun).
   const rideRailRef = useRef<HTMLDivElement | null>(null);
   const [bridgeSpot, setBridgeSpot] = useState<{ left: number; width: number } | null>(null);
-  // Arka planın yatay kayması (px): resim genişse (dik tam ekran) nehir, trenin
-  // gidip geldiği görünür alana düşecek şekilde kaydırılır.
-  const [bgOffsetX, setBgOffsetX] = useState(0);
   useEffect(() => {
     const inner = rideCanvasRef.current?.firstElementChild as HTMLElement | null;
     const rail = rideRailRef.current;
@@ -378,18 +375,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
       const box = inner.getBoundingClientRect();
       const railBox = rail.getBoundingClientRect();
       if (box.width <= 0 || box.height <= 0) return;
-      // object-cover: resim kutuyu dolduracak kadar büyütülür, dikeyde ortalanır.
-      const scale = Math.max(box.width / BG_SIZE.w, box.height / BG_SIZE.h);
-      const offsetY = (box.height - BG_SIZE.h * scale) / 2;
+      // Resim kasaba katmanını tam doldurur (object-fit: fill): kesit oranları doğrudan geçerli.
       const railY = railBox.top - box.top + railBox.height * (30 / 64);
-      const riverFrac = riverXAt((railY - offsetY) / (BG_SIZE.h * scale));
-      // Nehir, görünür kutunun %30'una gelsin; resim kutunun dışına taşmasın.
-      const slack = box.width - BG_SIZE.w * scale; // <= 0
-      const offsetX = Math.min(0, Math.max(slack, canvas.clientWidth * 0.3 - riverFrac * BG_SIZE.w * scale));
-      setBgOffsetX(offsetX);
-      const riverX = offsetX + riverFrac * BG_SIZE.w * scale;
+      const riverFrac = riverXAt(railY / box.height);
+      const riverX = riverFrac * box.width;
       // Köprü nehri ayaklarıyla kucaklayacak kadar geniş olur.
-      const widthPx = Math.max(box.width * (2 / GRID_COLS), 0.125 * BG_SIZE.w * scale);
+      const widthPx = Math.max(box.width * (2 / GRID_COLS), 0.125 * box.width);
       setBridgeSpot({ left: (riverX / box.width) * 100, width: (widthPx / box.width) * 100 });
     };
     measure();
@@ -1116,7 +1107,9 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 kutudan daha geniş, taşan kısım yana kaydırılarak keşfedilir. Hareket eden
                 tren ve düdük düğmesi bu katmanın DIŞINDA kalır ki ekranda sabit dursunlar. */}
             <div ref={rideCanvasRef} className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-3xl">
-              <div className="relative h-full" style={{ width: `${WORLD_WIDE_PERCENT}%`, containerType: 'size' }}>
+              {/* Kasaba her zaman arka plan resminin oranında (1600:686) çizilir: yapılar dikeyde
+                  de yatayda da resmin aynı noktasında durur. Ekran daha genişse hafifçe yayılır. */}
+              <div className="relative h-full" style={{ aspectRatio: `${BG_SIZE.w} / ${BG_SIZE.h}`, minWidth: '100%', containerType: 'size' }}>
             {/* Background Illustration Image */}
             <img
               src={cartoonBg}
@@ -1125,8 +1118,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                 const image = event.currentTarget;
                 if (image.src !== stableCartoonBackground) image.src = stableCartoonBackground;
               }}
-              // Dik tam ekranda nehir görünür alana kaydırılır (bkz. bgOffsetX).
-              style={{ objectPosition: `${bgOffsetX}px 50%` }}
+              // Resim kasaba katmanını tam doldurur (kırpılmaz); yapıların konumu resimle eşleşir.
+              style={{ objectFit: 'fill' }}
               className={`w-full h-full object-cover transition-all duration-700 ${
                 envTheme === 'sunset'
                   ? 'sepia hue-rotate-15 contrast-110'
