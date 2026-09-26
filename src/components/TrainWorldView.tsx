@@ -1314,8 +1314,8 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
                   sayWord('scenery-donkey');
                 }}
                 className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                // Garın hemen solunda, peronda: gar genişliğinin yarısı kadar sola yaslanır.
-                style={{ zIndex: 21, bottom: "21%", left: `${stationLeftPercent}%`, width: 'min(34cqh, 128px)', transform: 'translateX(calc(-100% - min(19cqh, 78px)))' }}
+                // Garın hemen solunda, rayın arkasındaki çimende: tren önünden geçerken de başı görünür.
+                style={{ zIndex: 29, bottom: "calc(13% + 17cqh)", left: `${stationLeftPercent}%`, width: 'min(34cqh, 128px)', transform: 'translateX(calc(-100% - min(19cqh, 78px)))' }}
                 title="Sıpa"
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
