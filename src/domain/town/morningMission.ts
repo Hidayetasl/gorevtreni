@@ -7,6 +7,7 @@ export type MorningTownStep = 'village_started' | 'bakery' | 'donkey' | 'complet
 interface StoredMorningTownMission {
   dateKey: string;
   step: MorningTownStep;
+  worldReplayPending?: boolean;
 }
 
 const STORAGE_KEY = 'ruzgar_town_morning_mission_v1';
@@ -46,6 +47,33 @@ export function readMorningTownStep(dateKey = localDateKey()): MorningTownStep {
 
 export function saveMorningTownStep(step: MorningTownStep, dateKey = localDateKey()) {
   if (typeof window === 'undefined') return;
-  const value: StoredMorningTownMission = { dateKey, step };
+  const value: StoredMorningTownMission = {
+    dateKey,
+    step,
+    worldReplayPending: step === 'completed',
+  };
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+}
+
+export function isMorningTownWorldReplayPending(dateKey = localDateKey()) {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') as StoredMorningTownMission | null;
+    return stored?.dateKey === dateKey && stored.step === 'completed' && stored.worldReplayPending === true;
+  } catch {
+    return false;
+  }
+}
+
+export function consumeMorningTownWorldReplay(dateKey = localDateKey()) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') as StoredMorningTownMission | null;
+    if (stored?.dateKey !== dateKey || stored.step !== 'completed' || !stored.worldReplayPending) return;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...stored, worldReplayPending: false }));
+  } catch {
+    // Depolama kullanılamıyorsa görsel tekrar yalnız mevcut oturumda kalır.
+  }
 }

@@ -187,15 +187,47 @@
 @keyframes gt-town-to-place { from { left: 8%; transform: translateY(0); } 45% { transform: translateY(-9%); } to { left: 59%; transform: translateY(0); } }
 
 .gt-town-visual--morning .gt-town-visual-place { left: 3%; right: auto; width: 30%; }
-.gt-town-visual-donkey { position: absolute; right: 4%; bottom: 12%; z-index: 3; width: 29%; height: 58%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(22, 50, 58, .25)); }
+.gt-town-visual-donkey { position: absolute; left: 67%; bottom: 12%; z-index: 3; width: 29%; height: 58%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(22, 50, 58, .25)); }
 .gt-town-visual-bread { position: absolute; left: 25%; bottom: 35%; z-index: 4; font-size: clamp(34px, 10vw, 54px); line-height: 1; filter: drop-shadow(0 3px 3px rgba(22, 50, 58, .25)); }
-.gt-town-visual--morning.is-travel .gt-town-visual-bread { animation: gt-town-bread-delivery .9s ease-in-out forwards; }
-.gt-town-visual--morning.is-arrived .gt-town-visual-bread { left: 70%; bottom: 32%; }
-@keyframes gt-town-bread-delivery { from { left: 25%; bottom: 35%; transform: rotate(-8deg) scale(.9); } 50% { bottom: 55%; transform: rotate(7deg) scale(1.08); } to { left: 70%; bottom: 32%; transform: rotate(0) scale(1); } }
+.gt-town-visual-bread-button { width: auto; min-width: 0; height: auto; min-height: 0; margin: 0; padding: 4px; border: 0; border-radius: 16px; background: rgba(255, 252, 245, .88) !important; cursor: pointer; animation: gt-town-bread-ready 1s ease-in-out infinite alternate; }
+.gt-town-visual-bread-button:focus-visible { outline: 4px solid var(--gt-turkuaz); outline-offset: 2px; }
+.gt-town-visual--morning.is-travel .gt-town-visual-donkey { animation: gt-town-donkey-to-bakery .9s ease-in-out forwards; }
+.gt-town-visual--morning.is-travel .gt-town-visual-bread { animation: gt-town-bread-pickup .9s ease-in-out forwards; }
+.gt-town-visual--morning.is-arrived .gt-town-visual-donkey { left: 29%; }
+.gt-town-visual--morning.is-arrived .gt-town-visual-bread { left: 43%; bottom: 30%; }
+.gt-town-visual--morning.is-return .gt-town-visual-donkey { animation: gt-town-donkey-return .9s ease-in-out forwards; }
+.gt-town-visual--morning.is-return .gt-town-visual-bread { animation: gt-town-bread-return .9s ease-in-out forwards; }
+@keyframes gt-town-bread-ready { from { transform: rotate(-5deg) scale(.95); } to { transform: rotate(5deg) scale(1.06); } }
+@keyframes gt-town-donkey-to-bakery { from { left: 67%; transform: translateY(0); } 52% { transform: translateY(-8%); } to { left: 29%; transform: translateY(0); } }
+@keyframes gt-town-bread-pickup { 0%, 64% { left: 25%; bottom: 35%; transform: rotate(-6deg); } to { left: 43%; bottom: 30%; transform: rotate(0); } }
+@keyframes gt-town-donkey-return { from { left: 29%; transform: translateY(0); } 48% { transform: translateY(-8%); } to { left: 67%; transform: translateY(0); } }
+@keyframes gt-town-bread-return { from { left: 43%; bottom: 30%; } to { left: 81%; bottom: 30%; } }
 
 @media (prefers-reduced-motion: reduce) {
   .gt-town-visual.is-travel .gt-town-visual-actor { animation: none; left: 59%; }
-  .gt-town-visual--morning.is-travel .gt-town-visual-bread { animation: none; left: 70%; bottom: 32%; }
+  .gt-town-visual--morning.is-travel .gt-town-visual-donkey { animation: none; left: 29%; }
+  .gt-town-visual--morning.is-travel .gt-town-visual-bread { animation: none; left: 43%; bottom: 30%; }
+  .gt-town-visual--morning.is-return .gt-town-visual-donkey { animation: none; left: 67%; }
+  .gt-town-visual--morning.is-return .gt-town-visual-bread { animation: none; left: 81%; bottom: 30%; }
+  .gt-town-visual-bread-button { animation: none; }
+}
+
+/* Treni sür sahnesinde aynı teslimat tek Sıpa örneğiyle bir kez tekrar edilir. */
+.gt-world-sipa.is-morning-delivery { animation: gt-world-sipa-delivery 3.8s ease-in-out both; }
+.gt-world-morning-bread { position: absolute; z-index: 34; font-size: clamp(24px, 5cqh, 42px); line-height: 1; transform: translate(-5%, -35%); filter: drop-shadow(0 3px 3px rgba(22, 50, 58, .3)); animation: gt-world-bread-pickup 3.8s ease-in-out both; pointer-events: none; }
+.gt-world-sipa-bread { animation: gt-world-carried-bread 3.8s ease-in-out both; }
+.gt-world-morning-thanks { position: absolute; z-index: 36; max-width: min(240px, 38vw); padding: 7px 10px; border-radius: 14px; background: rgba(255, 252, 245, .96); color: var(--gt-ink); font: 900 clamp(11px, 2cqh, 16px)/1.15 var(--gt-font); text-align: center; box-shadow: 0 3px 8px rgba(0, 0, 0, .2); transform: translate(-40%, -125%); animation: gt-world-thanks 3.8s ease-in-out both; pointer-events: none; }
+@keyframes gt-world-sipa-delivery {
+  0%, 8%, 92%, 100% { top: 63%; transform: translate(-120%, -50%); }
+  31%, 65% { left: var(--gt-sipa-target-left); top: var(--gt-sipa-target-top); transform: var(--gt-sipa-target-transform); }
+}
+@keyframes gt-world-bread-pickup { 0%, 31% { opacity: 1; } 38%, 100% { opacity: 0; } }
+@keyframes gt-world-carried-bread { 0%, 31% { opacity: 0; } 38%, 100% { opacity: 1; } }
+@keyframes gt-world-thanks { 0%, 33%, 66%, 100% { opacity: 0; } 40%, 59% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gt-world-sipa.is-morning-delivery { animation-duration: 1.8s; }
+  .gt-world-morning-bread, .gt-world-sipa-bread, .gt-world-morning-thanks { animation-duration: 1.8s; }
 }
 
 @container gt (max-width: 380px) {

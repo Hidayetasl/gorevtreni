@@ -35,32 +35,39 @@ import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
-import { readWordLang, saveWordLang, sceneWord, type WordLang } from '../utils/sceneWords';
-import { readMorningTownStep } from '../domain/town/morningMission';
+import { contentPhrase, contentText, readWordLang, saveWordLang, sceneWord, type WordLang } from '../utils/sceneWords';
+import {
+  consumeMorningTownWorldReplay,
+  isMorningTownWorldReplayPending,
+  readMorningTownStep,
+} from '../domain/town/morningMission';
 import { readAfternoonTownStep } from '../domain/town/afternoonMission';
 import { readParkTownStep } from '../domain/town/parkMission';
 // Sahnede rayla aynı hizada duran, yandan görünen köprü (mağazada 3D görsel kalır).
 import kopruYanImg from '../assets/images/kopru-yan.webp';
 
 export type TownMissionVisualKind = 'morning' | 'school' | 'park';
-export type TownMissionVisualPhase = 'start' | 'travel' | 'arrived';
+export type TownMissionVisualPhase = 'start' | 'travel' | 'arrived' | 'return';
 
 interface TownMissionVisualProps {
   kind: TownMissionVisualKind;
   phase: TownMissionVisualPhase;
+  onBreadClick?: () => void;
 }
 
 const TOWN_MISSION_LABELS: Record<TownMissionVisualKind, string> = {
-  morning: 'Ekmek Fırın’dan Sıpa’ya gidiyor',
+  morning: 'Sıpa Fırın’a gelip ekmeği alıyor ve yerine dönüyor',
   school: 'Sincap Okul’a gidiyor',
   park: 'Sıpa Park’a gidiyor',
 };
+
+const THANK_YOU = contentPhrase('thankYou');
 
 /**
  * Town görevlerinin yalnız görsel katmanı. Görev hazır olma, adım ilerletme ve
  * tamamlama kuralları mission/domain bileşenlerinde kalır.
  */
-export const TownMissionVisual: React.FC<TownMissionVisualProps> = ({ kind, phase }) => {
+export const TownMissionVisual: React.FC<TownMissionVisualProps> = ({ kind, phase, onBreadClick }) => {
   const placeId = kind === 'morning'
     ? 'scenery-bakery'
     : kind === 'school'
@@ -84,7 +91,16 @@ export const TownMissionVisual: React.FC<TownMissionVisualProps> = ({ kind, phas
       {kind === 'morning' ? (
         <>
           <img className="gt-town-visual-donkey" src={sipaMaskotImg} alt="Sıpa" draggable={false} />
-          <span className="gt-town-visual-bread" aria-hidden="true">🍞</span>
+          {onBreadClick && phase === 'start' ? (
+            <button
+              type="button"
+              className="gt-town-visual-bread gt-town-visual-bread-button"
+              onClick={onBreadClick}
+              aria-label="Fırının üstündeki ekmeği seç"
+            >🍞</button>
+          ) : (
+            <span className="gt-town-visual-bread" aria-hidden="true">🍞</span>
+          )}
         </>
       ) : kind === 'school' ? (
         <span className="gt-town-visual-actor gt-town-visual-squirrel" aria-label={actorAlt}>🐿️</span>
@@ -314,7 +330,20 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   onToggleSound,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('menu');
+  const [morningReplayPending, setMorningReplayPending] = useState(() => isMorningTownWorldReplayPending());
+  const [morningReplayActive, setMorningReplayActive] = useState(false);
   const [envTheme, setEnvTheme] = useState<EnvironmentTheme>('farm');
+
+  useEffect(() => {
+    if (viewMode !== 'ride' || !morningReplayPending) return;
+    setMorningReplayActive(true);
+    consumeMorningTownWorldReplay();
+    const timer = window.setTimeout(() => {
+      setMorningReplayActive(false);
+      setMorningReplayPending(false);
+    }, 3900);
+    return () => window.clearTimeout(timer);
+  }, [morningReplayPending, viewMode]);
   
   // V4 kokpit davranışı: düz hat üzerinde gerçek x-position + ping-pong yön.
   const [trainXPos, setTrainXPos] = useState(10);
@@ -450,12 +479,19 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const schoolMissionTarget = schoolTownCompleted
     ? placedSchool ?? createMissionFallbackTarget('school', worldItems)
     : undefined;
+  const morningReplayTarget = (morningReplayPending || morningReplayActive)
+    ? placedBakery ?? createMissionFallbackTarget('morning', worldItems)
+    : undefined;
+  const morningReplayPlace = morningReplayTarget
+    ? gridCellToScenePercent(morningReplayTarget.x, morningReplayTarget.y)
+    : undefined;
+  const morningReplayActorAnchor = morningReplayTarget
+    ? getMissionActorAnchor(morningReplayTarget)
+    : undefined;
   const sipaMissionTarget = parkTownCompleted
     ? placedPark ?? createMissionFallbackTarget('park', worldItems)
-    : morningTownCompleted
-      ? placedBakery ?? createMissionFallbackTarget('morning', worldItems)
-      : undefined;
-  const temporaryMissionTargets = [schoolMissionTarget, sipaMissionTarget]
+    : undefined;
+  const temporaryMissionTargets = [schoolMissionTarget, sipaMissionTarget, morningReplayTarget]
     .filter((target): target is PlacedWorldItem => Boolean(target?.id.startsWith('mission-target-')));
 
   // Köprü ve tünel de Kasabayı kur'da seçilen sütunun ortasına oturur.
@@ -521,7 +557,7 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
     'track-straight', 'track-curve', 'track-bridge', 'track-tunnel', 'track-station',
   ].includes(item.itemId)
     && !(schoolMissionTarget && item.itemId === 'scenery-squirrel-courier')
-    && !(sipaMissionTarget && item.itemId === 'scenery-donkey')
+    && !((hasPlacedStation || sipaMissionTarget || morningReplayTarget || morningTownCompleted) && item.itemId === 'scenery-donkey')
     && SCENE_ITEM_SIZE[item.itemId]);
 
   // Konum artık sabit bir tablodan değil, çocuğun Harita Çizimi'nde seçtiği
@@ -1495,29 +1531,47 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             )}
 
-            {/* Tek Sıpa örneği: görev sonucu varsa ilgili yapının, yoksa Gar'ın yanında. */}
-            {(hasPlacedStation || sipaMissionTarget) && (
+            {morningReplayActive && morningReplayPlace && (
+              <>
+                <span
+                  className="gt-world-morning-bread"
+                  style={{ left: morningReplayPlace.left, top: morningReplayPlace.top }}
+                  aria-hidden="true"
+                >🍞</span>
+                <span
+                  className="gt-world-morning-thanks"
+                  style={{ left: morningReplayActorAnchor?.left, top: morningReplayActorAnchor?.top }}
+                  role="status"
+                >{contentText(THANK_YOU, readWordLang())}</span>
+              </>
+            )}
+
+            {/* Tek Sıpa örneği: görev sırasında Fırın'a gider, sonra başlangıç yerine döner. */}
+            {(hasPlacedStation || sipaMissionTarget || morningReplayTarget || morningTownCompleted) && (
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
                   sayWord('scenery-donkey');
                 }}
-                className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                style={sipaMissionTarget ? {
+                className={`gt-world-sipa absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)] ${morningReplayActive ? 'is-morning-delivery' : ''}`}
+                style={sipaMissionTarget && !morningReplayActive ? {
                   ...getMissionActorAnchor(sipaMissionTarget),
                   width: 'var(--gt-sipa-w, min(34cqh, 170px))',
                 } : {
                   zIndex: 29,
-                  bottom: 'calc(13% + 17cqh)',
+                  top: '63%',
                   left: `${stationLeftPercent}%`,
                   width: 'var(--gt-sipa-w, min(34cqh, 170px))',
-                  transform: 'translateX(calc(-100% - min(19cqh, 104px)))',
-                }}
+                  transform: 'translate(-120%, -50%)',
+                  '--gt-sipa-target-left': morningReplayActorAnchor?.left,
+                  '--gt-sipa-target-top': morningReplayActorAnchor?.top,
+                  '--gt-sipa-target-transform': morningReplayActorAnchor?.transform,
+                } as React.CSSProperties}
                 title={parkTownCompleted ? 'Sıpa Parkta' : morningTownCompleted ? 'Sıpa ekmeğini aldı' : 'Sıpa'}
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
-                {morningTownCompleted && (
-                  <span className="absolute -right-1 bottom-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-lg shadow-md" aria-label="Sıpa'nın teslim aldığı ekmek">🍞</span>
+                {morningTownCompleted && !parkTownCompleted && (
+                  <span className={`absolute -right-1 bottom-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-lg shadow-md ${morningReplayActive ? 'gt-world-sipa-bread' : ''}`} aria-label="Sıpa'nın teslim aldığı ekmek">🍞</span>
                 )}
               </div>
             )}
