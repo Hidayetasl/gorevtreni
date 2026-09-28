@@ -47,12 +47,12 @@ export const AfternoonTownMission: React.FC<AfternoonTownMissionProps> = ({
 
   const chooseSchool = (choiceId: typeof SCHOOL_CHOICES[number]['id']) => {
     if (choiceId !== 'school') {
-      setFeedback('Bir daha deneyelim. School, okul demek.');
-      speakText('Bir daha deneyelim. School, okul demek.', speechEnabled);
+      setFeedback('Bir daha dene.');
+      speakText('Bir daha dene.', speechEnabled);
       return;
     }
-    setFeedback('Evet! School, okul demek.');
-    speakText('Evet! School, okul demek.', speechEnabled);
+    setFeedback('Doğru!');
+    speakText('Doğru!', speechEnabled);
     window.setTimeout(advance, 650);
   };
 
@@ -82,8 +82,8 @@ export const AfternoonTownMission: React.FC<AfternoonTownMissionProps> = ({
         <div className="gt-town-card">
           <img className="gt-town-place" src={schoolImage} alt="Sincap Köyü Okulu" />
           <p className="gt-label">OKUL</p>
-          <h1>School hangisi?</h1>
-          <button type="button" className="gt-town-listen" onClick={() => speakText('School hangisi?', speechEnabled)}>
+          <h1>School ne demek?</h1>
+          <button type="button" className="gt-town-listen" onClick={() => speakText('School ne demek?', speechEnabled)}>
             <Volume2 aria-hidden="true" /> Dinle
           </button>
           <div className="gt-town-choices" aria-label="School kelimesinin karşılığını seç">
