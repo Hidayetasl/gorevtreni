@@ -44,6 +44,10 @@ interface ParentModalProps {
   onCreateInvite?: (name: string, accessDays: number) => Promise<string>;
   /** Sesli mesaj dosyalarının depoda kapladığı alan. */
   onLoadStorageUsage?: () => Promise<{ bytes: number; files: number }>;
+  /** Aile yöneticisi: çocuk adı, aile PIN'i, davet, sıfırlama yalnızca onda. */
+  isAdmin?: boolean;
+  /** Açık hesabın uid'si: kişisel PIN için. */
+  currentUid?: string;
   activityLog?: ActivityLogEntry[];
   voiceMessages?: VoiceMessage[];
   weeklyStats?: Array<{ label: string; dateKey: string; rate: number | null }>;
@@ -71,6 +75,7 @@ const HELP_SECTIONS: Array<{ title: string; items: string[] }> = [
     'Açılan sayfada “Google ile giriş yap” → Gmail hesabını seç. Kod ya da PIN gerekmez; aileye kendiliğinden katılırsın.',
     'Davet linki tek kullanımlıktır ve 7 gün geçerlidir; çalışmazsa aileden yenisini iste.',
     'Sonraki girişlerde sadece Google hesabınla gir; telefon seni hatırlar.',
+    'Ebeveyn paneli (🔒) her açılışta PIN ister. Kendi PIN’ini Ayarlar → “Benim PIN’im”den belirleyebilirsin; belirlemediysen aile PIN’i geçerlidir.',
     'iPhone: Safari’de Paylaş ↑ → “Ana Ekrana Ekle”. Android: Chrome ⋮ → “Ana ekrana ekle”.',
     'Oyunu hep ana ekrandaki tren simgesinden aç; tam ekran olur.',
   ] },
@@ -133,6 +138,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onJoinFamily,
   onCreateInvite,
   onLoadStorageUsage,
+  isAdmin = false,
+  currentUid = '',
   activityLog = [],
   voiceMessages = [],
   weeklyStats = [],
@@ -262,6 +269,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [syncMessage, setSyncMessage] = useState('');
 
   const [editingPinAgain, setEditingPinAgain] = useState('');
+  const [editingMyPin, setEditingMyPin] = useState('');
+  const [editingMyPinAgain, setEditingMyPinAgain] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
 
   // Panel her açılışta PIN ister; kapanınca (oyuna dönünce) hemen kilitlenir.
@@ -287,6 +296,10 @@ export const ParentModal: React.FC<ParentModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Yetişkinin kendi PIN'i varsa o, yoksa aile PIN'i geçerlidir.
+  const myPin = currentUid ? parentConfig.adultPins?.[currentUid] : undefined;
+  const expectedPinHash = myPin?.pinHash || parentConfig.pinHash;
+
   const unlock = () => {
     setIsAuthenticated(true);
   };
@@ -302,7 +315,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
       if (newPin.length === 4) {
         // PIN yalnızca giriş ekranında, hesap şifresiyle giriş yapmış yetişkin
         // tarafından belirlenir. Panelde "ilk yazılan PIN kaydedilir" yolu yoktur.
-        if (parentConfig.pinHash && hashParentPin(newPin) === parentConfig.pinHash) {
+        if (expectedPinHash && hashParentPin(newPin) === expectedPinHash) {
           setPinInput('');
           unlock();
           setPinMessage('');
@@ -388,23 +401,33 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     onClose();
   };
 
+  const pinProblem = (pin: string, again: string) => {
+    if (!/^\d{4}$/.test(pin) || pin !== again) return 'PIN iki alanda da aynı 4 rakam olmalı.';
+    if (isWeakParentPin(pin) || needsNewParentPin(hashParentPin(pin))) return 'Bu PIN kolay tahmin edilir. Başka 4 rakam seçin.';
+    return '';
+  };
+
   const handleSaveSettings = () => {
-    onUpdateUserProfile({ ...userProfile, name: editingChildName.trim() || 'Rüzgar' });
-    const nextPin = editingPin.trim();
-    if (nextPin) {
-      if (!/^\d{4}$/.test(nextPin) || nextPin !== editingPinAgain) {
-        setSettingsMessage('Yeni PIN iki alanda da aynı 4 rakam olmalı.');
-        return;
-      }
-      if (isWeakParentPin(nextPin) || needsNewParentPin(hashParentPin(nextPin))) {
-        setSettingsMessage('Bu PIN kolay tahmin edilir. Başka 4 rakam seçin.');
-        return;
-      }
-      onUpdateParentConfig({ ...parentConfig, pinHash: hashParentPin(nextPin), pinUpdatedAt: Date.now() });
-      setEditingPin('');
-      setEditingPinAgain('');
+    let next = parentConfig;
+    const messages: string[] = [];
+    if (isAdmin) onUpdateUserProfile({ ...userProfile, name: editingChildName.trim() || 'Rüzgar' });
+    const familyPin = editingPin.trim();
+    if (isAdmin && familyPin) {
+      const problem = pinProblem(familyPin, editingPinAgain);
+      if (problem) { setSettingsMessage(`Aile PIN’i: ${problem}`); return; }
+      next = { ...next, pinHash: hashParentPin(familyPin), pinUpdatedAt: Date.now() };
+      messages.push('aile PIN’i değişti (kendi PIN’i olmayanlar kullanır)');
     }
-    setSettingsMessage(nextPin ? 'Ayarlar ve yeni PIN kaydedildi. PIN ailedeki tüm cihazlarda geçerli.' : 'Ayarlar kaydedildi.');
+    const ownPin = editingMyPin.trim();
+    if (ownPin && currentUid) {
+      const problem = pinProblem(ownPin, editingMyPinAgain);
+      if (problem) { setSettingsMessage(`Benim PIN’im: ${problem}`); return; }
+      next = { ...next, adultPins: { ...(next.adultPins || {}), [currentUid]: { pinHash: hashParentPin(ownPin), pinUpdatedAt: Date.now() } } };
+      messages.push('size özel PIN kaydedildi');
+    }
+    if (next !== parentConfig) onUpdateParentConfig(next);
+    setEditingPin(''); setEditingPinAgain(''); setEditingMyPin(''); setEditingMyPinAgain('');
+    setSettingsMessage(messages.length ? `Kaydedildi: ${messages.join(', ')}.` : 'Ayarlar kaydedildi.');
     speakText('Ayarlar kaydedildi', speechEnabled);
   };
 
@@ -477,8 +500,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
         {!isAuthenticated ? (
           /* PIN kapısı */
           <div className="pp-body pp-pin">
-            <p className="pp-lead">{parentConfig.pinHash ? 'Aile PIN’ini girin' : 'Aile PIN’i henüz yüklenmedi'}</p>
-            <p className="pp-muted">{parentConfig.pinHash ? 'Ailedeki tüm cihazlarda aynı PIN geçerlidir.' : 'İnternet bağlantısını kontrol edin. PIN buluttan gelince panel açılır.'}</p>
+            <p className="pp-lead">{expectedPinHash ? 'PIN’inizi girin' : 'PIN henüz yüklenmedi'}</p>
+            <p className="pp-muted">{expectedPinHash ? (myPin ? 'Size özel PIN.' : 'Aile PIN’i.') : 'İnternet bağlantısını kontrol edin. PIN buluttan gelince panel açılır.'}</p>
             <div className={`pp-dots ${pinError ? 'err' : ''}`} aria-hidden="true">
               {[0, 1, 2, 3].map((idx) => <i key={idx} className={pinInput.length > idx ? 'on' : ''} />)}
             </div>
@@ -838,19 +861,35 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 )}
 
                 <section className="pp-card pp-form">
-                  <p className="pp-label">ÇOCUK VE PIN</p>
-                  <label>Çocuğun adı
-                    <input type="text" value={editingChildName} onChange={(e) => setEditingChildName(e.target.value)} />
-                  </label>
-                  <label>Yeni aile PIN’i (4 rakam)
-                    <input type="password" autoComplete="new-password" maxLength={4} value={editingPin} inputMode="numeric" pattern="[0-9]*" placeholder="Değiştirmek için yazın"
-                      onChange={(e) => { setEditingPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
-                  </label>
-                  {editingPin && (
-                    <label>Yeni PIN tekrar
-                      <input type="password" autoComplete="new-password" maxLength={4} value={editingPinAgain} inputMode="numeric" pattern="[0-9]*" placeholder="Aynı 4 rakam"
-                        onChange={(e) => { setEditingPinAgain(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                  <p className="pp-label">{isAdmin ? 'ÇOCUK VE PIN' : 'PIN'}</p>
+                  {isAdmin && (
+                    <label>Çocuğun adı
+                      <input type="text" value={editingChildName} onChange={(e) => setEditingChildName(e.target.value)} />
                     </label>
+                  )}
+                  <label>Benim PIN’im (4 rakam){myPin ? ' · ayarlı' : ' · şu an aile PIN’ini kullanıyorsunuz'}
+                    <input type="password" autoComplete="new-password" maxLength={4} value={editingMyPin} inputMode="numeric" pattern="[0-9]*" placeholder="Değiştirmek için yazın"
+                      onChange={(e) => { setEditingMyPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                  </label>
+                  {editingMyPin && (
+                    <label>Benim PIN’im tekrar
+                      <input type="password" autoComplete="new-password" maxLength={4} value={editingMyPinAgain} inputMode="numeric" pattern="[0-9]*" placeholder="Aynı 4 rakam"
+                        onChange={(e) => { setEditingMyPinAgain(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                    </label>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <label>Aile PIN’i (kendi PIN’i olmayan yetişkinler için)
+                        <input type="password" autoComplete="new-password" maxLength={4} value={editingPin} inputMode="numeric" pattern="[0-9]*" placeholder="Değiştirmek için yazın"
+                          onChange={(e) => { setEditingPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                      </label>
+                      {editingPin && (
+                        <label>Aile PIN’i tekrar
+                          <input type="password" autoComplete="new-password" maxLength={4} value={editingPinAgain} inputMode="numeric" pattern="[0-9]*" placeholder="Aynı 4 rakam"
+                            onChange={(e) => { setEditingPinAgain(e.target.value.replace(/\D/g, '').slice(0, 4)); setSettingsMessage(''); }} />
+                        </label>
+                      )}
+                    </>
                   )}
                   <button type="button" className="pp-wide dark" onClick={handleSaveSettings}>Kaydet</button>
                   {settingsMessage && <p role="status" className="pp-note">{settingsMessage}</p>}
@@ -868,6 +907,9 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   </div>
                 </section>
 
+                {/* Aile ayarları, davet ve sıfırlama yalnızca aile yöneticisinde. */}
+                {isAdmin ? (
+                  <>
                 <section className="pp-card">
                   <p className="pp-label">AİLE EŞİTLEMESİ</p>
                   {!cloudConfigured ? (
@@ -982,6 +1024,13 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                     <button type="button" className="pp-wide soft danger-text" onClick={() => setConfirmReset(true)}><Trash2 aria-hidden="true" />Puanları ve görevleri sıfırla…</button>
                   )}
                 </section>
+                  </>
+                ) : (
+                  <section className="pp-card">
+                    <p className="pp-label">AİLE</p>
+                    <p className="pp-muted">Bu telefon aileye bağlı. Davet, aile ayarları ve sıfırlama aile yöneticisindedir.</p>
+                  </section>
+                )}
               </>
             )}
           </div>

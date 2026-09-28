@@ -104,6 +104,8 @@ export interface ParentConfig {
   pinHash?: string;
   /** PIN'in değiştiği an (ms): eşitlemede en yeni PIN kazanır, eski cihaz geri yazamaz. */
   pinUpdatedAt?: number;
+  /** Yetişkine özel PIN (uid → özet). Kendi PIN'i olmayan aile PIN'ini (pinHash) kullanır. */
+  adultPins?: Record<string, { pinHash: string; pinUpdatedAt: number }>;
 }
 
 /** Yetişkinin görünen adı: Baba, Anne, Anneanne ya da davetle eklenen biri (Dede, Teyze…). */

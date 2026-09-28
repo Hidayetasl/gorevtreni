@@ -3,7 +3,7 @@ import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, on
 import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { connectStorageEmulator, deleteObject, getMetadata, getStorage, listAll, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
-import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages, pickNewerPin } from './syncMerge';
+import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages, pickNewerPin, mergeAdultPins } from './syncMerge';
 // Uygulama bu birleştirme kurallarını cloudSync üzerinden de kullanır.
 export { mergeById, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems } from './syncMerge';
 
@@ -452,7 +452,11 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
     // buluttaki PIN'i asla silmez; PIN yalnızca açıkça değiştirilince güncellenir.
     const payload = removeUndefinedFields({
       ...data,
-      parentConfig: { ...data.parentConfig, ...pickNewerPin(data.parentConfig, remoteData.parentConfig as ParentConfig | undefined) },
+      parentConfig: {
+        ...data.parentConfig,
+        ...pickNewerPin(data.parentConfig, remoteData.parentConfig as ParentConfig | undefined),
+        adultPins: mergeAdultPins(data.parentConfig.adultPins, (remoteData.parentConfig as ParentConfig | undefined)?.adultPins),
+      },
       // Silinen görevlerin "silindi" işareti de saklanır; yoksa başka bir cihaz görevi geri getirir.
       tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks, true),
       shop: mergeShopUnlocks((remoteData.shop || []) as ShopItem[], data.shop),

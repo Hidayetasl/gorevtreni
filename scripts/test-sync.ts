@@ -15,6 +15,7 @@ import {
   stableStringify,
   stampAfter,
   pickNewerPin,
+  mergeAdultPins,
   unlockPaidItems,
 } from '../src/utils/syncMerge';
 
@@ -159,6 +160,14 @@ test('iki PIN değişikliğinden sonraki kazanır', () => {
 test('zaman damgası yoksa mevcut PIN korunur (eski davranış)', () => {
   assert.equal(pickNewerPin({}, { pinHash: 'b' }).pinHash, 'b');
   assert.equal(pickNewerPin({ pinHash: 'a' }, {}).pinHash, 'a');
+});
+
+test('kişisel PIN: her yetişkinde en yeni kazanır, diğerleri korunur', () => {
+  const remote = { baba: { pinHash: 'b2', pinUpdatedAt: 5 }, anne: { pinHash: 'a1', pinUpdatedAt: 1 } };
+  const staleDevice = { baba: { pinHash: 'b1', pinUpdatedAt: 2 } };
+  const merged = mergeAdultPins(staleDevice, remote)!;
+  assert.equal(merged.baba.pinHash, 'b2');
+  assert.equal(merged.anne.pinHash, 'a1');
 });
 
 console.log(`\n${passed} eşitleme testi geçti`);

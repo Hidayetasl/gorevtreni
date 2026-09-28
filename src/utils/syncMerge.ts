@@ -23,6 +23,18 @@ export function pickNewerPin(
   return { pinHash: local?.pinHash || remote?.pinHash, pinUpdatedAt: l || undefined };
 }
 
+/** Kişisel PIN'ler: her yetişkin için en son değiştirilen kazanır. */
+export function mergeAdultPins(
+  local: Record<string, { pinHash: string; pinUpdatedAt: number }> | undefined,
+  remote: Record<string, { pinHash: string; pinUpdatedAt: number }> | undefined,
+) {
+  const merged: Record<string, { pinHash: string; pinUpdatedAt: number }> = { ...(remote || {}) };
+  for (const [uid, pin] of Object.entries(local || {})) {
+    if (!merged[uid] || (pin.pinUpdatedAt || 0) > (merged[uid].pinUpdatedAt || 0)) merged[uid] = pin;
+  }
+  return Object.keys(merged).length ? merged : undefined;
+}
+
 export function stampAfter(previous?: string) {
   const prev = Date.parse(previous || '');
   return new Date(Math.max(Date.now(), Number.isFinite(prev) ? prev + 1 : 0)).toISOString();
