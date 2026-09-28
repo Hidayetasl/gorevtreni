@@ -50,6 +50,7 @@ import { VoiceMessagesModal } from './components/VoiceMessagesModal';
 import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
+import { MorningTownMission } from './components/town/MorningTownMission';
 import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
 import { pickNewerPin, mergeAdultPins } from './utils/syncMerge';
 import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, forgetAdultName, ACCESS_ENDED_KEY, deleteVoiceFile, getVoiceStorageUsage, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
@@ -1119,6 +1120,7 @@ export default function App() {
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
               caregiver={activeChildDevice?.setByName || adultUser?.name || null}
+              onOpenTown={() => handleChangeTab('world')}
             />
           )}
 
@@ -1135,18 +1137,24 @@ export default function App() {
           )}
 
           {activeTab === 'world' && (
-            <TrainWorldView
-              key={tabResetKey}
-              worldItems={world.filter((item) => !item.deletedAt)}
-              inventory={shop}
-              user={user}
-              onPlaceItem={handlePlaceItem}
-              onRemoveItem={handleRemoveItem}
-              onSetActiveTrain={handleSetActiveTrain}
+            <MorningTownMission
+              tasks={liveTasks}
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
-              onToggleSound={handleToggleSound}
-            />
+            >
+              <TrainWorldView
+                key={tabResetKey}
+                worldItems={world.filter((item) => !item.deletedAt)}
+                inventory={shop}
+                user={user}
+                onPlaceItem={handlePlaceItem}
+                onRemoveItem={handleRemoveItem}
+                onSetActiveTrain={handleSetActiveTrain}
+                soundEnabled={user.soundEnabled}
+                speechEnabled={user.speechEnabled}
+                onToggleSound={handleToggleSound}
+              />
+            </MorningTownMission>
           )}
 
           {activeTab === 'shop' && (

@@ -4,6 +4,7 @@ import { Check, Hand, LayoutGrid, Mic, TrainFront, Volume2 } from 'lucide-react'
 import type { AdultName, RoutineTask, TimeOfDay } from '../../types';
 import { withGenitive } from '../../utils/turkish';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
+import { isMorningTownReady } from '../../domain/town/morningMission';
 
 type Station = TimeOfDay | 'all';
 
@@ -15,6 +16,7 @@ interface TasksHomeProps {
   speechEnabled: boolean;
   /** Rüzgar şu an kimin yanında (aktif cihazı seçen yetişkin). */
   caregiver?: AdultName | null;
+  onOpenTown: () => void;
 }
 
 const STATIONS: Array<{ key: TimeOfDay; name: string; emoji: string }> = [
@@ -53,6 +55,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
   soundEnabled,
   speechEnabled,
   caregiver,
+  onOpenTown,
 }) => {
   const [station, setStation] = useState<Station>(() => {
     const now = stationForNow();
@@ -90,6 +93,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
   const doneCount = tasks.filter((task) => task.status !== 'todo').length;
   const stationInfo = STATIONS.find((item) => item.key === station);
   const nextOpenStation = STATIONS.find((item) => !stationDone(item.key));
+  const morningTownReady = isMorningTownReady(tasks);
 
   const chooseStation = (next: Station) => {
     playPopSound(soundEnabled);
@@ -138,6 +142,17 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
           Tümü
         </button>
       </div>
+
+      {morningTownReady && (
+        <section className="gt-town-callout" aria-label="Sincap Köyü görevi hazır">
+          <span aria-hidden="true">☀️</span>
+          <div>
+            <b>Sincap Köyü güne başladı</b>
+            <small>Fırın'da kısa bir görev var.</small>
+          </div>
+          <button type="button" onClick={onOpenTown}>Köye git</button>
+        </section>
+      )}
 
       {station === 'all' ? (
         <div className="gt-all">
