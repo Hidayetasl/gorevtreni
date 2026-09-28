@@ -3,7 +3,7 @@ import { Check, Home, Volume2 } from 'lucide-react';
 import type { RoutineTask } from '../../types';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
 import bakeryImage from '../../assets/images/urun-scenery-bakery.webp';
-import donkeyImage from '../../assets/images/sipa-maskot.webp';
+import { TownMissionVisual } from '../TrainWorldView';
 import {
   isMorningTownReady,
   nextMorningTownStep,
@@ -80,7 +80,7 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
 
       {step === 'bakery' && (
         <div className="gt-town-card">
-          <img className="gt-town-place" src={bakeryImage} alt="Sincap Köyü Fırını" />
+          <TownMissionVisual kind="morning" phase="start" />
           <p className="gt-label">FIRIN</p>
           <h1>Bread hangisi?</h1>
           <button type="button" className="gt-town-listen" onClick={() => speakText('Bread hangisi?', speechEnabled)}>
@@ -100,7 +100,7 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
 
       {step === 'donkey' && (
         <div className="gt-town-card">
-          <img className="gt-town-donkey" src={donkeyImage} alt="Sıpa" />
+          <TownMissionVisual kind="morning" phase="travel" />
           <p className="gt-label">SIPA</p>
           <h1>Ekmeği Sıpa'ya götür</h1>
           <p>Sıpa fırından gelen ekmeği bekliyor.</p>
@@ -110,7 +110,8 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
 
       {step === 'completed' && (
         <div className="gt-town-card">
-          <span className="gt-town-check" aria-hidden="true"><Check /></span>
+          <TownMissionVisual kind="morning" phase="arrived" />
+          <span className="gt-town-check gt-town-check--small" aria-hidden="true"><Check /></span>
           <p className="gt-label">SİNCAP KÖYÜ</p>
           <h1>Görev tamamlandı</h1>
           <p>Sıpa ekmeğine kavuştu. Bu kısa köy görevi burada bitti.</p>

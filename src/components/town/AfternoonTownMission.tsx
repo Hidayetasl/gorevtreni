@@ -3,6 +3,8 @@ import { Home, Volume2 } from 'lucide-react';
 import type { RoutineTask } from '../../types';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
 import schoolImage from '../../assets/images/urun-scenery-school.webp';
+import { TownMissionVisual } from '../TrainWorldView';
+import { isSelectedAfternoonTownScenario } from '../../domain/town/afternoonScenario';
 import {
   isAfternoonTownReady,
   nextAfternoonTownStep,
@@ -30,12 +32,13 @@ export const AfternoonTownMission: React.FC<AfternoonTownMissionProps> = ({
   speechEnabled,
   children,
 }) => {
+  const selected = isSelectedAfternoonTownScenario('school');
   const ready = isAfternoonTownReady(tasks);
   const [step, setStep] = useState<AfternoonTownStep>(() => readAfternoonTownStep());
   const [feedback, setFeedback] = useState('');
   const [showWorld, setShowWorld] = useState(() => readAfternoonTownStep() === 'completed');
 
-  if (!ready || showWorld) return <>{children}</>;
+  if (!selected || !ready || showWorld) return <>{children}</>;
 
   const advance = () => {
     const next = nextAfternoonTownStep(step);
@@ -80,7 +83,7 @@ export const AfternoonTownMission: React.FC<AfternoonTownMissionProps> = ({
 
       {step === 'school' && (
         <div className="gt-town-card">
-          <img className="gt-town-place" src={schoolImage} alt="Sincap Köyü Okulu" />
+          <TownMissionVisual kind="school" phase="travel" />
           <p className="gt-label">OKUL</p>
           <h1>School ne demek?</h1>
           <button type="button" className="gt-town-listen" onClick={() => speakText('School ne demek?', speechEnabled)}>
@@ -100,7 +103,7 @@ export const AfternoonTownMission: React.FC<AfternoonTownMissionProps> = ({
 
       {step === 'arrived' && (
         <div className="gt-town-card">
-          <img className="gt-town-place" src={schoolImage} alt="Sincap Köyü Okulu" />
+          <TownMissionVisual kind="school" phase="arrived" />
           <p className="gt-label">OKUL</p>
           <h1>Sincap okula ulaştı</h1>
           <p>Bugünkü kısa okul yolculuğu burada bitti.</p>

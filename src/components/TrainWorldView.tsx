@@ -39,8 +39,64 @@ import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
 import { sceneWord } from '../utils/sceneWords';
+import { readMorningTownStep } from '../domain/town/morningMission';
+import { readAfternoonTownStep } from '../domain/town/afternoonMission';
+import { readParkTownStep } from '../domain/town/parkMission';
 // Sahnede rayla aynı hizada duran, yandan görünen köprü (mağazada 3D görsel kalır).
 import kopruYanImg from '../assets/images/kopru-yan.webp';
+
+export type TownMissionVisualKind = 'morning' | 'school' | 'park';
+export type TownMissionVisualPhase = 'start' | 'travel' | 'arrived';
+
+interface TownMissionVisualProps {
+  kind: TownMissionVisualKind;
+  phase: TownMissionVisualPhase;
+}
+
+const TOWN_MISSION_LABELS: Record<TownMissionVisualKind, string> = {
+  morning: 'Ekmek Fırın’dan Sıpa’ya gidiyor',
+  school: 'Sincap Okul’a gidiyor',
+  park: 'Sıpa Park’a gidiyor',
+};
+
+/**
+ * Town görevlerinin yalnız görsel katmanı. Görev hazır olma, adım ilerletme ve
+ * tamamlama kuralları mission/domain bileşenlerinde kalır.
+ */
+export const TownMissionVisual: React.FC<TownMissionVisualProps> = ({ kind, phase }) => {
+  const placeId = kind === 'morning'
+    ? 'scenery-bakery'
+    : kind === 'school'
+      ? 'scenery-school'
+      : 'scenery-park';
+  const actorAlt = kind === 'school' ? 'Sincap' : 'Sıpa';
+
+  return (
+    <div
+      className={`gt-town-visual gt-town-visual--${kind} is-${phase}`}
+      role="img"
+      aria-label={TOWN_MISSION_LABELS[kind]}
+    >
+      <img className="gt-town-visual-bg" src={cartoonBg} alt="" draggable={false} />
+      <img
+        className="gt-town-visual-place"
+        src={SCENERY_IMAGES[placeId]}
+        alt={kind === 'morning' ? 'Fırın' : kind === 'school' ? 'Okul' : 'Park'}
+        draggable={false}
+      />
+      {kind === 'morning' ? (
+        <>
+          <img className="gt-town-visual-donkey" src={sipaMaskotImg} alt="Sıpa" draggable={false} />
+          <span className="gt-town-visual-bread" aria-hidden="true">🍞</span>
+        </>
+      ) : kind === 'school' ? (
+        <span className="gt-town-visual-actor gt-town-visual-squirrel" aria-label={actorAlt}>🐿️</span>
+      ) : (
+        <img className="gt-town-visual-actor" src={sipaMaskotImg} alt={actorAlt} draggable={false} />
+      )}
+    </div>
+  );
+};
 
 interface TrainWorldViewProps {
   worldItems: PlacedWorldItem[];
@@ -221,6 +277,34 @@ function getSceneDepthScale(y: number) {
   return Number((0.78 + depth * 0.32).toFixed(2));
 }
 
+function getMissionActorAnchor(item: PlacedWorldItem) {
+  const place = gridCellToScenePercent(item.x, item.y);
+  const placeLeft = Number.parseFloat(place.left);
+  const actorLeft = placeLeft + (item.x >= GRID_COLS - 2 ? -3.6 : 3.6);
+  return {
+    left: `${actorLeft}%`,
+    top: place.top,
+    zIndex: 24 + item.y,
+    transform: `translate(-50%, -42%) scale(${getSceneDepthScale(item.y)})`,
+  };
+}
+
+type MissionTargetKind = 'morning' | 'school' | 'park';
+
+const MISSION_TARGET_META: Record<MissionTargetKind, { itemId: string; name: string; icon: string; cells: Array<[number, number]> }> = {
+  morning: { itemId: 'scenery-bakery', name: 'Kasaba Fırını', icon: '🥐', cells: [[3, 2], [1, 1], [5, 2]] },
+  school: { itemId: 'scenery-school', name: 'Okul', icon: '🏫', cells: [[8, 1], [7, 2], [9, 1]] },
+  park: { itemId: 'scenery-park', name: 'Kasaba Parkı', icon: '🛝', cells: [[11, 2], [12, 1], [10, 2]] },
+};
+
+function createMissionFallbackTarget(kind: MissionTargetKind, worldItems: PlacedWorldItem[]): PlacedWorldItem {
+  const meta = MISSION_TARGET_META[kind];
+  const [x, y] = meta.cells.find(([cellX, cellY]) =>
+    !worldItems.some((item) => item.x === cellX && item.y === cellY && !item.deletedAt),
+  ) ?? meta.cells[0];
+  return { id: `mission-target-${kind}`, itemId: meta.itemId, x, y, icon: meta.icon, name: meta.name };
+}
+
 export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   worldItems,
   inventory,
@@ -358,6 +442,25 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   const placedStation = worldItems.find((item) => item.itemId === 'track-station');
   const stationLeftPercent = columnCenterPercent(placedStation?.x ?? 6);
 
+  // Kasaba görevleri yalnızca mevcut domain state'ini okur. Dünya sahnesi görev
+  // kuralı çalıştırmaz; tamamlanmış sonucun gerçek karakter konumunu resmeder.
+  const morningTownCompleted = readMorningTownStep() === 'completed';
+  const schoolTownCompleted = readAfternoonTownStep() === 'completed';
+  const parkTownCompleted = readParkTownStep() === 'completed';
+  const placedBakery = worldItems.find((item) => item.itemId === 'scenery-bakery');
+  const placedSchool = worldItems.find((item) => item.itemId === 'scenery-school');
+  const placedPark = worldItems.find((item) => item.itemId === 'scenery-park');
+  const schoolMissionTarget = schoolTownCompleted
+    ? placedSchool ?? createMissionFallbackTarget('school', worldItems)
+    : undefined;
+  const sipaMissionTarget = parkTownCompleted
+    ? placedPark ?? createMissionFallbackTarget('park', worldItems)
+    : morningTownCompleted
+      ? placedBakery ?? createMissionFallbackTarget('morning', worldItems)
+      : undefined;
+  const temporaryMissionTargets = [schoolMissionTarget, sipaMissionTarget]
+    .filter((target): target is PlacedWorldItem => Boolean(target?.id.startsWith('mission-target-')));
+
   // Köprü ve tünel de Kasabayı kur'da seçilen sütunun ortasına oturur.
   // Birden çok köprü yerleştirilebilir; her biri rayın üstünde çizilir.
   const placedBridges = worldItems.filter((item) => item.itemId === 'track-bridge');
@@ -419,7 +522,10 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
   // Ray yapıları kendi, raya hizalı katmanlarında çizilir.
   const placedSceneItems = worldItems.filter((item) => ![
     'track-straight', 'track-curve', 'track-bridge', 'track-tunnel', 'track-station',
-  ].includes(item.itemId) && SCENE_ITEM_SIZE[item.itemId]);
+  ].includes(item.itemId)
+    && !(schoolMissionTarget && item.itemId === 'scenery-squirrel-courier')
+    && !(sipaMissionTarget && item.itemId === 'scenery-donkey')
+    && SCENE_ITEM_SIZE[item.itemId]);
 
   // Konum artık sabit bir tablodan değil, çocuğun Harita Çizimi'nde seçtiği
   // gerçek (x, y) hücresinden geliyor — yerleştirdiği yer ile ana dünyada
@@ -1256,6 +1362,59 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               );
             })}
 
+            {/* Satın alma/yerleştirme yapmadan, eksik görev yapısını yalnız bu sahnede resmet. */}
+            {temporaryMissionTargets.map((target) => {
+              const anchor = gridCellToScenePercent(target.x, target.y);
+              return (
+                <div
+                  key={target.id}
+                  className="pointer-events-none absolute flex flex-col items-center"
+                  style={{
+                    left: anchor.left,
+                    top: anchor.top,
+                    zIndex: 20 + target.y,
+                    transform: `translate(-50%, -50%) scale(${getSceneDepthScale(target.y)})`,
+                  }}
+                  role="img"
+                  aria-label={`Geçici görev hedefi: ${target.name}`}
+                >
+                  <img
+                    src={SCENERY_IMAGES[target.itemId]}
+                    alt=""
+                    className="object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.45)]"
+                    style={sceneImgStyle(target.itemId)}
+                    draggable={false}
+                  />
+                  <span className="rounded-full bg-amber-50/95 px-2 py-0.5 text-[8px] font-black text-amber-900 shadow-sm sm:text-[10px]">Görev yeri</span>
+                </div>
+              );
+            })}
+
+            {/* Okul görevi tamamlanınca mevcut Sincap karakteri okulun yanına taşınır.
+                Yerleştirilmiş postacı dekoru yukarıda filtrelendiği için ikinci bir Sincap çizilmez. */}
+            {schoolMissionTarget && (
+              <button
+                type="button"
+                onClick={() => {
+                  playPopSound(soundEnabled);
+                  sayWord('scenery-squirrel-courier');
+                }}
+                className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
+                style={{
+                  ...getMissionActorAnchor(schoolMissionTarget),
+                  width: 'calc(min(14cqh, 76px) * var(--gt-obj-scale, 1))',
+                }}
+                title="Sincap Okulda"
+              >
+                <img
+                  src={SCENERY_IMAGES['scenery-squirrel-courier']}
+                  alt="Sincap okulun yanında"
+                  className="h-auto w-full object-contain"
+                  draggable={false}
+                />
+              </button>
+            )}
+
             {/* 4. CLASSIC STRAIGHT TWO-WAY RAIL */}
             <div ref={rideRailRef} className="straight-track absolute bottom-[13%] left-0 z-10 h-10 w-full pointer-events-none sm:h-14">
               <svg className="h-full w-full" viewBox="0 0 1000 64" preserveAspectRatio="none" role="img" aria-label="Tek düz tren hattı, gidiş ve dönüş">
@@ -1341,19 +1500,30 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
               </div>
             )}
 
-            {/* Sıpa Maskotu — Gar satın alınınca hemen yanında beliren, ücretsiz dekor */}
-            {hasPlacedStation && (
+            {/* Tek Sıpa örneği: görev sonucu varsa ilgili yapının, yoksa Gar'ın yanında. */}
+            {(hasPlacedStation || sipaMissionTarget) && (
               <div
                 onClick={() => {
                   playPopSound(soundEnabled);
                   sayWord('scenery-donkey');
                 }}
                 className="absolute cursor-pointer transition-transform hover:scale-105 drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)]"
-                // Garın hemen solunda, rayın arkasındaki çimende: tren önünden geçerken de başı görünür.
-                style={{ zIndex: 29, bottom: "calc(13% + 17cqh)", left: `${stationLeftPercent}%`, width: 'var(--gt-sipa-w, min(34cqh, 170px))', transform: 'translateX(calc(-100% - min(19cqh, 104px)))' }}
-                title="Sıpa"
+                style={sipaMissionTarget ? {
+                  ...getMissionActorAnchor(sipaMissionTarget),
+                  width: 'var(--gt-sipa-w, min(34cqh, 170px))',
+                } : {
+                  zIndex: 29,
+                  bottom: 'calc(13% + 17cqh)',
+                  left: `${stationLeftPercent}%`,
+                  width: 'var(--gt-sipa-w, min(34cqh, 170px))',
+                  transform: 'translateX(calc(-100% - min(19cqh, 104px)))',
+                }}
+                title={parkTownCompleted ? 'Sıpa Parkta' : morningTownCompleted ? 'Sıpa ekmeğini aldı' : 'Sıpa'}
               >
                 <img src={sipaMaskotImg} alt="Sıpa" width={480} height={319} className="w-full h-auto object-contain" draggable={false} />
+                {morningTownCompleted && (
+                  <span className="absolute -right-1 bottom-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-lg shadow-md" aria-label="Sıpa'nın teslim aldığı ekmek">🍞</span>
+                )}
               </div>
             )}
 

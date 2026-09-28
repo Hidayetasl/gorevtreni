@@ -6,6 +6,8 @@ import { withGenitive } from '../../utils/turkish';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
 import { isMorningTownReady } from '../../domain/town/morningMission';
 import { isAfternoonTownReady, readAfternoonTownStep } from '../../domain/town/afternoonMission';
+import { isParkTownReady, readParkTownStep } from '../../domain/town/parkMission';
+import { selectAfternoonTownScenario } from '../../domain/town/afternoonScenario';
 
 type Station = TimeOfDay | 'all';
 
@@ -95,8 +97,11 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
   const stationInfo = STATIONS.find((item) => item.key === station);
   const nextOpenStation = STATIONS.find((item) => !stationDone(item.key));
   const morningTownReady = isMorningTownReady(tasks);
+  const afternoonTownScenario = selectAfternoonTownScenario();
   const afternoonTownReady = isAfternoonTownReady(tasks);
   const afternoonTownCompleted = readAfternoonTownStep() === 'completed';
+  const parkTownReady = isParkTownReady(tasks);
+  const parkTownCompleted = readParkTownStep() === 'completed';
 
   const chooseStation = (next: Station) => {
     playPopSound(soundEnabled);
@@ -157,7 +162,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
         </section>
       )}
 
-      {afternoonTownReady && !afternoonTownCompleted && (
+      {afternoonTownScenario === 'school' && afternoonTownReady && !afternoonTownCompleted && (
         <section className="gt-town-callout" aria-label="Sincap Köyü okul görevi hazır">
           <span aria-hidden="true">🐿️</span>
           <div>
@@ -165,6 +170,17 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
             <small>Okulda kısa bir öğrenme adımı var.</small>
           </div>
           <button type="button" onClick={onOpenTown}>Okula git</button>
+        </section>
+      )}
+
+      {afternoonTownScenario === 'park' && parkTownReady && !parkTownCompleted && (
+        <section className="gt-town-callout" aria-label="Sincap Köyü park görevi hazır">
+          <span aria-hidden="true">🫏</span>
+          <div>
+            <b>Sıpa biraz hareket etmek istiyor</b>
+            <small>Parkta kısa bir renk oyunu var.</small>
+          </div>
+          <button type="button" onClick={onOpenTown}>Parka git</button>
         </section>
       )}
 
