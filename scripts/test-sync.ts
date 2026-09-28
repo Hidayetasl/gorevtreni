@@ -14,6 +14,7 @@ import {
   mergeVoiceMessages,
   stableStringify,
   stampAfter,
+  pickNewerPin,
   unlockPaidItems,
 } from '../src/utils/syncMerge';
 
@@ -142,6 +143,22 @@ test('alan sırası farklı ama içerik aynı kopyalar "farklı" sayılmaz', () 
 test('gerçek yerel değişiklik "gönderilecek" olarak algılanır', () => {
   assert.equal(mergeKeptLocal([{ id: 'x', a: 1 }], [{ id: 'x', a: 2 }]), true);
   assert.equal(mergeKeptLocal([{ id: 'x' }], [{ id: 'x' }, { id: 'y' }]), true);
+});
+
+// --- Aile PIN'i ---
+test('yeni PIN, gönderilmemiş eski PIN\'li cihaz tarafından geri yazılamaz', () => {
+  const remote = { pinHash: 'yeni', pinUpdatedAt: 2000 };
+  const staleDevice = { pinHash: 'eski' };
+  assert.equal(pickNewerPin(staleDevice, remote).pinHash, 'yeni');
+  assert.equal(pickNewerPin(remote, staleDevice).pinHash, 'yeni');
+});
+test('iki PIN değişikliğinden sonraki kazanır', () => {
+  assert.equal(pickNewerPin({ pinHash: 'a', pinUpdatedAt: 1 }, { pinHash: 'b', pinUpdatedAt: 2 }).pinHash, 'b');
+  assert.equal(pickNewerPin({ pinHash: 'a', pinUpdatedAt: 3 }, { pinHash: 'b', pinUpdatedAt: 2 }).pinHash, 'a');
+});
+test('zaman damgası yoksa mevcut PIN korunur (eski davranış)', () => {
+  assert.equal(pickNewerPin({}, { pinHash: 'b' }).pinHash, 'b');
+  assert.equal(pickNewerPin({ pinHash: 'a' }, {}).pinHash, 'a');
 });
 
 console.log(`\n${passed} eşitleme testi geçti`);

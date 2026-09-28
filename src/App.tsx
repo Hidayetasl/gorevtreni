@@ -51,6 +51,7 @@ import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
 import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
+import { pickNewerPin } from './utils/syncMerge';
 import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, forgetAdultName, ACCESS_ENDED_KEY, deleteVoiceFile, getVoiceStorageUsage, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
@@ -367,7 +368,7 @@ export default function App() {
             coins: calculateLedgerBalance(syncedLedger, remote.user.coins),
           };
           const syncedParentConfig = hadLocalChanges && localData
-            ? { ...remote.parentConfig, ...localData.parentConfig, pinHash: localData.parentConfig.pinHash || remote.parentConfig?.pinHash }
+            ? { ...remote.parentConfig, ...localData.parentConfig, ...pickNewerPin(localData.parentConfig, remote.parentConfig) }
             : remote.parentConfig;
 
           const syncedShop = mergeShopItemsWithCatalog(remote.shop);

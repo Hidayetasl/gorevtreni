@@ -3,7 +3,7 @@ import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, on
 import { arrayUnion, connectFirestoreEmulator, disableNetwork, enableNetwork, doc, getDoc, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, runTransaction, setDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { connectStorageEmulator, deleteObject, getMetadata, getStorage, listAll, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { ActivityLogEntry, ActiveChildDevice, AdultName, BonusCard, CoinLedgerEntry, ParentConfig, PlacedWorldItem, RoutineTask, ShopItem, StoryVideo, UserProfile, VoiceMessage } from '../types';
-import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages } from './syncMerge';
+import { mergeActivityLog, mergeById, mergeCoinLedger, mergeShopUnlocks, mergeVideos, mergeVoiceMessages, pickNewerPin } from './syncMerge';
 // Uygulama bu birleştirme kurallarını cloudSync üzerinden de kullanır.
 export { mergeById, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems } from './syncMerge';
 
@@ -368,7 +368,7 @@ export async function deleteVoiceFile(url?: string) {
 /** Aile PIN'i tüm cihazlarda ortaktır; yalnızca giriş yapmış yetişkin değiştirir. */
 export async function setFamilyPinHash(code: string, pinHash: string) {
   await getServices();
-  await updateDoc(familyRef(code), { 'parentConfig.pinHash': pinHash, updatedAt: Date.now() });
+  await updateDoc(familyRef(code), { 'parentConfig.pinHash': pinHash, 'parentConfig.pinUpdatedAt': Date.now(), updatedAt: Date.now() });
 }
 
 /** İlk yetişkin, bu cihazdaki oyun verisiyle yeni bir aile kaydı açar. */
@@ -450,10 +450,9 @@ export async function uploadFamilyData(code: string, data: FamilyData) {
     const memberUids = [...new Set([...(Array.isArray(remoteData.memberUids) ? remoteData.memberUids : []), uid])];
     // Aile PIN'i ortak tutulur. PIN'i olmayan (eski/yeni) bir cihazın yazması
     // buluttaki PIN'i asla silmez; PIN yalnızca açıkça değiştirilince güncellenir.
-    const remotePinHash = (remoteData.parentConfig as ParentConfig | undefined)?.pinHash;
     const payload = removeUndefinedFields({
       ...data,
-      parentConfig: { ...data.parentConfig, pinHash: data.parentConfig.pinHash || remotePinHash },
+      parentConfig: { ...data.parentConfig, ...pickNewerPin(data.parentConfig, remoteData.parentConfig as ParentConfig | undefined) },
       // Silinen görevlerin "silindi" işareti de saklanır; yoksa başka bir cihaz görevi geri getirir.
       tasks: mergeById((remoteData.tasks || []) as RoutineTask[], data.tasks, true),
       shop: mergeShopUnlocks((remoteData.shop || []) as ShopItem[], data.shop),

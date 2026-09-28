@@ -11,6 +11,18 @@ import { mergeVideosById } from './videoOrder';
  * damgalanır. Saati geri kalmış bir cihazın yaptığı onay/işaretleme,
  * birleştirmede "eski" sayılıp kaybolmaz.
  */
+/** İki kopyadan en son değiştirilmiş aile PIN'ini seçer (zaman damgası yoksa mevcut olan). */
+export function pickNewerPin(
+  local: { pinHash?: string; pinUpdatedAt?: number } | undefined,
+  remote: { pinHash?: string; pinUpdatedAt?: number } | undefined,
+): { pinHash?: string; pinUpdatedAt?: number } {
+  const l = local?.pinUpdatedAt || 0;
+  const r = remote?.pinUpdatedAt || 0;
+  if (r > l) return { pinHash: remote?.pinHash || local?.pinHash, pinUpdatedAt: r };
+  if (l > r) return { pinHash: local?.pinHash || remote?.pinHash, pinUpdatedAt: l };
+  return { pinHash: local?.pinHash || remote?.pinHash, pinUpdatedAt: l || undefined };
+}
+
 export function stampAfter(previous?: string) {
   const prev = Date.parse(previous || '');
   return new Date(Math.max(Date.now(), Number.isFinite(prev) ? prev + 1 : 0)).toISOString();

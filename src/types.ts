@@ -102,6 +102,8 @@ export interface ParentConfig {
   parentName: string;
   /** Yerel, tek ebeveyn PIN'inin geriye uyumlu özeti. */
   pinHash?: string;
+  /** PIN'in değiştiği an (ms): eşitlemede en yeni PIN kazanır, eski cihaz geri yazamaz. */
+  pinUpdatedAt?: number;
 }
 
 /** Yetişkinin görünen adı: Baba, Anne, Anneanne ya da davetle eklenen biri (Dede, Teyze…). */

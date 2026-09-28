@@ -400,7 +400,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
         setSettingsMessage('Bu PIN kolay tahmin edilir. Başka 4 rakam seçin.');
         return;
       }
-      onUpdateParentConfig({ ...parentConfig, pinHash: hashParentPin(nextPin) });
+      onUpdateParentConfig({ ...parentConfig, pinHash: hashParentPin(nextPin), pinUpdatedAt: Date.now() });
       setEditingPin('');
       setEditingPinAgain('');
     }
