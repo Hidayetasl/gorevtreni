@@ -6,7 +6,7 @@ import { extractYoutubeId, hashParentPin, isWeakParentPin, needsNewParentPin } f
 /** PIN girildikten sonra panel bu süre boyunca yeniden PIN sormadan açılır. */
 import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { withGenitive } from '../utils/turkish';
-import { VOICE_STORAGE_LIMIT_BYTES, VOICE_STORAGE_WARN_RATIO } from '../utils/cloudSync';
+import { devBypassAuth, VOICE_STORAGE_LIMIT_BYTES, VOICE_STORAGE_WARN_RATIO } from '../utils/cloudSync';
 import { ArrowLeft, Check, ChevronRight, HelpCircle, Gift, History, ListChecks, Lock, Mic, Plus, RefreshCw, RotateCcw, Settings, Trash2, Tv, TrendingUp, Volume2, VolumeX, X } from 'lucide-react';
 import '../design/parent.css';
 
@@ -146,7 +146,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   recentRewards = [],
   deviceControls,
 }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(devBypassAuth);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
@@ -276,8 +276,10 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   // Panel her açılışta PIN ister; kapanınca (oyuna dönünce) hemen kilitlenir.
   // Rüzgar oynarken panel hiçbir zaman PIN'siz açılmaz.
   useEffect(() => {
-    setIsAuthenticated(false);
-    setPinInput('');
+    if (!devBypassAuth) {
+      setIsAuthenticated(false);
+      setPinInput('');
+    }
     // Panel her açılışta ana sayfadan başlar; yarım kalan onaylar kapanır.
     if (isOpen) {
       setSection(null);

@@ -53,7 +53,7 @@ import { TasksHome } from './components/child/TasksHome';
 import { MorningTownMission } from './components/town/MorningTownMission';
 import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
 import { pickNewerPin, mergeAdultPins } from './utils/syncMerge';
-import { acceptFamilyInvite, createFamilyCode, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, forgetAdultName, ACCESS_ENDED_KEY, deleteVoiceFile, getVoiceStorageUsage, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
+import { acceptFamilyInvite, createFamilyCode, devBypassAuth, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, forgetAdultName, ACCESS_ENDED_KEY, deleteVoiceFile, getVoiceStorageUsage, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
 import { mergeVideosById, sortVideosNewestFirst } from './utils/videoOrder';
 import { buildDailyProgress, calculateCurrentStreak, weeklyCompletion } from './utils/progress';
 import { validateYoutubeVideo } from './utils/youtubeValidation';
@@ -203,7 +203,9 @@ export default function App() {
   });
   const [familyCode, setFamilyCode] = useState(() => getFamilyCode());
   const [activeChildDevice, setActiveChildDevice] = useState<ActiveChildDevice | null | undefined>(undefined);
-  const [adultUser, setAdultUser] = useState<{ uid: string; name: AdultName } | null>(null);
+  const [adultUser, setAdultUser] = useState<{ uid: string; name: AdultName } | null>(() => (
+    devBypassAuth ? { uid: 'local-dev-user', name: 'Baba' } : null
+  ));
   // Aile kaydından: bu hesap davet oluşturabilir mi, süreli erişimi ne zaman biter.
   const [isInviteAdmin, setIsInviteAdmin] = useState(false);
   const [accessUntil, setAccessUntil] = useState<number | null>(null);
@@ -1220,7 +1222,7 @@ export default function App() {
             onToggleSound: handleToggleSound,
             onManualSync: () => void handleManualSync(),
             isSyncing: isManualSyncing,
-            onSwitchAccount: adultUser ? () => void handleSwitchAccount() : undefined,
+            onSwitchAccount: adultUser && !devBypassAuth ? () => void handleSwitchAccount() : undefined,
             isActiveDevice: activeChildDevice?.deviceId === deviceIdRef.current,
             activeDeviceLabel: activeChildDevice?.label || activeChildDevice?.setByName,
             onSetActiveDevice: (checked) => void handleSetActiveChildDevice(checked),

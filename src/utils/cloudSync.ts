@@ -27,6 +27,11 @@ const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'app
 // Yerel geliştirmede Firebase emülatörleri kullanılır; canlı projeye hiçbir
 // istek gitmez. "demo-" ile başlayan proje kimliği emülatör dışına çıkamaz.
 export const usesEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
+// Yalnızca Vite geliştirme sunucusunda auth ve bulut senkronunu tamamen kapatır.
+// `DEV` kapısı, değişken yanlışlıkla production ortamına taşınsa bile bypass'ın
+// yayın derlemesinde etkinleşmesini engeller.
+export const devBypassAuth = import.meta.env.DEV
+  && import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
 
 const firebaseConfig = usesEmulators
   ? {
@@ -90,7 +95,8 @@ const adultAccountConfig: Array<{ name: AdultName; email: string; uid: string }>
   },
 ];
 
-export const isCloudConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]?.trim()));
+export const isCloudConfigured = !devBypassAuth
+  && requiredKeys.every((key) => Boolean(firebaseConfig[key]?.trim()));
 
 function firebaseAuth() {
   if (!isCloudConfigured) throw new Error('Firebase yapılandırması eksik.');
