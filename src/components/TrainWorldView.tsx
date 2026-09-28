@@ -3,9 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlacedWorldItem, ShopItem, UserProfile } from '../types';
 import { playTrainWhistle, playTrainMovementTick, playPopSound, speakText, unlockAudioContext, speakTurkishThenEnglish } from '../utils/audio';
 
-/** Dünya'da yapıya dokununca: 'both' = Türkçe + İngilizce, 'en' = sadece İngilizce. Cihazda hatırlanır. */
-const WORD_LANG_KEY = 'ruzgar_world_word_lang_v1';
-type WordLang = 'both' | 'en';
 import { ArrowLeft, Check, Plus, Trash2, Play, Pause, Sparkles, Volume2, VolumeX, Maximize2, Minimize2, FastForward, RotateCcw, RotateCw, Undo2, WandSparkles, MapPin, Eye, Compass, Layers, Move, MousePointer2 } from 'lucide-react';
 import menuTren from '../assets/images/menu-tren.webp';
 import menuKasaba from '../assets/images/menu-kasaba.webp';
@@ -38,7 +35,7 @@ import elmaVagonuImg from '../assets/images/elma-vagonu.webp';
 import oyuncakVagonuImg from '../assets/images/oyuncak-vagonu.webp';
 import sipaMaskotImg from '../assets/images/sipa-maskot.webp';
 import { SCENERY_IMAGES } from '../utils/sceneryImages';
-import { sceneWord } from '../utils/sceneWords';
+import { readWordLang, saveWordLang, sceneWord, type WordLang } from '../utils/sceneWords';
 import { readMorningTownStep } from '../domain/town/morningMission';
 import { readAfternoonTownStep } from '../domain/town/afternoonMission';
 import { readParkTownStep } from '../domain/town/parkMission';
@@ -762,14 +759,12 @@ export const TrainWorldView: React.FC<TrainWorldViewProps> = ({
 
   // Interactive item tap handlers in cartoon mode
   // Yapıya/nesneye dokununca adı önce Türkçe, sonra İngilizce söylenir.
-  const [wordLang, setWordLang] = useState<WordLang>(() => {
-    try { return localStorage.getItem(WORD_LANG_KEY) === 'en' ? 'en' : 'both'; } catch { return 'both'; }
-  });
+  const [wordLang, setWordLang] = useState<WordLang>(readWordLang);
   const toggleWordLang = () => {
     playPopSound(soundEnabled);
     const next: WordLang = wordLang === 'both' ? 'en' : 'both';
     setWordLang(next);
-    try { localStorage.setItem(WORD_LANG_KEY, next); } catch { /* yoksay */ }
+    saveWordLang(next);
     setInteractiveMessage(next === 'en' ? '🇬🇧 Sadece İngilizce: bir yapıya dokun!' : '🇹🇷 🇬🇧 Türkçe ve İngilizce: bir yapıya dokun!');
     if (next === 'en') speakText('English', speechEnabled, 0.8, 'en-US', 1.0);
     else speakText('Türkçe ve İngilizce', speechEnabled);

@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
+import { contentWord } from '../utils/sceneWords';
 import { Volume2, RotateCcw, Mic, ArrowLeft } from 'lucide-react';
 
 interface LearnViewProps {
@@ -156,6 +157,8 @@ function buildSyllableRound(level: number, excludeWord?: string): { target: Syll
 type EnglishCategoryId = 'colors' | 'numbers' | 'animals' | 'family' | 'toys' | 'food' | 'phrases';
 type EnglishWord = { word: string; tr: string; emoji: string; category: EnglishCategoryId };
 
+const BREAD_WORD = contentWord('bread');
+
 const ENGLISH_CATEGORIES: { id: EnglishCategoryId; label: string; icon: string }[] = [
   { id: 'colors', label: 'Renkler', icon: '🎨' },
   { id: 'numbers', label: 'Sayılar', icon: '🔢' },
@@ -219,7 +222,7 @@ const ENGLISH_WORDS: EnglishWord[] = [
   { word: 'Apple', tr: 'Elma', emoji: '🍎', category: 'food' },
   { word: 'Banana', tr: 'Muz', emoji: '🍌', category: 'food' },
   { word: 'Milk', tr: 'Süt', emoji: '🥛', category: 'food' },
-  { word: 'Bread', tr: 'Ekmek', emoji: '🍞', category: 'food' },
+  { word: BREAD_WORD.en, tr: BREAD_WORD.tr, emoji: BREAD_WORD.emoji, category: 'food' },
   { word: 'Egg', tr: 'Yumurta', emoji: '🥚', category: 'food' },
   { word: 'Cake', tr: 'Pasta', emoji: '🎂', category: 'food' },
   { word: 'Cheese', tr: 'Peynir', emoji: '🧀', category: 'food' },

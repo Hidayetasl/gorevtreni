@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { Check, Home, Volume2 } from 'lucide-react';
 import type { RoutineTask } from '../../types';
-import { playFanfare, playPopSound, speakText } from '../../utils/audio';
+import { playFanfare, playPopSound, speakText, speakTurkishThenEnglish } from '../../utils/audio';
+import {
+  contentPhrase,
+  contentText,
+  contentWord,
+  readWordLang,
+  type ContentWordId,
+} from '../../utils/sceneWords';
 import bakeryImage from '../../assets/images/urun-scenery-bakery.webp';
 import { TownMissionVisual } from '../TrainWorldView';
 import {
@@ -19,11 +26,14 @@ interface MorningTownMissionProps {
   children: React.ReactNode;
 }
 
-const BREAD_CHOICES = [
-  { id: 'apple', emoji: '🍎', label: 'Elma' },
-  { id: 'bread', emoji: '🍞', label: 'Ekmek' },
-  { id: 'milk', emoji: '🥛', label: 'Süt' },
-] as const;
+const BREAD_CHOICE_IDS = ['apple', 'bread', 'milk'] as const satisfies readonly ContentWordId[];
+const BREAD_CHOICES = BREAD_CHOICE_IDS.map((id) => ({ id, ...contentWord(id) }));
+const BREAD = contentWord('bread');
+const BREAD_QUESTION = contentPhrase('breadQuestion');
+const BREAD_TRY_AGAIN = contentPhrase('breadTryAgain');
+const BREAD_CORRECT = contentPhrase('breadCorrect');
+const GIVE_BREAD = contentPhrase('giveBread');
+const THANK_YOU = contentPhrase('thankYou');
 
 export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
   tasks,
@@ -46,14 +56,14 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
     playPopSound(soundEnabled);
   };
 
-  const chooseBread = (choiceId: typeof BREAD_CHOICES[number]['id']) => {
+  const chooseBread = (choiceId: ContentWordId) => {
     if (choiceId !== 'bread') {
-      setFeedback('Bir daha deneyelim. Bread, ekmek demek.');
-      speakText('Bir daha deneyelim. Bread, ekmek demek.', speechEnabled);
+      setFeedback(BREAD_TRY_AGAIN.tr);
+      speakText(BREAD_TRY_AGAIN.tr, speechEnabled);
       return;
     }
-    setFeedback('Evet! Bread, ekmek demek.');
-    speakText('Evet! Bread, ekmek demek.', speechEnabled);
+    setFeedback(BREAD_CORRECT.tr);
+    speakText(BREAD_CORRECT.tr, speechEnabled);
     window.setTimeout(advance, 650);
   };
 
@@ -61,7 +71,12 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
     saveMorningTownStep('completed');
     setStep('completed');
     playFanfare(soundEnabled);
-    speakText('Görev tamamlandı. Sıpa ekmeğine kavuştu.', speechEnabled);
+    const language = readWordLang();
+    if (language === 'en') {
+      speakText(THANK_YOU.en, speechEnabled, 0.7, 'en-US', 1.0);
+    } else {
+      speakTurkishThenEnglish(THANK_YOU.tr, THANK_YOU.en, speechEnabled);
+    }
   };
 
   return (
@@ -82,15 +97,15 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
         <div className="gt-town-card">
           <TownMissionVisual kind="morning" phase="start" />
           <p className="gt-label">FIRIN</p>
-          <h1>Bread hangisi?</h1>
-          <button type="button" className="gt-town-listen" onClick={() => speakText('Bread hangisi?', speechEnabled)}>
+          <h1>{BREAD_QUESTION.tr}</h1>
+          <button type="button" className="gt-town-listen" onClick={() => speakText(BREAD_QUESTION.tr, speechEnabled)}>
             <Volume2 aria-hidden="true" /> Dinle
           </button>
-          <div className="gt-town-choices" aria-label="Bread kelimesinin karşılığını seç">
+          <div className="gt-town-choices" aria-label={`${BREAD.en} kelimesinin karşılığını seç`}>
             {BREAD_CHOICES.map((choice) => (
               <button key={choice.id} type="button" onClick={() => chooseBread(choice.id)}>
                 <span aria-hidden="true">{choice.emoji}</span>
-                <b>{choice.label}</b>
+                <b>{choice.tr}</b>
               </button>
             ))}
           </div>
@@ -104,7 +119,7 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
           <p className="gt-label">SIPA</p>
           <h1>Ekmeği Sıpa'ya götür</h1>
           <p>Sıpa fırından gelen ekmeği bekliyor.</p>
-          <button type="button" className="gt-big" onClick={completeMission}>🍞 Ekmeği ver</button>
+          <button type="button" className="gt-big" onClick={completeMission}>{GIVE_BREAD.emoji} {GIVE_BREAD.tr}</button>
         </div>
       )}
 
@@ -114,6 +129,7 @@ export const MorningTownMission: React.FC<MorningTownMissionProps> = ({
           <span className="gt-town-check gt-town-check--small" aria-hidden="true"><Check /></span>
           <p className="gt-label">SİNCAP KÖYÜ</p>
           <h1>Görev tamamlandı</h1>
+          <p className="gt-town-feedback">{contentText(THANK_YOU, readWordLang())}</p>
           <p>Sıpa ekmeğine kavuştu. Bu kısa köy görevi burada bitti.</p>
           <button type="button" className="gt-big turkuaz" onClick={() => setShowWorld(true)}>
             <Home aria-hidden="true" /> Dünyaya dön
