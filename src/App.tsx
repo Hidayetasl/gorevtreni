@@ -51,6 +51,7 @@ import { AuthGate } from './components/AuthGate';
 import { ChildShell } from './components/child/ChildShell';
 import { TasksHome } from './components/child/TasksHome';
 import { MorningTownMission } from './components/town/MorningTownMission';
+import { AfternoonTownMission } from './components/town/AfternoonTownMission';
 import { combineVoiceMessages, mergeKeptLocal, stableStringify, stampAfter } from './utils/syncMerge';
 import { pickNewerPin, mergeAdultPins } from './utils/syncMerge';
 import { acceptFamilyInvite, createFamilyCode, devBypassAuth, familyExists, getCurrentUid, mergeCoinLedger, mergeShopUnlocks, unlockPaidItems, getKnownAdultName, createJoinInvite, forgetAdultName, ACCESS_ENDED_KEY, deleteVoiceFile, getVoiceStorageUsage, getFamilyCode, getFamilyData, getInviteFamilyCode, isCloudConfigured, mergeById, saveFamilyCode, signOutAdult, subscribeToAuth, subscribeToFamily, uploadFamilyData } from './utils/cloudSync';
@@ -1144,18 +1145,24 @@ export default function App() {
               soundEnabled={user.soundEnabled}
               speechEnabled={user.speechEnabled}
             >
-              <TrainWorldView
-                key={tabResetKey}
-                worldItems={world.filter((item) => !item.deletedAt)}
-                inventory={shop}
-                user={user}
-                onPlaceItem={handlePlaceItem}
-                onRemoveItem={handleRemoveItem}
-                onSetActiveTrain={handleSetActiveTrain}
+              <AfternoonTownMission
+                tasks={liveTasks}
                 soundEnabled={user.soundEnabled}
                 speechEnabled={user.speechEnabled}
-                onToggleSound={handleToggleSound}
-              />
+              >
+                <TrainWorldView
+                  key={tabResetKey}
+                  worldItems={world.filter((item) => !item.deletedAt)}
+                  inventory={shop}
+                  user={user}
+                  onPlaceItem={handlePlaceItem}
+                  onRemoveItem={handleRemoveItem}
+                  onSetActiveTrain={handleSetActiveTrain}
+                  soundEnabled={user.soundEnabled}
+                  speechEnabled={user.speechEnabled}
+                  onToggleSound={handleToggleSound}
+                />
+              </AfternoonTownMission>
             </MorningTownMission>
           )}
 

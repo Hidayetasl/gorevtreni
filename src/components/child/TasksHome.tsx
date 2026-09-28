@@ -5,6 +5,7 @@ import type { AdultName, RoutineTask, TimeOfDay } from '../../types';
 import { withGenitive } from '../../utils/turkish';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
 import { isMorningTownReady } from '../../domain/town/morningMission';
+import { isAfternoonTownReady, readAfternoonTownStep } from '../../domain/town/afternoonMission';
 
 type Station = TimeOfDay | 'all';
 
@@ -94,6 +95,8 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
   const stationInfo = STATIONS.find((item) => item.key === station);
   const nextOpenStation = STATIONS.find((item) => !stationDone(item.key));
   const morningTownReady = isMorningTownReady(tasks);
+  const afternoonTownReady = isAfternoonTownReady(tasks);
+  const afternoonTownCompleted = readAfternoonTownStep() === 'completed';
 
   const chooseStation = (next: Station) => {
     playPopSound(soundEnabled);
@@ -151,6 +154,17 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
             <small>Fırın'da kısa bir görev var.</small>
           </div>
           <button type="button" onClick={onOpenTown}>Köye git</button>
+        </section>
+      )}
+
+      {afternoonTownReady && !afternoonTownCompleted && (
+        <section className="gt-town-callout" aria-label="Sincap Köyü okul görevi hazır">
+          <span aria-hidden="true">🐿️</span>
+          <div>
+            <b>Sincap okula gitmek istiyor</b>
+            <small>Okulda kısa bir öğrenme adımı var.</small>
+          </div>
+          <button type="button" onClick={onOpenTown}>Okula git</button>
         </section>
       )}
 
