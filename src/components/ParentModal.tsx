@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RoutineTask, ParentConfig, UserProfile, BonusCard, StoryVideo, ActivityLogEntry, VoiceMessage } from '../types';
 import { playCoinSound, playPopSound, speakText } from '../utils/audio';
 import { extractYoutubeId, hashParentPin, isWeakParentPin, needsNewParentPin } from '../utils/storage';
 
 /** PIN girildikten sonra panel bu süre boyunca yeniden PIN sormadan açılır. */
-const PARENT_UNLOCK_MS = 5 * 60 * 1000;
 import { sortVideosNewestFirst } from '../utils/videoOrder';
 import { withGenitive } from '../utils/turkish';
 import { VOICE_STORAGE_LIMIT_BYTES, VOICE_STORAGE_WARN_RATIO } from '../utils/cloudSync';
@@ -141,7 +140,6 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   deviceControls,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const unlockedAtRef = useRef(0);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pinMessage, setPinMessage] = useState('PIN 4 rakam olmalı.');
@@ -266,13 +264,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [editingPinAgain, setEditingPinAgain] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
 
-  // Panel kapanıp tekrar açıldığında, son PIN girişinin üzerinden 5 dakika
-  // geçtiyse yeniden kilitlenir; açık unutulan panel Rüzgar'a kalmaz.
+  // Panel her açılışta PIN ister; kapanınca (oyuna dönünce) hemen kilitlenir.
+  // Rüzgar oynarken panel hiçbir zaman PIN'siz açılmaz.
   useEffect(() => {
-    if (isOpen && Date.now() - unlockedAtRef.current > PARENT_UNLOCK_MS) {
-      setIsAuthenticated(false);
-      setPinInput('');
-    }
+    setIsAuthenticated(false);
+    setPinInput('');
     // Panel her açılışta ana sayfadan başlar; yarım kalan onaylar kapanır.
     if (isOpen) {
       setSection(null);
@@ -281,10 +277,17 @@ export const ParentModal: React.FC<ParentModalProps> = ({
     }
   }, [isOpen]);
 
+  // Panel açıkken uygulama arka plana giderse (telefon kilitlendi, başka uygulamaya geçildi) kilitlenir.
+  useEffect(() => {
+    if (!isOpen) return;
+    const lockWhenHidden = () => { if (document.visibilityState === 'hidden') { setIsAuthenticated(false); setPinInput(''); } };
+    document.addEventListener('visibilitychange', lockWhenHidden);
+    return () => document.removeEventListener('visibilitychange', lockWhenHidden);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const unlock = () => {
-    unlockedAtRef.current = Date.now();
     setIsAuthenticated(true);
   };
 
