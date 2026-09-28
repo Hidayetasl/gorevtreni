@@ -4,7 +4,7 @@ import { Check, Hand, LayoutGrid, Mic, TrainFront, Volume2 } from 'lucide-react'
 import type { AdultName, RoutineTask, TimeOfDay } from '../../types';
 import { withGenitive } from '../../utils/turkish';
 import { playFanfare, playPopSound, speakText } from '../../utils/audio';
-import { isMorningTownReady } from '../../domain/town/morningMission';
+import { isMorningTownReady, readMorningTownStep } from '../../domain/town/morningMission';
 import { isAfternoonTownReady, readAfternoonTownStep } from '../../domain/town/afternoonMission';
 import { isParkTownReady, readParkTownStep } from '../../domain/town/parkMission';
 import { selectAfternoonTownScenario } from '../../domain/town/afternoonScenario';
@@ -97,6 +97,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
   const stationInfo = STATIONS.find((item) => item.key === station);
   const nextOpenStation = STATIONS.find((item) => !stationDone(item.key));
   const morningTownReady = isMorningTownReady(tasks);
+  const morningTownCompleted = readMorningTownStep() === 'completed';
   const afternoonTownScenario = selectAfternoonTownScenario();
   const afternoonTownReady = isAfternoonTownReady(tasks);
   const afternoonTownCompleted = readAfternoonTownStep() === 'completed';
@@ -151,7 +152,7 @@ export const TasksHome: React.FC<TasksHomeProps> = ({
         </button>
       </div>
 
-      {morningTownReady && (
+      {morningTownReady && !morningTownCompleted && (
         <section className="gt-town-callout" aria-label="Sincap Köyü görevi hazır">
           <span aria-hidden="true">☀️</span>
           <div>

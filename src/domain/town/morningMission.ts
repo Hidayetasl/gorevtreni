@@ -10,7 +10,9 @@ interface StoredMorningTownMission {
   worldReplayPending?: boolean;
 }
 
-const STORAGE_KEY = 'ruzgar_town_morning_mission_v1';
+// v2: Fırın üstündeki ekmeğe dokunma → Sıpa'nın gidip alması → teşekkür → dönüş.
+// Eski v1 tamamlanma kaydı yeni animasyonu ilk açılışta gizlememeli.
+const STORAGE_KEY = 'ruzgar_town_morning_mission_v2';
 const STEPS: MorningTownStep[] = ['village_started', 'bakery', 'donkey', 'completed'];
 
 export function localDateKey(date = new Date()) {
